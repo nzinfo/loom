@@ -154,7 +154,7 @@ fields:
 
   it('parseFile throws ParseError with the right category', () => {
     try {
-      parseFile(`version: loom-schema/v9\nkind: mixin\nname: X\n`, 'x');
+      parseFile('version: loom-schema/v9\nkind: mixin\nname: X\n', 'x');
       expect.unreachable('should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(ParseError);
@@ -162,14 +162,14 @@ fields:
       expect((e as ParseError).file).toBe('x');
     }
     try {
-      parseFile(`version: loom-schema/v1\nkind: bogus\nname: X\n`, 'x');
+      parseFile('version: loom-schema/v1\nkind: bogus\nname: X\n', 'x');
       expect.unreachable('should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(ParseError);
       expect((e as ParseError).category).toBe('kind');
     }
     try {
-      parseFile(`:\n  - :\n  : bad`, 'x');
+      parseFile(':\n  - :\n  : bad', 'x');
       expect.unreachable('should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(ParseError);

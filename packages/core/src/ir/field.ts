@@ -33,10 +33,7 @@ export function isSingleFieldValueType(vt: ValueTypeNode): boolean {
  * Expand a value_type reference into physical column names.
  * @param prefix the table/entity field name that references the value_type.
  */
-export function expandValueColumns(
-  prefix: string,
-  vt: ValueTypeNode,
-): ExpandedColumn[] {
+export function expandValueColumns(prefix: string, vt: ValueTypeNode): ExpandedColumn[] {
   if (isSingleFieldValueType(vt)) {
     return [{ name: prefix }];
   }

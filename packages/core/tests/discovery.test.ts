@@ -2,8 +2,8 @@
  * Pass 0 — discovery tests. See spec §13.1.
  */
 import { describe, expect, it } from 'vitest';
-import { discover } from '../src/loader/discovery.js';
 import { Diagnostics } from '../src/errors.js';
+import { discover } from '../src/loader/discovery.js';
 import { buildBaseSchemaFs } from './fixtures/base_schema.js';
 import { MemoryFileSystem } from './fixtures/memory_fs.js';
 

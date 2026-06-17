@@ -1,3 +1,5 @@
+import type { Diagnostics } from '../errors.js';
+import type { IR } from '../ir/version.js';
 /**
  * Loader entry. Implements spec §13.1 four-pass pipeline.
  *
@@ -5,8 +7,6 @@
  * will be filled in during writing-plans execution.
  */
 import type { FileSystem } from './fs.js';
-import type { IR } from '../ir/version.js';
-import { Diagnostics } from '../errors.js';
 
 export interface LoadOptions {
   /** Injected FS adapter. Required — core never imports node:fs. */

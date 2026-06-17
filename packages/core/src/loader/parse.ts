@@ -1,6 +1,9 @@
+import type { FileSystem } from './fs.js';
 import type { Diagnostics } from '../errors.js';
-import { type AnyFile, ParseError, parseFile } from '../ir/schemas.js';
 import type { DiscoveredEntry } from './discovery.js';
+import type { AnyFile } from '../ir/schemas.js';
+import { ParseError, parseFile } from '../ir/schemas.js';
+
 /**
  * Pass 1 — parse. See spec §13.1.
  *
@@ -8,8 +11,6 @@ import type { DiscoveredEntry } from './discovery.js';
  * Failures become `parse` (or `version`) diagnostics; the file is dropped
  * from the parsed map but does not abort the pass.
  */
-import type { FileSystem } from './fs.js';
-
 export interface ParseOptions {
   readonly fs: FileSystem;
   readonly files: ReadonlyMap<string, DiscoveredEntry>;
@@ -23,6 +24,7 @@ export interface ParseResult {
 
 export async function parseAll(opts: ParseOptions): Promise<ParseResult> {
   const parsed = new Map<string, AnyFile>();
+  const decoder = new TextDecoder('utf-8');
   for (const [identity, entry] of opts.files) {
     let bytes: Uint8Array;
     try {
@@ -37,7 +39,7 @@ export async function parseAll(opts: ParseOptions): Promise<ParseResult> {
       });
       continue;
     }
-    const text = Buffer.from(bytes).toString('utf-8');
+    const text = decoder.decode(bytes);
     try {
       const f = parseFile(text, entry.path);
       parsed.set(identity, f);

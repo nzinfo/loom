@@ -16,8 +16,8 @@
  *   64 usage error
  */
 import process from 'node:process';
-import { versionCommand } from './commands/version.js';
 import { checkCommand } from './commands/check.js';
+import { versionCommand } from './commands/version.js';
 
 function usage(): void {
   process.stderr.write(`usage: loom <command> [options]

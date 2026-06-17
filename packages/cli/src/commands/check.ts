@@ -1,9 +1,9 @@
-/** `loom check` — load + validate. See spec §8.7. */
-import { load, type FileSystem } from '@loom/core';
-import * as fs from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
+import * as fs from 'node:fs/promises';
 import process from 'node:process';
 import { createInterface } from 'node:readline';
+/** `loom check` — load + validate. See spec §8.7. */
+import { type FileSystem, load } from '@loom/core';
 
 /** Node.js FileSystem adapter implementing @loom/core's FileSystem interface. */
 class NodeFileSystem implements FileSystem {
@@ -26,7 +26,10 @@ class NodeFileSystem implements FileSystem {
         const full = `${current}/${entry.name}`;
         if (entry.isDirectory()) {
           stack.push(full);
-        } else if (entry.isFile() && (entry.name.endsWith('.yaml') || entry.name.endsWith('.yml'))) {
+        } else if (
+          entry.isFile() &&
+          (entry.name.endsWith('.yaml') || entry.name.endsWith('.yml'))
+        ) {
           yield full;
         }
       }

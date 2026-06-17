@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  expandValueColumns,
-  isSingleFieldValueType,
-  type ValueTypeNode,
-} from '../src/ir/field.js';
+import { type ValueTypeNode, expandValueColumns, isSingleFieldValueType } from '../src/ir/field.js';
 
 describe('field expansion', () => {
   const email: ValueTypeNode = {
@@ -36,10 +32,7 @@ describe('field expansion', () => {
 
   it('expands a multi-field ref as prefix_fieldname columns', () => {
     const cols = expandValueColumns('balance', money);
-    expect(cols).toEqual([
-      { name: 'balance_amount' },
-      { name: 'balance_currency_code' },
-    ]);
+    expect(cols).toEqual([{ name: 'balance_amount' }, { name: 'balance_currency_code' }]);
   });
 
   it('rejects single-field value_type whose field name is not "value"', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CURRENT_VERSION, FORMAT_FAMILY, FORMAT_VERSION, FILE_KIND } from '../src/index.js';
+import { CURRENT_VERSION, FILE_KIND, FORMAT_FAMILY, FORMAT_VERSION } from '../src/index.js';
 
 describe('format version', () => {
   it('exposes the expected family and version', () => {

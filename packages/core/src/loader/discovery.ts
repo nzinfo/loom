@@ -1,3 +1,5 @@
+import type { Diagnostics } from '../errors.js';
+import { type DiscoveredFile, pathToIdentity } from '../ir/paths.js';
 /**
  * Pass 0 — discovery. See spec §13.1.
  *
@@ -6,8 +8,6 @@
  * layout emit an `identity` diagnostic but do not abort the walk.
  */
 import type { FileSystem } from './fs.js';
-import type { Diagnostics } from '../errors.js';
-import { pathToIdentity, type DiscoveredFile } from '../ir/paths.js';
 
 export interface DiscoveredEntry {
   readonly identity: string;
@@ -56,7 +56,11 @@ export async function discover(opts: DiscoverOptions): Promise<DiscoveryResult> 
       });
       continue;
     }
-    if (opts.systemFilter !== undefined && meta.system !== '' && !opts.systemFilter.includes(meta.system)) {
+    if (
+      opts.systemFilter !== undefined &&
+      meta.system !== '' &&
+      !opts.systemFilter.includes(meta.system)
+    ) {
       continue;
     }
     if (files.has(meta.identity)) {
