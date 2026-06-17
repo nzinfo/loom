@@ -1,6 +1,6 @@
 import type { Diagnostics } from '../errors.js';
+import type { BaseTypes, Entity, ExtensionFields, Table } from '../ir/schemas.js';
 import type { IR } from '../ir/version.js';
-import type { BaseTypes, Table, ExtensionFields, Entity } from '../ir/schemas.js';
 
 /**
  * Pass 3 — semantic validation. See spec §13.1, §10, §6.9, §7.5.

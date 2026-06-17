@@ -1,3 +1,4 @@
+import type { Entity } from '../ir/schemas.js';
 /**
  * Sidecar EAV pivot view generator. See spec §7.4.
  *
@@ -12,10 +13,7 @@
  * Dialect layers render PivotView into actual CREATE VIEW SQL.
  */
 import type { IR } from '../ir/version.js';
-import type { Entity } from '../ir/schemas.js';
-import type {
-  PhysicalModel,
-} from './types.js';
+import type { PhysicalModel } from './types.js';
 
 /** Which ext-table value column holds a given scalar. Spec §7.3. */
 const EAV_COLUMN_BY_SCALAR: Record<string, string> = {
@@ -65,8 +63,10 @@ export function buildPivotViews(model: PhysicalModel, ir: IR): PivotView[] {
     let entityId: string | undefined;
     for (const [eid, ptId] of entityToTable) {
       const ptNode = ir.nodes.get(ptId);
-      if (ptNode?.identity === `table:${table.name.replace(/_base$/, '')}` ||
-          ptNode?.identity.endsWith(`.${table.name}`)) {
+      if (
+        ptNode?.identity === `table:${table.name.replace(/_base$/, '')}` ||
+        ptNode?.identity.endsWith(`.${table.name}`)
+      ) {
         entityId = eid;
         break;
       }

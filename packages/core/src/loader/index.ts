@@ -1,13 +1,13 @@
+import { Diagnostics } from '../errors.js';
+import type { IR } from '../ir/version.js';
+import { CURRENT_VERSION } from '../ir/version.js';
+import { discover } from './discovery.js';
 /**
  * Loader entry. Implements spec §13.1 four-pass pipeline.
  */
 import type { FileSystem } from './fs.js';
-import type { IR } from '../ir/version.js';
-import { CURRENT_VERSION } from '../ir/version.js';
-import { Diagnostics } from '../errors.js';
-import { discover } from './discovery.js';
-import { parseAll } from './parse.js';
 import { link } from './link.js';
+import { parseAll } from './parse.js';
 import { validate } from './validate.js';
 
 export interface LoadOptions {

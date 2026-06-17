@@ -1,9 +1,9 @@
 import type { Diagnostics } from '../errors.js';
-import type { Identity, IR, IRNode } from '../ir/version.js';
+import { parseRef } from '../ir/refs.js';
 import type { AnyFile } from '../ir/schemas.js';
+import type { IR, IRNode, Identity } from '../ir/version.js';
 import type { FileKind } from '../ir/version.js';
 import { CURRENT_VERSION } from '../ir/version.js';
-import { parseRef } from '../ir/refs.js';
 
 /**
  * Pass 2 — link. See spec §13.1, §12.
@@ -216,6 +216,11 @@ function safeParseRef(
   }
 }
 
-function refToIdentity(r: { kind: FileKind; system: string; module: string; name: string }): string {
+function refToIdentity(r: {
+  kind: FileKind;
+  system: string;
+  module: string;
+  name: string;
+}): string {
   return `${r.kind}:${r.system}.${r.module}.${r.name}`;
 }

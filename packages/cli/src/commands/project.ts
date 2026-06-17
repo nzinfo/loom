@@ -1,11 +1,11 @@
+import { createWriteStream } from 'node:fs';
+import type { Dirent } from 'node:fs';
+import * as fs from 'node:fs/promises';
 /** `loom project sql --dialect <pg|mysql|sqlite> [--out <file>] <path>`. See spec §8.8. */
 import process from 'node:process';
-import { createWriteStream } from 'node:fs';
-import { Writable } from 'node:stream';
+import type { Writable } from 'node:stream';
 import { load, projectSqlFromIr } from '@loom/core';
 import type { Dialect, FileSystem } from '@loom/core';
-import * as fs from 'node:fs/promises';
-import type { Dirent } from 'node:fs';
 
 class NodeFileSystem implements FileSystem {
   async readFile(path: string): Promise<Uint8Array> {
@@ -25,7 +25,8 @@ class NodeFileSystem implements FileSystem {
       for (const entry of entries) {
         const full = `${current}/${entry.name}`;
         if (entry.isDirectory()) stack.push(full);
-        else if (entry.isFile() && (entry.name.endsWith('.yaml') || entry.name.endsWith('.yml'))) yield full;
+        else if (entry.isFile() && (entry.name.endsWith('.yaml') || entry.name.endsWith('.yml')))
+          yield full;
       }
     }
   }

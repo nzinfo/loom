@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
 import { load } from '../src/loader/index.js';
 import { projectSqlFromIr } from '../src/projector/sql.js';
 import { buildBaseSchemaFs } from './fixtures/base_schema.js';

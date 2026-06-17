@@ -7,17 +7,17 @@
  * This is the core of the Loom projection engine.
  */
 
+import { type ValueTypeNode, expandValueColumns, isSingleFieldValueType } from '../ir/field.js';
+import type { ExtensionFields, Table, ValueType } from '../ir/schemas.js';
 import type { IR, IRNode } from '../ir/version.js';
-import type { Table, ValueType, ExtensionFields } from '../ir/schemas.js';
 import type {
+  ExtensionFieldEntry,
+  PhysicalColumn,
+  PhysicalForeignKey,
+  PhysicalIndex,
   PhysicalModel,
   PhysicalTable,
-  PhysicalColumn,
-  PhysicalIndex,
-  PhysicalForeignKey,
-  ExtensionFieldEntry,
 } from './types.js';
-import { isSingleFieldValueType, expandValueColumns, type ValueTypeNode } from '../ir/field.js';
 
 /**
  * Main entry point: project a design IR to a physical model.
@@ -120,10 +120,10 @@ function expandTable(
 function extractPhysicalSchema(node: IRNode & { kind: 'table' }, ir: IR): string {
   // Identity format: table:<system>.<module>.<Name>
   const identityParts = node.identity.split(':');
-  const qualifiedName = identityParts[1]!; // <system>.<module>.<Name>
-  const parts = qualifiedName.split('.');
-  const system = parts[0]!;
-  const module = parts[1]!;
+  const qualifiedName = identityParts[1]; // <system>.<module>.<Name>
+  const parts = (qualifiedName ?? '').split('.');
+  const system = parts[0] ?? '';
+  const module = parts[1] ?? '';
   const manifestIdentity = `module_manifest:${system}.${module}`;
   const manifestNode = ir.nodes.get(manifestIdentity);
 
@@ -163,7 +163,10 @@ function resolveFields(
         throw new Error(`Expected mixin, got ${mixinNode.kind}`);
       }
       // Recursively resolve the mixin's fields.
-      const mixinFields = resolveFields(mixinNode.data.fields as ReadonlyArray<Record<string, unknown>>, ir);
+      const mixinFields = resolveFields(
+        mixinNode.data.fields as ReadonlyArray<Record<string, unknown>>,
+        ir,
+      );
       resolved.push(...mixinFields);
     } else {
       resolved.push(fRec);
@@ -283,7 +286,16 @@ function expandField(
  */
 function extractProperties(field: Record<string, unknown>): Record<string, unknown> {
   const props: Record<string, unknown> = {};
-  const skipKeys = new Set(['name', 'base', 'ref', 'required', 'unique', 'default', 'include', 'default_scope']);
+  const skipKeys = new Set([
+    'name',
+    'base',
+    'ref',
+    'required',
+    'unique',
+    'default',
+    'include',
+    'default_scope',
+  ]);
 
   for (const [k, v] of Object.entries(field)) {
     if (!skipKeys.has(k)) {

@@ -5,11 +5,11 @@
  * views for sidecar_eav tables, and dispatches to the requested dialect.
  */
 import type { IR } from '../ir/version.js';
+import { projectMysql } from './dialects/mysql.js';
+import { projectPg } from './dialects/pg.js';
+import { projectSqlite } from './dialects/sqlite.js';
 import { expandTables } from './expand.js';
 import { buildPivotViews } from './views.js';
-import { projectPg } from './dialects/pg.js';
-import { projectMysql } from './dialects/mysql.js';
-import { projectSqlite } from './dialects/sqlite.js';
 
 export type Dialect = 'pg' | 'mysql' | 'sqlite';
 

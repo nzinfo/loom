@@ -9,9 +9,9 @@
  *   64 usage error
  */
 import process from 'node:process';
-import { versionCommand } from './commands/version.js';
 import { checkCommand } from './commands/check.js';
 import { projectCommand } from './commands/project.js';
+import { versionCommand } from './commands/version.js';
 
 function usage(): void {
   process.stderr.write(`usage: loom <command> [options]
@@ -25,7 +25,10 @@ commands:
 `);
 }
 
-function parseFlag(rest: readonly string[], name: string): { value: string | undefined; remaining: string[] } {
+function parseFlag(
+  rest: readonly string[],
+  name: string,
+): { value: string | undefined; remaining: string[] } {
   const idx = rest.indexOf(name);
   if (idx < 0) return { value: undefined, remaining: [...rest] };
   const value = rest[idx + 1];

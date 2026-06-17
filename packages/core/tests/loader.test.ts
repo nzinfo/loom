@@ -13,7 +13,8 @@ describe('load (end-to-end)', () => {
 
   it('surfaces discovery errors via diagnostics', async () => {
     const fs = new MemoryFileSystem({
-      'systems/base/core/garbage/x.yaml': `version: loom-schema/v1\nkind: mixin\nname: X\nfields:\n  - name: a\n    base: string\n`,
+      'systems/base/core/garbage/x.yaml':
+        'version: loom-schema/v1\nkind: mixin\nname: X\nfields:\n  - name: a\n    base: string\n',
     });
     const result = await load({ fs, basePath: '' });
     expect(result.diagnostics.hasErrors).toBe(true);
@@ -21,8 +22,10 @@ describe('load (end-to-end)', () => {
 
   it('respects systemFilter', async () => {
     const fs = new MemoryFileSystem({
-      'systems/base/core/mixin/a.yaml': `version: loom-schema/v1\nkind: mixin\nname: A\nfields:\n  - name: x\n    base: string\n`,
-      'systems/retail/core/mixin/b.yaml': `version: loom-schema/v1\nkind: mixin\nname: B\nfields:\n  - name: y\n    base: string\n`,
+      'systems/base/core/mixin/a.yaml':
+        'version: loom-schema/v1\nkind: mixin\nname: A\nfields:\n  - name: x\n    base: string\n',
+      'systems/retail/core/mixin/b.yaml':
+        'version: loom-schema/v1\nkind: mixin\nname: B\nfields:\n  - name: y\n    base: string\n',
     });
     const result = await load({ fs, basePath: '', systemFilter: ['base'] });
     expect(result.diagnostics.hasErrors).toBe(false);

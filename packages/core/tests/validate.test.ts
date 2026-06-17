@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { Diagnostics } from '../src/errors.js';
 import { discover } from '../src/loader/discovery.js';
-import { parseAll } from '../src/loader/parse.js';
 import { link } from '../src/loader/link.js';
+import { parseAll } from '../src/loader/parse.js';
 import { validate } from '../src/loader/validate.js';
 import { buildBaseSchemaFs } from './fixtures/base_schema.js';
 import { MemoryFileSystem } from './fixtures/memory_fs.js';
-import { Diagnostics } from '../src/errors.js';
 
 async function runValidate(fs: ReturnType<typeof buildBaseSchemaFs>) {
   const diag = new Diagnostics();
@@ -38,7 +38,9 @@ fields:
 `,
     });
     const { diagnostics } = await runValidate(fs);
-    expect(diagnostics.errors.some((e) => e.category === 'schema' && /unknown scalar/.test(e.message))).toBe(true);
+    expect(
+      diagnostics.errors.some((e) => e.category === 'schema' && /unknown scalar/.test(e.message)),
+    ).toBe(true);
   });
 
   it('flags primary_key field that is not required', async () => {
@@ -71,7 +73,9 @@ primary_key: [id]
 `,
     });
     const { diagnostics } = await runValidate(fs);
-    expect(diagnostics.errors.some((e) => e.category === 'semantic' && /primary_key/.test(e.message))).toBe(true);
+    expect(
+      diagnostics.errors.some((e) => e.category === 'semantic' && /primary_key/.test(e.message)),
+    ).toBe(true);
   });
 
   it('flags extension_fields targeting a non-sidecar entity', async () => {
@@ -118,7 +122,9 @@ fields:
 `,
     });
     const { diagnostics } = await runValidate(fs);
-    expect(diagnostics.errors.some((e) => e.category === 'semantic' && /sidecar_eav/.test(e.message))).toBe(true);
+    expect(
+      diagnostics.errors.some((e) => e.category === 'semantic' && /sidecar_eav/.test(e.message)),
+    ).toBe(true);
   });
 
   it('validates scalar property presence (decimal requires precision/scale)', async () => {
@@ -144,6 +150,8 @@ fields:
 `,
     });
     const { diagnostics } = await runValidate(fs);
-    expect(diagnostics.errors.some((e) => e.category === 'schema' && /precision/.test(e.message))).toBe(true);
+    expect(
+      diagnostics.errors.some((e) => e.category === 'schema' && /precision/.test(e.message)),
+    ).toBe(true);
   });
 });

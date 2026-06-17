@@ -10,7 +10,14 @@ describe('projector expand', () => {
     const users = phys.tables.find((t) => t.name === 'users_base');
     expect(users).toBeDefined();
     expect(users?.columns.map((c) => c.name)).toEqual(
-      expect.arrayContaining(['id', 'created_at', 'updated_at', 'email', 'balance_amount', 'balance_currency_code']),
+      expect.arrayContaining([
+        'id',
+        'created_at',
+        'updated_at',
+        'email',
+        'balance_amount',
+        'balance_currency_code',
+      ]),
     );
   });
 

@@ -3,7 +3,11 @@ import { projectCommand } from '../src/commands/project.js';
 
 describe('loom project sql', () => {
   it('returns usage error when dialect missing', async () => {
-    const code = await projectCommand({ path: '/tmp/whatever', dialect: undefined, out: undefined });
+    const code = await projectCommand({
+      path: '/tmp/whatever',
+      dialect: undefined,
+      out: undefined,
+    });
     expect(code).toBe(64);
   });
 

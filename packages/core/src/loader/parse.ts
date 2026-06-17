@@ -1,8 +1,8 @@
-import type { FileSystem } from './fs.js';
 import type { Diagnostics } from '../errors.js';
-import type { DiscoveredEntry } from './discovery.js';
 import type { AnyFile } from '../ir/schemas.js';
 import { ParseError, parseFile } from '../ir/schemas.js';
+import type { DiscoveredEntry } from './discovery.js';
+import type { FileSystem } from './fs.js';
 
 /**
  * Pass 1 — parse. See spec §13.1.
