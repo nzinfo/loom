@@ -3,13 +3,15 @@ import type { BaseTypes, Entity, ExtensionFields, Table } from '../ir/schemas.js
 import type { IR } from '../ir/version.js';
 
 /**
- * Pass 3 — semantic validation. See spec §13.1, §10, §6.9, §7.5.
+ * Pass 3 — semantic validation. See spec §13.1, §6.9, §7.5 (v2).
  *
  * Cross-file rules that Zod cannot express:
- *   - every field `base` is a scalar declared in base_types
+ *   - every field `type:` single-segment name is a scalar declared in base_types
  *   - every scalar property flagged required in base_types is present on the field
  *   - table.primary_key entries are all required:true fields
  *   - extension_fields targets an entity whose primary_table is sidecar_eav
+ *
+ * (v2: three-segment value_type refs are validated at the value_type file.)
  */
 export interface ValidateOptions {
   readonly ir: IR;
@@ -34,7 +36,7 @@ export function validate(opts: ValidateOptions): ValidateResult {
       case 'extension_fields': {
         const data = node.data as { fields?: FieldLike[] };
         for (const f of data.fields ?? []) {
-          checkScalarField(identity, f, scalarNames, requiredProps, opts.diagnostics);
+          checkTypedField(identity, f, scalarNames, requiredProps, opts.diagnostics);
         }
         if (node.kind === 'extension_fields') {
           checkExtensionTarget(identity, node.data as ExtensionFields, opts.ir, opts.diagnostics);
@@ -73,7 +75,7 @@ function indexRequiredProps(base: BaseTypes | null): Map<string, Set<string>> {
   return m;
 }
 
-function checkScalarField(
+function checkTypedField(
   identity: string,
   f: FieldLike,
   scalarNames: Set<string>,
@@ -81,19 +83,23 @@ function checkScalarField(
   diag: Diagnostics,
 ): void {
   if (scalarNames.size === 0) return;
-  const base = f.base;
-  if (typeof base !== 'string') return;
-  if (!scalarNames.has(base)) {
+  const typeVal = f.type;
+  if (typeof typeVal !== 'string') return;
+  // Three-segment (value_type ref): skip — validated at the value_type file.
+  if (typeVal.includes('.')) return;
+
+  // Single-segment: must be a known scalar.
+  if (!scalarNames.has(typeVal)) {
     diag.add({
       category: 'schema',
       file: identity,
       line: 1,
       column: 1,
-      message: `unknown scalar type "${base}" (not in base_types)`,
+      message: `unknown scalar type "${typeVal}" (not in base_types)`,
     });
     return;
   }
-  const req = requiredProps.get(base) ?? new Set<string>();
+  const req = requiredProps.get(typeVal) ?? new Set<string>();
   for (const rp of req) {
     if (!(rp in f)) {
       diag.add({
@@ -101,7 +107,7 @@ function checkScalarField(
         file: identity,
         line: 1,
         column: 1,
-        message: `scalar "${base}" requires property "${rp}" (base_types)`,
+        message: `scalar "${typeVal}" requires property "${rp}" (base_types)`,
       });
     }
   }
@@ -120,7 +126,7 @@ function checkTable(
     if (typeof fieldRec.name === 'string' && fieldRec.required === true) {
       requiredFieldNames.add(fieldRec.name);
     }
-    checkScalarField(identity, fieldRec, scalarNames, requiredProps, diag);
+    checkTypedField(identity, fieldRec, scalarNames, requiredProps, diag);
   }
   for (const pk of t.primary_key) {
     if (!requiredFieldNames.has(pk)) {

@@ -155,3 +155,162 @@ fields:
     ).toBe(true);
   });
 });
+
+async function validateFromStringMap(files: Record<string, string>) {
+  const fs = new MemoryFileSystem(files);
+  const diag = new Diagnostics();
+  const { files: discovered } = await discover({ fs, basePath: '', diagnostics: diag });
+  const { parsed } = await parseAll({ fs, files: discovered, diagnostics: diag });
+  const { ir } = await link({ parsed, diagnostics: diag });
+  validate({ ir, diagnostics: diag });
+  return diag;
+}
+
+describe('v2 validate — typed fields', () => {
+  it('reports unknown scalar for a single-segment type not in base_types', async () => {
+    const diag = await validateFromStringMap({
+      'base_types.yaml': `version: loom-schema/v2
+kind: base_types
+scalars:
+  - { name: string, description: s, properties: [] }
+`,
+      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: base
+module: core
+physical_schema: base_core
+`,
+      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+kind: table
+name: Users
+table:
+  name: users
+  extension: { strategy: none }
+fields:
+  - { name: id, type: string, required: true }
+  - { name: age, type: notAScalar }
+primary_key: [id]
+`,
+    });
+
+    expect(diag.hasErrors).toBe(true);
+    expect(
+      diag.errors.some(
+        (d) => d.message.includes('unknown scalar') && d.message.includes('notAScalar'),
+      ),
+    ).toBe(true);
+  });
+
+  it('reports missing required scalar property (decimal needs precision/scale)', async () => {
+    const diag = await validateFromStringMap({
+      'base_types.yaml': `version: loom-schema/v2
+kind: base_types
+scalars:
+  - name: decimal
+    description: d
+    properties:
+      - { name: precision, type: integer, required: true }
+      - { name: scale, type: integer, required: true }
+  - { name: string, description: s, properties: [] }
+`,
+      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: base
+module: core
+physical_schema: base_core
+`,
+      'systems/base/core/value_type/money.yaml': `version: loom-schema/v2
+kind: value_type
+name: Money
+fields:
+  - name: amount
+    type: decimal
+    precision: 18
+`,
+      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+kind: table
+name: Users
+using:
+  - base.core.*
+table:
+  name: users
+  extension: { strategy: none }
+fields:
+  - { name: id, type: string, required: true }
+  - { name: balance, type: Money }
+primary_key: [id]
+`,
+    });
+
+    expect(diag.hasErrors).toBe(true);
+    expect(diag.errors.some((d) => d.message.includes('scale'))).toBe(true);
+  });
+
+  it('passes when a three-segment value_type ref is used (no scalar check on the ref)', async () => {
+    const diag = await validateFromStringMap({
+      'base_types.yaml': `version: loom-schema/v2
+kind: base_types
+scalars:
+  - { name: string, description: s, properties: [] }
+`,
+      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: base
+module: core
+physical_schema: base_core
+`,
+      'systems/base/core/value_type/email.yaml': `version: loom-schema/v2
+kind: value_type
+name: Email
+fields:
+  - { name: value, type: string }
+`,
+      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+kind: table
+name: Users
+using:
+  - base.core.*
+table:
+  name: users
+  extension: { strategy: none }
+fields:
+  - { name: id, type: string, required: true }
+  - { name: email, type: base.core.Email }
+primary_key: [id]
+`,
+    });
+
+    expect(diag.hasErrors).toBe(false);
+  });
+
+  it('still checks primary_key fields are required:true', async () => {
+    const diag = await validateFromStringMap({
+      'base_types.yaml': `version: loom-schema/v2
+kind: base_types
+scalars:
+  - { name: string, description: s, properties: [] }
+`,
+      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: base
+module: core
+physical_schema: base_core
+`,
+      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+kind: table
+name: Users
+table:
+  name: users
+  extension: { strategy: none }
+fields:
+  - { name: id, type: string }
+primary_key: [id]
+`,
+    });
+
+    expect(diag.hasErrors).toBe(true);
+    expect(
+      diag.errors.some((d) => d.message.includes('primary_key') && d.message.includes('required')),
+    ).toBe(true);
+  });
+});
