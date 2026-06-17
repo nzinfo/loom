@@ -265,4 +265,53 @@ primary_key: [id]
     const colNames = users?.columns.map((c) => c.name).sort() ?? [];
     expect(colNames).toEqual(['balance_amount', 'balance_currency_code', 'id']);
   });
+
+  it('records enumRef as the full value_type identity for an enum value_type', async () => {
+    const model = await expandFromStringMap({
+      'base_types.yaml': `version: loom-schema/v2
+kind: base_types
+scalars:
+  - name: enum
+    description: e
+    properties:
+      - { name: values, type: string, required: true }
+  - { name: bigint, description: i, properties: [] }
+`,
+      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: base
+module: core
+physical_schema: base_core
+`,
+      'systems/base/core/value_type/status.yaml': `version: loom-schema/v2
+kind: value_type
+name: Status
+fields:
+  - name: value
+    type: enum
+    values: [active, inactive]
+`,
+      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+kind: table
+name: Users
+using:
+  - base.core.*
+table:
+  name: users
+  extension: { strategy: none }
+fields:
+  - { name: id, type: bigint, required: true }
+  - { name: status, type: Status }
+primary_key: [id]
+`,
+    });
+
+    const users = model.tables.find((t) => t.name === 'users');
+    const statusCol = users?.columns.find((c) => c.name === 'status');
+    expect(statusCol).toBeDefined();
+    // enumRef must be the full identity, not the bare fqn — the enum
+    // registry is keyed by identity and dialect generators look it up.
+    expect(statusCol?.enumRef).toBe('value_type:base.core.Status');
+    expect(model.enums.get('value_type:base.core.Status')).toEqual(['active', 'inactive']);
+  });
 });

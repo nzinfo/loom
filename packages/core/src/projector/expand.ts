@@ -234,7 +234,7 @@ function expandField(
     const props = extractProperties(inner);
     let enumRef: string | undefined;
     if (scalar === 'enum' && Array.isArray(inner.values)) {
-      enumRef = typeVal;
+      enumRef = targetId;
     }
     const result: PhysicalColumn = {
       name: fName,
@@ -258,7 +258,7 @@ function expandField(
       required: f.required === true,
       unique: f.unique === true,
       props: extractProperties(subField),
-      ...(subType === 'enum' && Array.isArray(subField.values) ? { enumRef: typeVal } : {}),
+      ...(subType === 'enum' && Array.isArray(subField.values) ? { enumRef: targetId } : {}),
     };
     return result;
   });
