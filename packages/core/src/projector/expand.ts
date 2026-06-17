@@ -194,102 +194,86 @@ function expandFields(
   return columns;
 }
 
-/**
- * Expand a single field into one or more PhysicalColumns.
- *
- * - Base fields: expand to 1 column (or N if the base is a value_type with multiple fields).
- * - Ref fields to value_types: expand to 1 or N columns based on the value_type.
- * - Ref fields to other kinds (not currently handled).
- *
- * Also records enumRef for single-field enum value_types.
- */
 function expandField(
   f: Record<string, unknown>,
   ir: IR,
   enums: Map<string, ReadonlyArray<string>>,
 ): PhysicalColumn[] {
   const fName = String(f.name);
-  let scalar: string;
-  let props: Record<string, unknown> = {};
-  let enumRef: string | undefined;
+  const typeVal = String(f.type);
 
-  if ('base' in f) {
-    // Direct base scalar (e.g., bigint, string).
-    scalar = String(f.base);
-    props = extractProperties(f);
-  } else if ('ref' in f) {
-    // Reference to a value_type or other construct.
-    const ref = String(f.ref);
-    if (!ref.startsWith('value_type:')) {
-      throw new Error(`Only value_type refs are supported in field expansion, got ${ref}`);
-    }
-    const vtNode = ir.nodes.get(ref);
-    if (!vtNode) {
-      throw new Error(`Value type not found: ${ref}`);
-    }
-    if (vtNode.kind !== 'value_type') {
-      throw new Error(`Expected value_type, got ${vtNode.kind}`);
-    }
-
-    const vt = vtNode.data as ValueType;
-    const vtNodeForField = vt as unknown as ValueTypeNode;
-
-    // For single-field value_types, expose the inner field's base.
-    if (isSingleFieldValueType(vtNodeForField)) {
-      const inner = vt.fields[0] as Record<string, unknown>;
-      scalar = String(inner.base);
-      props = extractProperties(inner);
-      // If the inner field is an enum, record the reference.
-      if (scalar === 'enum' && 'values' in inner) {
-        const values = inner.values;
-        if (Array.isArray(values)) {
-          enumRef = ref; // The value_type identity.
-        }
-      }
-    } else {
-      // Multi-field value_type: create a column for each sub-field.
-      const expanded = expandValueColumns(fName, vtNodeForField);
-      return expanded.map((col, idx) => {
-        // Find the corresponding sub-field to get its base and properties.
-        const subField = vt.fields[idx] as Record<string, unknown>;
-        const result: PhysicalColumn = {
-          name: col.name,
-          scalar: String(subField.base),
-          required: f.required === true,
-          unique: f.unique === true,
-          props: extractProperties(subField),
-          ...(subField.base === 'enum' && Array.isArray(subField.values) ? { enumRef: ref } : {}),
-        };
-        return result;
-      });
-    }
-  } else {
-    throw new Error(`Field must have 'base' or 'ref': ${JSON.stringify(f)}`);
+  // Single-segment: direct base_types scalar.
+  if (!typeVal.includes('.')) {
+    const result: PhysicalColumn = {
+      name: fName,
+      scalar: typeVal,
+      required: f.required === true,
+      unique: f.unique === true,
+      props: extractProperties(f),
+    };
+    return [result];
   }
 
-  // Single-field case (base or single-field value_type ref).
-  const result: PhysicalColumn = {
-    name: fName,
-    scalar,
-    required: f.required === true,
-    unique: f.unique === true,
-    props,
-    ...(enumRef !== undefined ? { enumRef: enumRef } : {}),
-  };
-  return [result];
+  // Three-segment: value_type reference. Link pass verified existence + kind
+  // and rewrote short-name matches to their fqn, so typeVal is `sys.mod.Name`.
+  const targetId = `value_type:${typeVal}`;
+  const vtNode = ir.nodes.get(targetId);
+  if (!vtNode) {
+    throw new Error(`Value type not found: ${targetId}`);
+  }
+  if (vtNode.kind !== 'value_type') {
+    throw new Error(`Expected value_type, got ${vtNode.kind} for ${targetId}`);
+  }
+
+  const vt = vtNode.data as ValueType;
+  const vtNodeForField = vt as unknown as ValueTypeNode;
+
+  if (isSingleFieldValueType(vtNodeForField)) {
+    const inner = vt.fields[0] as Record<string, unknown>;
+    const scalar = String(inner.type);
+    const props = extractProperties(inner);
+    let enumRef: string | undefined;
+    if (scalar === 'enum' && Array.isArray(inner.values)) {
+      enumRef = typeVal;
+    }
+    const result: PhysicalColumn = {
+      name: fName,
+      scalar,
+      required: f.required === true,
+      unique: f.unique === true,
+      props,
+      ...(enumRef !== undefined ? { enumRef } : {}),
+    };
+    return [result];
+  }
+
+  // Multi-field value_type: one column per subfield.
+  const expanded = expandValueColumns(fName, vtNodeForField);
+  return expanded.map((col, idx) => {
+    const subField = vt.fields[idx] as Record<string, unknown>;
+    const subType = String(subField.type);
+    const result: PhysicalColumn = {
+      name: col.name,
+      scalar: subType,
+      required: f.required === true,
+      unique: f.unique === true,
+      props: extractProperties(subField),
+      ...(subType === 'enum' && Array.isArray(subField.values) ? { enumRef: typeVal } : {}),
+    };
+    return result;
+  });
 }
 
 /**
  * Extract scalar properties from a field object (e.g., max_length, precision, scale).
  *
- * Skips known structural keys like 'name', 'base', 'ref', 'required', 'unique', 'default', 'include'.
+ * Skips known structural keys like 'name', 'type', 'required', 'unique', 'default', 'include'.
  */
 function extractProperties(field: Record<string, unknown>): Record<string, unknown> {
   const props: Record<string, unknown> = {};
   const skipKeys = new Set([
     'name',
-    'base',
-    'ref',
+    'type',
     'required',
     'unique',
     'default',
@@ -307,7 +291,7 @@ function extractProperties(field: Record<string, unknown>): Record<string, unkno
 }
 
 /**
- * Collect enum values from value_types with base='enum'.
+ * Collect enum values from value_types with type="enum".
  *
  * Populates the `enums` registry: identity → values array.
  */
@@ -316,10 +300,10 @@ function collectEnums(ir: IR, enums: Map<string, ReadonlyArray<string>>): void {
     if (node.kind !== 'value_type') continue;
 
     const vt = node.data as ValueType;
-    // Check if the first field has base='enum'.
+    // Check if the first field has type="enum".
     if (vt.fields.length === 1) {
       const first = vt.fields[0] as Record<string, unknown>;
-      if (first.base === 'enum' && Array.isArray(first.values)) {
+      if (first.type === 'enum' && Array.isArray(first.values)) {
         enums.set(identity, first.values as ReadonlyArray<string>);
       }
     }
@@ -348,26 +332,24 @@ function collectExtensionFields(
       // Skip include entries (they're handled at parse time)
       if ('include' in fRec) continue;
 
-      // Handle ref fields
-      if ('ref' in fRec) {
+      const typeVal = String(fRec.type);
+      if (typeVal.includes('.')) {
         const entry: ExtensionFieldEntry = {
           name: String(fRec.name),
           scalar: '',
-          refValueTypeId: String(fRec.ref),
-          props: extractProperties(fRec),
-          ...(fRec.default_scope !== undefined ? { defaultScope: String(fRec.default_scope) } : {}),
-        };
-        entries.push(entry);
-      } else if ('base' in fRec) {
-        const entry: ExtensionFieldEntry = {
-          name: String(fRec.name),
-          scalar: String(fRec.base),
+          refValueTypeId: `value_type:${typeVal}`,
           props: extractProperties(fRec),
           ...(fRec.default_scope !== undefined ? { defaultScope: String(fRec.default_scope) } : {}),
         };
         entries.push(entry);
       } else {
-        throw new Error(`Extension field must have 'base' or 'ref': ${JSON.stringify(fRec)}`);
+        const entry: ExtensionFieldEntry = {
+          name: String(fRec.name),
+          scalar: typeVal,
+          props: extractProperties(fRec),
+          ...(fRec.default_scope !== undefined ? { defaultScope: String(fRec.default_scope) } : {}),
+        };
+        entries.push(entry);
       }
     }
 
