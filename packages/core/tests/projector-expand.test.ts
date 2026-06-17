@@ -54,19 +54,19 @@ describe('projector expand', () => {
   it('produces no ext columns for strategy=none', async () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
-      'base_types.yaml': `version: loom-schema/v1
+      'base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - name: bigint
     properties: []
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v1
+      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/table/t.yaml': `version: loom-schema/v1
+      'systems/base/core/table/t.yaml': `version: loom-schema/v2
 kind: table
 name: T
 table:
@@ -75,7 +75,7 @@ table:
     strategy: none
 fields:
   - name: id
-    base: bigint
+    type: bigint
     required: true
 primary_key: [id]
 `,
@@ -90,7 +90,7 @@ primary_key: [id]
   it('exposes enum registry keyed by value_type identity (spec §11)', async () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
-      'base_types.yaml': `version: loom-schema/v1
+      'base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - name: enum
@@ -99,18 +99,18 @@ scalars:
         type: array<string>
         required: true
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v1
+      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/value_type/status.yaml': `version: loom-schema/v1
+      'systems/base/core/value_type/status.yaml': `version: loom-schema/v2
 kind: value_type
 name: Status
 fields:
   - name: value
-    base: enum
+    type: enum
     values: [active, inactive]
 `,
     });

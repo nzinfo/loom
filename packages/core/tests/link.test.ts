@@ -36,7 +36,7 @@ describe('link (Pass 2)', () => {
   it('reports dangling refs', async () => {
     const fs = new MemoryFileSystem({
       'systems/base/core/mixin/a.yaml':
-        'version: loom-schema/v1\nkind: mixin\nname: A\nfields:\n  - name: x\n    ref: value_type:base.core.DoesNotExist\n',
+        'version: loom-schema/v2\nkind: mixin\nname: A\nfields:\n  - name: x\n    type: base.core.DoesNotExist\n',
     });
     const { diagnostics } = await runLink(fs);
     expect(diagnostics.hasErrors).toBe(true);
@@ -46,7 +46,9 @@ describe('link (Pass 2)', () => {
   it('reports kind_mismatch when ref points at wrong kind', async () => {
     const fs = new MemoryFileSystem({
       'systems/base/core/mixin/a.yaml':
-        'version: loom-schema/v1\nkind: mixin\nname: A\nfields:\n  - name: x\n    ref: entity:base.core.Whatever\n',
+        'version: loom-schema/v2\nkind: mixin\nname: A\nfields:\n  - name: x\n    type: base.core.Users\n',
+      'systems/base/core/table/users.yaml':
+        'version: loom-schema/v2\nkind: table\nname: Users\ntable:\n  name: users\n  extension:\n    strategy: none\nfields:\n  - name: id\n    type: string\n    required: true\nprimary_key: [id]\n',
     });
     const { diagnostics } = await runLink(fs);
     expect(diagnostics.errors.some((e) => e.category === 'kind_mismatch')).toBe(true);
@@ -55,9 +57,9 @@ describe('link (Pass 2)', () => {
   it('reports mixin cycles', async () => {
     const fs = new MemoryFileSystem({
       'systems/base/core/mixin/a.yaml':
-        'version: loom-schema/v1\nkind: mixin\nname: A\nfields:\n  - include: mixin:base.core.B\n  - name: xa\n    base: string\n',
+        'version: loom-schema/v2\nkind: mixin\nname: A\nfields:\n  - include: mixin:base.core.B\n  - name: xa\n    type: string\n',
       'systems/base/core/mixin/b.yaml':
-        'version: loom-schema/v1\nkind: mixin\nname: B\nfields:\n  - include: mixin:base.core.A\n  - name: xb\n    base: string\n',
+        'version: loom-schema/v2\nkind: mixin\nname: B\nfields:\n  - include: mixin:base.core.A\n  - name: xb\n    type: string\n',
     });
     const { diagnostics } = await runLink(fs);
     expect(diagnostics.errors.some((e) => e.category === 'cycle')).toBe(true);

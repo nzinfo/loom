@@ -23,18 +23,18 @@ describe('validate (Pass 3)', () => {
 
   it('flags unknown scalar base', async () => {
     const fs = new MemoryFileSystem({
-      'base_types.yaml': `version: loom-schema/v1
+      'base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - name: string
     properties: []
 `,
-      'systems/base/core/mixin/a.yaml': `version: loom-schema/v1
+      'systems/base/core/mixin/a.yaml': `version: loom-schema/v2
 kind: mixin
 name: A
 fields:
   - name: x
-    base: not_a_scalar
+    type: not_a_scalar
 `,
     });
     const { diagnostics } = await runValidate(fs);
@@ -45,7 +45,7 @@ fields:
 
   it('flags primary_key field that is not required', async () => {
     const fs = new MemoryFileSystem({
-      'base_types.yaml': `version: loom-schema/v1
+      'base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - name: bigint
@@ -53,13 +53,13 @@ scalars:
   - name: string
     properties: []
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v1
+      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/table/t.yaml': `version: loom-schema/v1
+      'systems/base/core/table/t.yaml': `version: loom-schema/v2
 kind: table
 name: T
 table:
@@ -68,7 +68,7 @@ table:
     strategy: none
 fields:
   - name: id
-    base: bigint
+    type: bigint
 primary_key: [id]
 `,
     });
@@ -80,7 +80,7 @@ primary_key: [id]
 
   it('flags extension_fields targeting a non-sidecar entity', async () => {
     const fs = new MemoryFileSystem({
-      'base_types.yaml': `version: loom-schema/v1
+      'base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - name: bigint
@@ -88,13 +88,13 @@ scalars:
   - name: string
     properties: []
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v1
+      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/table/t.yaml': `version: loom-schema/v1
+      'systems/base/core/table/t.yaml': `version: loom-schema/v2
 kind: table
 name: T
 table:
@@ -103,21 +103,21 @@ table:
     strategy: none
 fields:
   - name: id
-    base: bigint
+    type: bigint
     required: true
 primary_key: [id]
 `,
-      'systems/base/core/entity/t.yaml': `version: loom-schema/v1
+      'systems/base/core/entity/t.yaml': `version: loom-schema/v2
 kind: entity
 name: T
 primary_table: table:base.core.T
 `,
-      'systems/base/core/extension/t_fields.yaml': `version: loom-schema/v1
+      'systems/base/core/extension/t_fields.yaml': `version: loom-schema/v2
 kind: extension_fields
 entity: entity:base.core.T
 fields:
   - name: note
-    base: string
+    type: string
     max_length: 10
 `,
     });
@@ -129,7 +129,7 @@ fields:
 
   it('validates scalar property presence (decimal requires precision/scale)', async () => {
     const fs = new MemoryFileSystem({
-      'base_types.yaml': `version: loom-schema/v1
+      'base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - name: decimal
@@ -141,12 +141,12 @@ scalars:
         type: integer
         required: true
 `,
-      'systems/base/core/mixin/a.yaml': `version: loom-schema/v1
+      'systems/base/core/mixin/a.yaml': `version: loom-schema/v2
 kind: mixin
 name: A
 fields:
   - name: x
-    base: decimal
+    type: decimal
 `,
     });
     const { diagnostics } = await runValidate(fs);

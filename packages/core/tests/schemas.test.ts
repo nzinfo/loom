@@ -25,8 +25,6 @@ fields:
     expect(f.kind).toBe('mixin');
     const fields = (f.data as { fields: Array<Record<string, unknown>> }).fields;
     expect(fields[0]?.type).toBe('integer');
-    expect((fields[0] as Record<string, unknown>).base).toBeUndefined();
-    expect((fields[0] as Record<string, unknown>).ref).toBeUndefined();
   });
 
   it('accepts a field with type: <three-segment>', () => {
@@ -114,7 +112,7 @@ fields:
 describe('schemas', () => {
   it('parses base_types.yaml', () => {
     const f = parseFile(
-      'version: loom-schema/v1\nkind: base_types\nscalars:\n  - name: string\n    description: s\n    properties:\n      - name: max_length\n        type: integer\n        required: true\n',
+      'version: loom-schema/v2\nkind: base_types\nscalars:\n  - name: string\n    description: s\n    properties:\n      - name: max_length\n        type: integer\n        required: true\n',
       'base_types.yaml',
     );
     expect(f.kind).toBe('base_types');
@@ -122,32 +120,32 @@ describe('schemas', () => {
   });
 
   it('parses a single-field value_type', () => {
-    const src = `version: loom-schema/v1
+    const src = `version: loom-schema/v2
 kind: value_type
 name: Email
 fields:
   - name: value
-    base: string
+    type: string
     max_length: 254
 `;
     const f = parseFile(src, 'systems/base/core/value_type/email.yaml');
     expect(f.kind).toBe('value_type');
     const vt = ValueTypeSchema.parse((f as { raw: unknown }).raw);
-    expect(vt.fields[0]?.base).toBe('string');
+    expect(vt.fields[0]?.type).toBe('string');
   });
 
   it('parses a multi-field value_type with constraints', () => {
-    const src = `version: loom-schema/v1
+    const src = `version: loom-schema/v2
 kind: value_type
 name: Money
 fields:
   - name: amount
-    base: decimal
+    type: decimal
     precision: 18
     scale: 4
     required: true
   - name: currency_code
-    base: string
+    type: string
     max_length: 3
 constraints:
   - kind: check
@@ -158,32 +156,20 @@ constraints:
     expect(() => ValueTypeSchema.parse((f as { raw: unknown }).raw)).not.toThrow();
   });
 
-  it('rejects a field with both base and ref', () => {
-    const src = `version: loom-schema/v1
-kind: value_type
-name: Bad
-fields:
-  - name: x
-    base: string
-    ref: value_type:base.core.Email
-`;
-    expect(() => parseFile(src, 'systems/base/core/value_type/bad.yaml')).toThrow(/base and ref/);
-  });
-
   it('parses a mixin', () => {
-    const src = `version: loom-schema/v1
+    const src = `version: loom-schema/v2
 kind: mixin
 name: Audit
 fields:
   - name: created_at
-    base: datetime
+    type: datetime
     required: true
 `;
     expect(() => MixinSchema.parse((parseFile(src, 'x') as { raw: unknown }).raw)).not.toThrow();
   });
 
   it('parses a table with extension strategy sidecar_eav', () => {
-    const src = `version: loom-schema/v1
+    const src = `version: loom-schema/v2
 kind: table
 name: Users
 table:
@@ -194,7 +180,7 @@ table:
     view: users
 fields:
   - name: id
-    base: bigint
+    type: bigint
     required: true
 primary_key: [id]
 `;
@@ -204,7 +190,7 @@ primary_key: [id]
   });
 
   it('parses an entity referencing a primary_table', () => {
-    const src = `version: loom-schema/v1
+    const src = `version: loom-schema/v2
 kind: entity
 name: User
 primary_table: table:base.core.Users
@@ -215,12 +201,12 @@ business_keys: [email]
   });
 
   it('parses extension_fields', () => {
-    const src = `version: loom-schema/v1
+    const src = `version: loom-schema/v2
 kind: extension_fields
 entity: entity:base.core.User
 fields:
   - name: nickname
-    base: string
+    type: string
     max_length: 50
     default_scope: tenant
 `;
@@ -235,7 +221,7 @@ fields:
   });
 
   it('parseFile rejects unknown kind', () => {
-    expect(() => parseFile('version: loom-schema/v1\nkind: bogus\nname: X\n', 'x')).toThrow(/kind/);
+    expect(() => parseFile('version: loom-schema/v2\nkind: bogus\nname: X\n', 'x')).toThrow(/kind/);
   });
 
   it('AnyFile is a discriminated union by kind', () => {
@@ -261,7 +247,7 @@ fields:
       expect((e as ParseError).file).toBe('x');
     }
     try {
-      parseFile('version: loom-schema/v1\nkind: bogus\nname: X\n', 'x');
+      parseFile('version: loom-schema/v2\nkind: bogus\nname: X\n', 'x');
       expect.unreachable('should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(ParseError);

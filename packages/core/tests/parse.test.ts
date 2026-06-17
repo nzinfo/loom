@@ -35,7 +35,7 @@ describe('parse (Pass 1)', () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
       'systems/base/core/mixin/a.yaml':
-        'version: loom-schema/v1\nkind: mixin\nname: A\nfields:\n  - base: string\n',
+        'version: loom-schema/v2\nkind: mixin\nname: A\nfields:\n  - base: string\n',
     });
     const diag = new Diagnostics();
     const { files } = await discover({ fs, basePath: '', diagnostics: diag });
