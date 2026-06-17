@@ -14,3 +14,4 @@ export * from './ir/paths.js';
 export * from './ir/schemas.js';
 export * from './ir/field.js';
 export * from './loader/discovery.js';
+export * from './loader/parse.js';
