@@ -45,6 +45,18 @@ export class ParseError extends Error {
 const versionSchema = z.literal(CURRENT_VERSION);
 
 /**
+ * Optional per-file type imports. See spec v2 §4.
+ *
+ * Each entry is a string:
+ *   - `<ns>.*`  → import all types from namespace `<ns>` (module wildcard)
+ *   - `<fqtn>`  → import a single type by fully-qualified name
+ *
+ * Default `base.core.*` is implicit (injected by the link pass) and never
+ * written in files.
+ */
+const usingSchema = z.array(z.string().min(1)).optional();
+
+/**
  * A field with a type reference (spec v2 §3).
  *
  * `type:` is the single key. Value is a type name — single-segment
@@ -111,6 +123,7 @@ export const BaseTypesSchema = z
   .object({
     version: versionSchema,
     kind: z.literal('base_types'),
+    using: usingSchema,
     scalars: z
       .array(
         z
@@ -133,6 +146,7 @@ export const ModuleManifestSchema = z
     module: z.string().min(1),
     physical_schema: z.string().min(1),
     description: z.string().optional(),
+    using: usingSchema,
     exports: z.array(z.string().min(1)).optional(),
   })
   .strict();
@@ -144,6 +158,7 @@ export const ValueTypeSchema = z
     name: z.string().min(1),
     display_name: z.string().optional(),
     description: z.string().optional(),
+    using: usingSchema,
     fields: z.array(fieldOrInclude).min(1),
     constraints: z.array(constraintSchema).optional(),
   })
@@ -156,6 +171,7 @@ export const MixinSchema = z
     name: z.string().min(1),
     display_name: z.string().optional(),
     description: z.string().optional(),
+    using: usingSchema,
     fields: z.array(fieldOrInclude).min(1),
   })
   .strict();
@@ -167,6 +183,7 @@ export const TableSchema = z
     name: z.string().min(1),
     display_name: z.string().optional(),
     description: z.string().optional(),
+    using: usingSchema,
     table: z
       .object({
         name: z.string().min(1),
@@ -188,6 +205,7 @@ export const EntitySchema = z
     name: z.string().min(1),
     display_name: z.string().optional(),
     description: z.string().optional(),
+    using: usingSchema,
     primary_table: z.string().min(1),
     business_keys: z.array(z.string().min(1)).optional(),
     audit: z.boolean().optional(),
@@ -199,6 +217,7 @@ export const ExtensionFieldsSchema = z
     version: versionSchema,
     kind: z.literal('extension_fields'),
     entity: z.string().min(1),
+    using: usingSchema,
     fields: z.array(fieldOrInclude).min(1),
   })
   .strict();

@@ -63,6 +63,52 @@ fields:
 `;
     expect(() => parseFile(yaml, 'test.yaml')).toThrow();
   });
+
+  it('accepts an optional using: list on a value_type file', () => {
+    const yaml = `version: loom-schema/v2
+kind: value_type
+name: Order
+using:
+  - base.core.*
+  - retail.pos.types.*
+fields:
+  - name: value
+    type: string
+    max_length: 100
+`;
+    const f = parseFile(yaml, 'test.yaml');
+    const data = f.data as { using?: string[] };
+    expect(data.using).toEqual(['base.core.*', 'retail.pos.types.*']);
+  });
+
+  it('accepts a file with no using: key (default base.core.* is implicit)', () => {
+    const yaml = `version: loom-schema/v2
+kind: value_type
+name: Email
+fields:
+  - name: value
+    type: string
+    max_length: 254
+`;
+    const f = parseFile(yaml, 'test.yaml');
+    const data = f.data as { using?: string[] };
+    expect(data.using).toBeUndefined();
+  });
+
+  it('accepts using: with a single precise name', () => {
+    const yaml = `version: loom-schema/v2
+kind: mixin
+name: M
+using:
+  - base.core.Email
+fields:
+  - name: x
+    type: Email
+`;
+    const f = parseFile(yaml, 'test.yaml');
+    const data = f.data as { using?: string[] };
+    expect(data.using).toEqual(['base.core.Email']);
+  });
 });
 
 describe('schemas', () => {
