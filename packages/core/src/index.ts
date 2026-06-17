@@ -19,3 +19,4 @@ export * from './loader/link.js';
 export * from './loader/validate.js';
 export * from './projector/types.js';
 export * from './projector/expand.js';
+export * from './projector/views.js';
