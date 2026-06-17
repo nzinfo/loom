@@ -1,6 +1,6 @@
 import type { Diagnostics } from '../errors.js';
 import type { BaseTypes, Entity, ExtensionFields, Table } from '../ir/schemas.js';
-import type { IR } from '../ir/version.js';
+import type { FileKind, IR } from '../ir/version.js';
 
 /**
  * Pass 3 — semantic validation. See spec §13.1, §6.9, §7.5 (v2).
@@ -36,7 +36,7 @@ export function validate(opts: ValidateOptions): ValidateResult {
       case 'extension_fields': {
         const data = node.data as { fields?: FieldLike[] };
         for (const f of data.fields ?? []) {
-          checkTypedField(identity, f, scalarNames, requiredProps, opts.diagnostics);
+          checkTypedField(identity, node.kind, f, scalarNames, requiredProps, opts.diagnostics);
         }
         if (node.kind === 'extension_fields') {
           checkExtensionTarget(identity, node.data as ExtensionFields, opts.ir, opts.diagnostics);
@@ -77,6 +77,7 @@ function indexRequiredProps(base: BaseTypes | null): Map<string, Set<string>> {
 
 function checkTypedField(
   identity: string,
+  hostKind: FileKind,
   f: FieldLike,
   scalarNames: Set<string>,
   requiredProps: Map<string, Set<string>>,
@@ -85,6 +86,17 @@ function checkTypedField(
   if (scalarNames.size === 0) return;
   const typeVal = f.type;
   if (typeof typeVal !== 'string') return;
+  // Inline enum is only legal inside a value_type file (spec v2 §6).
+  if (typeVal === 'enum' && hostKind !== 'value_type') {
+    diag.add({
+      category: 'schema',
+      file: identity,
+      line: 1,
+      column: 1,
+      message: `inline enum is not allowed in ${hostKind} (define a value_type and reference it)`,
+    });
+    return;
+  }
   // Three-segment (value_type ref): skip — validated at the value_type file.
   if (typeVal.includes('.')) return;
 
@@ -126,7 +138,7 @@ function checkTable(
     if (typeof fieldRec.name === 'string' && fieldRec.required === true) {
       requiredFieldNames.add(fieldRec.name);
     }
-    checkTypedField(identity, fieldRec, scalarNames, requiredProps, diag);
+    checkTypedField(identity, 'table', fieldRec, scalarNames, requiredProps, diag);
   }
   for (const pk of t.primary_key) {
     if (!requiredFieldNames.has(pk)) {

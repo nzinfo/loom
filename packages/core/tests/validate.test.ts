@@ -313,4 +313,84 @@ primary_key: [id]
       diag.errors.some((d) => d.message.includes('primary_key') && d.message.includes('required')),
     ).toBe(true);
   });
+
+  it('rejects inline enum in a table field (enum must go through value_type)', async () => {
+    const diag = await validateFromStringMap({
+      'base_types.yaml': `version: loom-schema/v2
+kind: base_types
+scalars:
+  - name: enum
+    description: e
+    properties:
+      - { name: values, type: string, required: true }
+  - { name: string, description: s, properties: [] }
+`,
+      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: base
+module: core
+physical_schema: base_core
+`,
+      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+kind: table
+name: Users
+table:
+  name: users
+  extension: { strategy: none }
+fields:
+  - { name: id, type: string, required: true }
+  - name: status
+    type: enum
+    values: [active, inactive]
+primary_key: [id]
+`,
+    });
+
+    expect(diag.hasErrors).toBe(true);
+    expect(diag.errors.some((d) => d.message.includes('inline enum'))).toBe(true);
+  });
+
+  it('allows type: enum inside a value_type file (enum definition)', async () => {
+    const diag = await validateFromStringMap({
+      'base_types.yaml': `version: loom-schema/v2
+kind: base_types
+scalars:
+  - name: enum
+    description: e
+    properties:
+      - { name: values, type: string, required: true }
+  - { name: string, description: s, properties: [] }
+`,
+      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: base
+module: core
+physical_schema: base_core
+`,
+      'systems/base/core/value_type/status.yaml': `version: loom-schema/v2
+kind: value_type
+name: Status
+fields:
+  - name: value
+    type: enum
+    values: [active, inactive]
+`,
+      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+kind: table
+name: Users
+using:
+  - base.core.*
+table:
+  name: users
+  extension: { strategy: none }
+fields:
+  - { name: id, type: string, required: true }
+  - { name: status, type: Status }
+primary_key: [id]
+`,
+    });
+
+    const inlineEnumErrors = diag.errors.filter((d) => d.message.includes('inline enum'));
+    expect(inlineEnumErrors).toEqual([]);
+  });
 });
