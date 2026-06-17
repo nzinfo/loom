@@ -9,3 +9,4 @@ export * from './errors.js';
 export { load } from './loader/index.js';
 export type { LoadOptions, LoadResult } from './loader/index.js';
 export type { FileSystem } from './loader/fs.js';
+export * from './ir/refs.js';
