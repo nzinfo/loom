@@ -18,6 +18,7 @@
 - [第 3 章 第一个 Schema：从 YAML 到 SQL](#第-3-章-第一个-schema从-yaml-到-sql)
 - [第 4 章 base_types：可用标量目录](#第-4-章-base_types可用标量目录)
 - [第 5 章 value_type：语义类型包装](#第-5-章-value_type语义类型包装)
+- [第 5.5 章 using 导入机制](#第-55-章-using-导入机制)
 - [第 6 章 mixin：字段组复用](#第-6-章-mixin字段组复用)
 - [第 7 章 entity 与 module_manifest](#第-7-章-entity-与-module_manifest)
 - [第 8 章 三种扩展策略与 sidecar EAV](#第-8-章-三种扩展策略与-sidecar-eav)
@@ -132,12 +133,14 @@ systems/base/core/entity/user.yaml
 每个文件顶格两行：
 
 ```yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: <entity | table | value_type | mixin | module_manifest | extension_fields | base_types>
 # 之后是该 kind 的内容
 ```
 
 `version` 是 wire 版本号，破坏性变更必须 bump。reader 严格匹配。
+v2（`loom-schema/v2`）引入统一 `type:` 键与 `using` 导入机制，不兼容 v1（详见
+`docs/specs/2026-06-18-loom-v2-type-system.md`）。
 
 ---
 
@@ -158,7 +161,7 @@ touch my-schema/base_types.yaml
 
 ```yaml
 # my-schema/base_types.yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: base_types
 
 scalars:
@@ -180,7 +183,7 @@ scalars:
 
 ```yaml
 # my-schema/systems/base/core/MANIFEST.yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
@@ -194,7 +197,7 @@ description: core module
 
 ```yaml
 # my-schema/systems/base/core/table/users.yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: table
 name: Users
 table:
@@ -203,14 +206,18 @@ table:
     strategy: none
 fields:
   - name: id
-    base: bigint
+    type: bigint
     required: true
   - name: email
-    base: string
+    type: string
     max_length: 254
     required: true
 primary_key: [id]
 ```
+
+v2 用单一 `type:` 键表达字段类型（替代 v1 的 `base` / `ref` 互斥键）：
+单段短名（如 `bigint`、`string`）解析到 base_types 标量；三段全限定名
+（如 `base.core.Email`）解析到 value_type 节点。详见第 5 章。
 
 ### 3.5 校验
 
@@ -256,7 +263,7 @@ entity field 最终都要落到这些标量之一。
   `string` 有 `max_length`），**不绑定方言**
 - 方言映射在投影器里集中管理（`decimal` → PG `NUMERIC(18,4)` / MySQL `DECIMAL(18,4)`
   / SQLite `NUMERIC`）
-- v1 内**不可扩展**：想加新标量，需改 base_types.yaml + 投影器并 bump 版本号
+- v2 内**不可扩展**：想加新标量，需改 base_types.yaml + 投影器并 bump 版本号
 
 ### 4.2 推荐内置标量
 
@@ -290,7 +297,8 @@ scalars:
 ### 4.3 关键约束
 
 - **唯一权威**：value type / table field 引用的 scalar 必须在此声明，否则报
-  `unknown scalar type` 错误
+  `unknown scalar` 错误（v2 把所有字段统一到 `type:` 键，scalar 通过短名或
+  `base.core.<Scalar>` 全限定名引用）
 - **不出现方言**：base_types 不写 `pg: NUMERIC`，由投影器决定
 - **属性有类型**：属性自身用 base_type（递归闭包），保证可校验
 
@@ -310,13 +318,13 @@ value_type 是用户定义的"语义类型"，介于 base_type scalar 和 field 
 
 ```yaml
 # systems/base/core/value_type/email.yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: value_type
 name: Email
 display_name: 邮箱
 fields:
   - name: value
-    base: string
+    type: string
     max_length: 254
 ```
 
@@ -325,27 +333,37 @@ fields:
 ```yaml
 fields:
   - name: email
-    ref: value_type:base.core.Email
+    type: base.core.Email
     required: true
     unique: true
 # → 物理：email VARCHAR(254)
+```
+
+也可以在文件顶部用 `using:` 导入后写短名（详见 §5.5）：
+
+```yaml
+using:
+  - base.core.*
+fields:
+  - name: email
+    type: Email                       # 短名，等价于 base.core.Email
 ```
 
 ### 5.2 多字段 value_type
 
 ```yaml
 # systems/base/core/value_type/money.yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: value_type
 name: Money
 fields:
   - name: amount
-    base: decimal
+    type: decimal
     precision: 18
     scale: 4
     required: true
   - name: currency_code
-    base: string
+    type: string
     max_length: 3
     required: true
 ```
@@ -355,7 +373,7 @@ fields:
 ```yaml
 fields:
   - name: balance
-    ref: value_type:base.core.Money
+    type: base.core.Money
 # → 物理：balance_amount NUMERIC(18,4), balance_currency_code VARCHAR(3)
 ```
 
@@ -366,13 +384,163 @@ fields:
 | 单字段 newtype | `value` | 1 | 引用字段名（无后缀） |
 | 多字段 | 任意 | N | `<引用字段名>_<子字段名>` |
 
-### 5.4 base / ref 互斥
+投影规则本身与 v1 一致，只是输入语法的 `base`/`ref` 键合并成了单一 `type:`。
 
-任何 field 元素（value_type / table / mixin / extension_fields 内）都必须满足：
+### 5.4 单一 `type:` 键
 
-- 只能填 `base` **或** `ref`，二选一
-- 都缺 → `field must have either base or ref`
-- 都填 → `field cannot have both base and ref`
+v2 取消了 v1 的 `base` / `ref` 互斥约束，改为**单一 `type:` 键**。任何 field 元素
+（value_type / table / mixin / extension_fields 内）都只有一个类型键：
+
+```yaml
+fields:
+  - name: age
+    type: integer                     # 单段短名 → base_types 标量
+  - name: email
+    type: base.core.Email             # 三段全限定名 → value_type 节点
+```
+
+加载器按**点号数量**区分两种形态（详见 spec §3.2）：
+
+| 形态 | 形式 | 含义 | 解析路径 |
+|---|---|---|---|
+| 短名 | `integer` / `string`（无点） | base_types 标量 | 查 base_types 注册表 |
+| 全限定 | `base.core.Email`（两个点） | value_type 节点 | 查节点表，验证 `kind === 'value_type'` |
+
+**为什么这么设计**：`integer`（内置标量）和 `base.core.Email`（用户定义的 value_type）
+从类型论看是同类东西——都是"类型"。"是不是类型"由被引用节点自身的 `kind` 决定，
+引用者只需说"我的类型是 X"，不需要再标 kind 前缀。
+
+**错误情况**：
+
+- field 没有 `type:` → `field must have a type`
+- `type: foo.bar.Baz` 节点不存在 → `unknown type "foo.bar.Baz"`
+- `type: foo.bar.Baz` 目标 kind 不是 value_type →
+  `type reference "foo.bar.Baz" resolves to kind=entity, expected value_type`
+- `type: integer` base_types 里没有 → `unknown scalar "integer"`
+
+---
+
+## 第 5.5 章 using 导入机制
+
+v2 引入编程语言式的 `using:` 导入机制（类比 C# `using`、Java `import`、Go `import`），
+让你用短名引用 value_type，不必每次写三段全限定名。
+
+### 5.5.1 动机
+
+`type: base.core.Email` 比 v1 的 `ref: value_type:base.core.Email` 干净，但每次
+都写三段名仍然啰嗦。using 提供：
+
+- **可读性**：`type: Money` 比 `type: base.core.Money` 干净
+- **模块边界自文档化**：using 列表显式声明"这个文件依赖哪些模块的类型"
+- **重构友好**：移动 value_type 到另一模块，改 using 而非改所有引用处
+- **LSP / 补全友好**：using 列表给工具明确的补全范围
+
+### 5.5.2 文件级声明
+
+每个 .yaml 文件**顶部**声明自己的 using 列表（类比 C# per-file `using`，而非 Go
+package-level `import`）。模块内的不同文件可以有不同 using——更灵活，避免一个文件
+引入整个模块不需要的依赖。
+
+```yaml
+# systems/retail/pos/table/orders.yaml
+version: loom-schema/v2
+kind: table
+name: Orders
+using:
+  - base.core.*                       # 导入 base.core 命名空间下所有类型
+  - retail.pos.types.*                # 导入 retail.pos.types 命名空间下所有类型
+fields:
+  - name: id
+    type: bigint                      # 默认导入的 base_types 短名
+  - name: contact_email
+    type: Email                       # 经 using 短名，等价 base.core.Email
+  - name: total
+    type: Money                       # 经 using 短名，等价 retail.pos.types.Money
+```
+
+using 列表为空时可省略 `using:` 键。
+
+### 5.5.3 默认导入：`base.core.*`
+
+每个文件**隐含** `using: [base.core.*]`，base_types 标量在任何文件里都可以直接用
+短名（`integer`、`string`、`decimal`、`enum`、`datetime`...），无需显式声明。
+
+类比 Java 默认 `java.lang.*`、C# 默认 `System`、Go 的 builtins。
+
+### 5.5.4 A 与 B 统一语法
+
+A（命名空间通配导入）和 B（精确名导入）在语法上**统一为同一个机制**——都是
+"全限定路径 + 可选通配后缀"：
+
+```yaml
+using:
+  - base.core.*              # A：导入 base.core 命名空间下所有类型
+  - retail.pos.types.*       # A：另一个模块全部
+  - base.core.Email          # B：精确导入单个类型
+  - base.core.Money          # B：另一个精确
+```
+
+末尾 `.*` = 命名空间通配；无 `.*` = 精确名。加载器按末尾是否 `.*` 分流，但词法
+形态一致——这就是"A 与 B 统一"。
+
+**何时用哪种**：
+
+- A（`ns.*`）：文件用到一个模块的大量类型，省得逐一列举
+- B（`ns.Name`）：文件只用到一两个类型，精确导入更显式、更易追踪依赖
+
+两种形态可以混用，但在同一文件内**不要对同一命名空间同时写** `ns.*` 和 `ns.Name`
+（精确名会被通配覆盖，多余）。
+
+### 5.5.5 短名解析规则
+
+加载器看到 `type: X`，按以下顺序解析（详见 spec §4.6）：
+
+1. **形态分流**：单段（无点）走短名解析；三段（两个点）走全限定解析。
+2. **短名解析**：
+   - 先查 base_types 注册表（默认 `base.core.*` 导入）→ 命中即内置标量
+   - 再查当前文件 using 列表：
+     - 遍历每条 using，若为 `<ns>.*` 则在 `<ns>.X` 处查节点；若为精确名则直接匹配
+     - 若短名在多个 using 命名空间命中 → 报
+       `ambiguous type reference "X", candidates: ...`
+     - 若都没命中 → 报 `unknown type "X"`
+3. **全限定解析**：
+   - 直接按 `sys.mod.Name` 查节点表
+   - 验证目标节点 `kind === 'value_type'`，否则报
+     `resolves to kind=..., expected value_type`
+   - 不存在 → 报 `unknown type "sys.mod.Name"`
+   - **全限定引用不走 using**（已经全限定了）
+
+### 5.5.6 歧义检测
+
+两个模块都有 `Money` 时，using 通配会撞名：
+
+```yaml
+using:
+  - base.core.*
+  - retail.pos.types.*
+fields:
+  - name: total
+    type: Money              # 命中 base.core.Money 和 retail.pos.types.Money
+# → 报错：ambiguous type reference "Money", candidates: base.core.Money, retail.pos.types.Money
+```
+
+解决办法：用全限定名绕开 using 解析：
+
+```yaml
+fields:
+  - name: total
+    type: retail.pos.types.Money    # 全限定，不走 using
+```
+
+### 5.5.7 形态 C（重命名）：挂起
+
+形态 C 用于命名冲突消解（在文件内给某个类型起别名）。**v2 不实现**，语法待定。
+冲突的临时解决办法就是上一节的全限定名。详见 spec §4.5。
+
+### 5.5.8 using 的校验
+
+- using 条目的命名空间或精确名必须存在 → 否则 `unknown using target "..."`
+- using 列表为空时可省略 `using:` 键
 
 ---
 
@@ -385,13 +553,13 @@ fields:
 
 ```yaml
 # systems/base/_shared/mixin/audit.yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: mixin
 name: Audit
 display_name: 审计字段组
 fields:
-  - { name: created_at, base: datetime, required: true }
-  - { name: updated_at, base: datetime, required: true }
+  - { name: created_at, type: datetime, required: true }
+  - { name: updated_at, type: datetime, required: true }
 ```
 
 约定：共享 mixin 放在 `_shared/mixin/` 目录下，跨模块复用。
@@ -402,11 +570,11 @@ fields:
 # systems/base/core/table/users.yaml
 fields:
   - name: id
-    base: bigint
+    type: bigint
     required: true
   - include: mixin:base._shared.Audit     # 整组插入到当前位置
   - name: email
-    ref: value_type:base.core.Email
+    type: base.core.Email
     required: true
     unique: true
 ```
@@ -431,12 +599,12 @@ mixin **物理上落到主表**（展开为列），与运行时 sidecar EAV 完
 
 ```yaml
 # systems/base/core/entity/user.yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: entity
 name: User
 display_name: 用户
 description: 系统用户主体
-primary_table: table:base.core.Users     # 强引用一张 table
+primary_table: table:base.core.Users     # 强引用一张 table（身份引用，kind 前缀保留）
 business_keys: [email]                   # 业务唯一标识（区别于主键 id）
 audit: true
 ```
@@ -445,7 +613,8 @@ audit: true
 
 - entity **不重复 fields**——fields 由 table 负责，避免双重真理源
 - entity 的本质是"引用一张 primary_table + 加业务身份元数据"
-- v1 投影时 entity 不直接投影，只通过 primary_table 投影
+- `primary_table:` 是**身份引用**，保留 `table:` kind 前缀（详见 §11.2）
+- v2 投影时 entity 不直接投影，只通过 primary_table 投影
 
 ### 7.2 module_manifest：physical_schema 归属
 
@@ -453,13 +622,13 @@ audit: true
 
 ```yaml
 # systems/base/core/MANIFEST.yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 description: 基础核心模块
-exports:                                   # 可选：声明对外的导出
+exports:                                   # 可选：声明对外的导出（身份引用形式）
   - entity:base.core.User
   - value_type:base.core.Email
 ```
@@ -574,20 +743,20 @@ EAV 表完全动态会带来隐患（任意字段都能加）。`extension_field
 
 ```yaml
 # systems/base/core/extension/user_fields.yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: extension_fields
-entity: entity:base.core.User           # 作用于哪个 entity
+entity: entity:base.core.User           # 作用于哪个 entity（身份引用，kind 前缀保留）
 fields:
   - name: nickname
-    base: string
+    type: string
     max_length: 50
     default_scope: tenant              # 租户级自定义
   - name: credit_limit
-    ref: value_type:base.core.Money    # 多字段 value_type 也能用
+    type: base.core.Money              # 多字段 value_type 也能用
     default_scope: tenant
   - name: customer_grade
-    base: enum
-    values: [A, B, C, D]
+    type: base.core.CustomerGrade      # enum 强制走 value_type（详见 §10.1）
+    default_scope: tenant
 ```
 
 ### 9.2 为什么独立文件
@@ -607,18 +776,35 @@ entity/table（开发期）不同。混在一起，diff 会被频繁的部署配
 
 ### 10.1 枚举
 
-enum 在 base_types 列为 scalar，但**值列表在 value_type 定义**：
+enum 在 base_types 列为 scalar，但**值列表在 value_type 定义**。v2 取消了 v1 的
+inline enum 写法（在 table / extension_fields 的 field 里直接写
+`base: enum, values: [...]`），enum 值列表**只能**在 value_type 文件里声明：
 
 ```yaml
 # systems/base/core/value_type/user_status.yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: value_type
 name: UserStatus
 fields:
   - name: value
-    base: enum
+    type: enum                         # enum 是 base_types 短名
     values: [active, inactive, suspended]
 ```
+
+引用处和其他 value_type 完全一样：
+
+```yaml
+fields:
+  - name: status
+    type: base.core.UserStatus         # 或经 using 短名：type: UserStatus
+```
+
+enum 不再特殊——它就是一个内部字段类型为 `enum` 标量的 value_type。
+
+> **v2 破坏性变更**：v1 允许在任意 field 处 inline 写 `base: enum, values: [...]`，
+> v2 取消。inline enum 让"值列表放哪"暧昧（同一组 enum 可能散落在多处重复声明），
+> 无法统一管理。迁移方法：把每个 inline enum 提到独立的 value_type 文件，引用处
+> 改为 `type: <fqn>`。
 
 物理投影：
 
@@ -627,14 +813,6 @@ fields:
 | PostgreSQL | `CREATE TYPE user_status AS ENUM ('active','inactive','suspended');` + 列类型引用 |
 | MySQL | 列内联 `ENUM('active','inactive','suspended')` |
 | SQLite | `TEXT` + `CHECK (value IN ('active','inactive','suspended'))` |
-
-引用：
-
-```yaml
-fields:
-  - name: status
-    ref: value_type:base.core.UserStatus
-```
 
 ### 10.2 索引
 
@@ -650,23 +828,23 @@ indexes:
 ```yaml
 # systems/base/core/table/user_roles.yaml
 fields:
-  - { name: user_id, base: bigint, required: true }
-  - { name: role_id, base: bigint, required: true }
+  - { name: user_id, type: bigint, required: true }
+  - { name: role_id, type: bigint, required: true }
 primary_key: [user_id, role_id]
 foreign_keys:
   - name: fk_user_roles_user
     fields: [user_id]
-    ref_table: entity:base.core.User
+    ref_table: entity:base.core.User       # 身份引用，kind 前缀保留
     ref_fields: [id]
     on_delete: cascade
   - name: fk_user_roles_role
     fields: [role_id]
-    ref_table: entity:base.core.Role
+    ref_table: entity:base.core.Role       # 身份引用，kind 前缀保留
     ref_fields: [id]
     on_delete: restrict
 ```
 
-> **v0.1.0 已知局限**：`ref_table` 当前原样渲染，`entity:` refs 不会自动解析为
+> **v0.2.0 已知局限**：`ref_table` 当前原样渲染，`entity:` refs 不会自动解析为
 > `primary_table` 的物理表名。建议先用 `table:` refs。
 
 ### 10.4 关键约束
@@ -680,47 +858,99 @@ foreign_keys:
 
 ## 第 11 章 `$ref` 引用语法
 
-跨文件引用是字符串（不是 map）：
+loom 的跨文件引用是字符串（不是 map）。v2 把引用明确分成两个名字空间：
+**类型引用**（无 kind 前缀）和**身份引用**（带 kind 前缀）。两者解析路径不同，
+不可混用。
+
+### 11.1 类型引用（field `type:`）
+
+**形态**：三段名 `sys.mod.Name`，**不带** kind 前缀。
+
+用于 field 的 `type:` 键，目标必须是 value_type 节点。
 
 ```
-value_type:base.core.Email          ← base/core/value_type/email.yaml
-entity:retail.pos.Order             ← retail/pos/entity/order.yaml
-table:base.core.users               ← base/core/table/users.yaml
-mixin:base._shared.Audit            ← base/_shared/mixin/audit.yaml
-```
-
-### 11.1 完整形式（FQ）
-
-```
-<kind>:<system>.<module>.<Name>
+base.core.Email              ← base/core/value_type/email.yaml
+base.core.Money              ← base/core/value_type/money.yaml
+retail.pos.types.OrderId     ← retail/pos/types/value_type/order_id.yaml
 ```
 
 逻辑名是 PascalCase（与推导规则一致）。
 
-### 11.2 短形式（计划中）
+**解析路径**（详见 spec §4.6）：
 
-同文件内引用支持 short form（`value_type:.Money`，省略 system.module），加载器
-按当前文件上下文补全。
+1. 单段短名（`Money`）→ 先查 base_types 注册表，再查当前文件 using 列表
+2. 三段全限定（`base.core.Money`）→ 直接查节点表，验证 `kind === 'value_type'`
+3. 全限定引用**不走 using**（已经全限定了）
 
-> **v0.1.0 已知局限**：当前仅支持完全限定形式。
+**短名经 using**：
 
-### 11.3 include 语法
+```yaml
+using:
+  - base.core.*
+fields:
+  - name: email
+    type: Email                       # 短名，经 using 解析到 base.core.Email
+```
 
-`fields` 数组里元素可以是 field 也可以是 include：
+**错误情况**：
+
+- 短名歧义（多个 using 命名空间命中）→ `ambiguous type reference "X"`
+- 目标 kind 不是 value_type →
+  `type reference "X" resolves to kind=entity, expected value_type`
+- 目标不存在 → `unknown type "X"`
+
+### 11.2 身份引用（非类型）
+
+**形态**：四段 `kind:sys.mod.Name`，**带** kind 前缀。
+
+用于"这不是字段的类型，而是指向某个节点"的场景。kind 前缀必须与目标节点的
+`kind` 字段匹配，加载器按身份表查找。
+
+```
+entity:base.core.User             ← base/core/entity/user.yaml
+table:base.core.Users             ← base/core/table/users.yaml
+mixin:base._shared.Audit          ← base/_shared/mixin/audit.yaml
+value_type:base.core.Email        ← base/core/value_type/email.yaml
+```
+
+**身份引用出现在哪些位置**：
+
+| 位置 | 示例 | 说明 |
+|---|---|---|
+| `primary_table:` | `primary_table: table:base.core.Users` | entity 强引用一张 table |
+| `ref_table:`（foreign_keys） | `ref_table: entity:base.core.User` | FK 引用目标表 |
+| `- include:`（mixin） | `- include: mixin:base._shared.Audit` | fields 数组里展开 mixin |
+| `entity:`（extension_fields） | `entity: entity:base.core.User` | extension_fields 作用于哪个 entity |
+| `exports:`（module_manifest） | `- value_type:base.core.Email` | 声明对外导出的节点 |
 
 ```yaml
 fields:
-  - name: id                           # field
-    base: bigint
-  - include: mixin:base._shared.Audit  # include（整组展开）
-  - name: email                        # field
-    ref: value_type:base.core.Email
+  - name: id                           # field（类型引用走 type:）
+    type: bigint
+  - include: mixin:base._shared.Audit  # 身份引用（mixin 展开到 fields）
 ```
+
+### 11.3 为什么分两个名字空间
+
+类型论上，"字段的类型"和"指向某个节点"是两件事：
+
+- **类型引用**回答"这个字段是什么类型"——目标必须是 value_type（能投影成列），
+  加载器验证 `kind === 'value_type'`。类型引用走更窄的名字空间（三段、无 kind），
+  因为"是不是类型"由被引用节点自身的 `kind` 决定，不需要引用者再标。
+- **身份引用**回答"我要指哪个节点"——目标可以是任意 kind（entity / table / mixin /
+  value_type），kind 前缀让引用者和加载器都明确"我在找哪种节点"。
+  `primary_table` 必须是 table，`include` 必须是 mixin，`entity:` 必须是 entity。
+
+两套名字空间通过"被引用节点 `kind === 'value_type'`"这一条规则连接，互不冲突。
+加载器内部维护两张查表：身份表（全 identity → node）、类型表（sys.mod.Name →
+value_type node）。
 
 ### 11.4 悬挂 ref
 
 `$ref` 目标不存在时报 `dangling_ref` 错误。kind 与上下文不符
 （如 `ref_table` 指向 value_type）报 `kind_mismatch`。
+类型引用的 kind 校验失败（目标非 value_type）报
+`type reference "..." resolves to kind=..., expected value_type`。
 
 ---
 
@@ -741,9 +971,9 @@ loom lift <physical.yaml>                       反向提炼（未实现）
 机器可读格式，供下游（atlas 等）协商版本：
 
 ```
-loom 0.1.0
-schema-versions-supported: loom-schema/v1
-current: loom-schema/v1
+loom 0.2.0
+schema-versions-supported: loom-schema/v2
+current: loom-schema/v2
 ```
 
 ### 12.2 check
@@ -795,7 +1025,7 @@ Pass 2  Link          解析所有 $ref，建立 identity→object 映射
                       错误：dangling_ref、kind_mismatch、cycle（mixin 环）
 
 Pass 3  Validate      语义校验
-                      错误：base/ref 互斥、属性 schema 不匹配、
+                      错误：type 缺失或解析失败、属性 schema 不匹配、
                             primary_key 非 required、extension_fields 引用
                             非 sidecar_eav entity、decimal 缺 precision/scale
 ```
@@ -808,7 +1038,7 @@ Pass 2 即使有 parse 错误也会运行（为了暴露尽可能多的诊断）
 <file>:<line>:<col>: <category>: <message>
 ```
 
-> **v0.1.0 已知局限**：诊断信息行号列号硬编码为 `1:1`，精确位置追踪未实现。
+> **v0.2.0 已知局限**：诊断信息行号列号硬编码为 `1:1`，精确位置追踪未实现。
 
 ### 13.3 错误不可降级
 
@@ -926,20 +1156,22 @@ diff-stable 且引用完整。
 
 ## 第 16 章 已知局限与路线
 
-### 16.1 v0.1.0 已知局限
+### 16.1 v0.2.0 已知局限
 
 | 项 | 说明 |
 |---|---|
 | 诊断无行号 | 错误硬编码为 `1:1`，YAML 位置追踪未实现 |
 | FK 渲染原始 | `foreign_keys.ref_table` 原样输出，`entity:` refs 不解析为 `primary_table` |
-| 短格式 ref 未支持 | `refToIdentity` 仅处理完全限定形式 |
+| 形态 C 重命名未实现 | using 仅支持 A（`ns.*`）与 B（`ns.Name`）；冲突时用全限定名绕开 |
+| mixin using 化未实现 | mixin include 仍用 `- include: mixin:...`（v2.1 候选） |
 | 未实现的命令 | `fmt`（格式化）、`lift`（反向提炼）、`project atlas-yaml` |
 
 ### 16.2 后续路线
 
 - YAML 位置追踪 → 精确 line:col 诊断
 - FK 跨 kind 解析（`entity:` → `primary_table`）
-- 短格式 ref 支持
+- using 形态 C（重命名）——解决短名冲突，无需回退全限定名
+- mixin using 化——把 `- include: mixin:...` 纳入 using 体系（v2.1 候选）
 - `loom fmt` — 字段排序、key 顺序固定、缩进统一
 - `loom lift` — 从 atlas-yaml/v2 物理格式反向提炼 design schema 骨架
 - `loom project atlas-yaml` — 桥接到 atlas 生态
@@ -955,7 +1187,7 @@ diff-stable 且引用完整。
 ### A.1 base_types.yaml
 
 ```yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: base_types
 scalars:
   - { name: bigint,   description: 64-bit integer, properties: [] }
@@ -976,7 +1208,7 @@ scalars:
 ### A.2 systems/base/core/MANIFEST.yaml
 
 ```yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
@@ -987,39 +1219,39 @@ description: core module
 ### A.3 systems/base/_shared/mixin/audit.yaml
 
 ```yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: mixin
 name: Audit
 fields:
-  - { name: created_at, base: datetime, required: true }
-  - { name: updated_at, base: datetime, required: true }
+  - { name: created_at, type: datetime, required: true }
+  - { name: updated_at, type: datetime, required: true }
 ```
 
 ### A.4 systems/base/core/value_type/email.yaml + money.yaml
 
 ```yaml
 # email.yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: value_type
 name: Email
 fields:
-  - { name: value, base: string, max_length: 254 }
+  - { name: value, type: string, max_length: 254 }
 ```
 
 ```yaml
 # money.yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: value_type
 name: Money
 fields:
-  - { name: amount,        base: decimal, precision: 18, scale: 4, required: true }
-  - { name: currency_code, base: string,  max_length: 3, required: true }
+  - { name: amount,        type: decimal, precision: 18, scale: 4, required: true }
+  - { name: currency_code, type: string,  max_length: 3, required: true }
 ```
 
 ### A.5 systems/base/core/table/users.yaml
 
 ```yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: table
 name: Users
 table:
@@ -1029,14 +1261,14 @@ table:
     ext_table: users_ext
     view: users
 fields:
-  - { name: id, base: bigint, required: true }
+  - { name: id, type: bigint, required: true }
   - include: mixin:base._shared.Audit
   - name: email
-    ref: value_type:base.core.Email
+    type: base.core.Email
     required: true
     unique: true
   - name: balance
-    ref: value_type:base.core.Money
+    type: base.core.Money
 primary_key: [id]
 indexes:
   - { name: idx_users_email, fields: [email], unique: true }
@@ -1045,7 +1277,7 @@ indexes:
 ### A.6 systems/base/core/entity/user.yaml
 
 ```yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: entity
 name: User
 primary_table: table:base.core.Users
@@ -1056,11 +1288,11 @@ audit: true
 ### A.7 systems/base/core/extension/user_fields.yaml
 
 ```yaml
-version: loom-schema/v1
+version: loom-schema/v2
 kind: extension_fields
 entity: entity:base.core.User
 fields:
-  - { name: nickname, base: string, max_length: 50, default_scope: tenant }
+  - { name: nickname, type: string, max_length: 50, default_scope: tenant }
 ```
 
 ### A.8 投影输出（PG）
@@ -1116,11 +1348,13 @@ FROM base_core.users_base u;
 | `dangling_ref` | `$ref` 目标不存在 |
 | `kind_mismatch` | `$ref` 目标 kind 与上下文期望不符 |
 | `cycle` | mixin 互相 include 形成环 |
-| `schema` | base/ref 互斥违反、属性不在 scalar 的 properties schema 内 |
+| `schema` | field 缺 `type:`、类型解析失败、属性不在 scalar 的 properties schema 内 |
 | `semantic` | primary_key 字段非 required、extension_fields 目标 entity 不存在或非 sidecar_eav |
 | `project` | 投影器无法落到目标方言 |
 
 ---
 
-**更多设计细节**：参见 `docs/specs/2026-06-17-loom-design.md`（完整设计规范）。
-**实现计划**：参见 `docs/superpowers/plans/2026-06-17-loom-v1.md`（v1 16 任务拆解）。
+**更多设计细节**：参见 `docs/specs/2026-06-17-loom-design.md`（v1 完整设计规范）。
+**v2 类型系统设计**：参见 `docs/specs/2026-06-18-loom-v2-type-system.md`
+（统一 `type:` 键与 `using` 导入机制的设计文档）。
+**v2 实现计划**：参见 `docs/superpowers/plans/2026-06-18-loom-v2.md`（v2 15 任务拆解）。
