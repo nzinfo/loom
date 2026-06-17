@@ -5,7 +5,7 @@
  * `<kind>:.<Name>` (short form, system/module resolved by the loader against
  * the current file's context).
  */
-import type { FileKind } from './version.js';
+import { FILE_KIND, type FileKind } from './version.js';
 
 export interface Ref {
   readonly kind: FileKind;
@@ -14,15 +14,8 @@ export interface Ref {
   readonly name: string;
 }
 
-const REF_KINDS = new Set<FileKind>([
-  'base_types',
-  'module_manifest',
-  'value_type',
-  'mixin',
-  'table',
-  'entity',
-  'extension_fields',
-]);
+/** All valid kinds for a $ref target. Derived from FILE_KIND so it can't drift. */
+const REF_KINDS: ReadonlySet<FileKind> = new Set(FILE_KIND);
 
 /**
  * Parse a ref string into structured form. Throws on malformed input —

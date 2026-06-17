@@ -30,4 +30,11 @@ describe('refs', () => {
       name: 'Money',
     });
   });
+
+  it('round-trips formatRef ∘ parseRef for both forms', () => {
+    const fq = 'value_type:base.core.Email';
+    expect(formatRef(parseRef(fq))).toBe(fq);
+    const short = 'value_type:.Money';
+    expect(formatRef(parseRef(short))).toBe(short);
+  });
 });
