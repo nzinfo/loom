@@ -118,10 +118,12 @@ function expandTable(
  * This function walks up the path to find it.
  */
 function extractPhysicalSchema(node: IRNode & { kind: 'table' }, ir: IR): string {
-  // Path format: systems/<system>/<module>/table/<name>.yaml
-  const parts = node.file.split('/');
-  const system = parts[1];
-  const module = parts[2];
+  // Identity format: table:<system>.<module>.<Name>
+  const identityParts = node.identity.split(':');
+  const qualifiedName = identityParts[1]!; // <system>.<module>.<Name>
+  const parts = qualifiedName.split('.');
+  const system = parts[0]!;
+  const module = parts[1]!;
   const manifestIdentity = `module_manifest:${system}.${module}`;
   const manifestNode = ir.nodes.get(manifestIdentity);
 

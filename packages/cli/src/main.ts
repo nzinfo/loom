@@ -2,13 +2,6 @@
 /**
  * loom CLI entry point.
  *
- * Usage:
- *   loom version
- *   loom check <path>
- *   loom fmt <path>            (not yet implemented)
- *   loom project sql --dialect pg --out <dir> <path>   (not yet implemented)
- *   loom lift <physical.yaml> --out <dir>              (not yet implemented)
- *
  * Exit codes (spec §16.1):
  *   0  success
  *   1  load / validation failure
@@ -16,19 +9,28 @@
  *   64 usage error
  */
 import process from 'node:process';
-import { checkCommand } from './commands/check.js';
 import { versionCommand } from './commands/version.js';
+import { checkCommand } from './commands/check.js';
+import { projectCommand } from './commands/project.js';
 
 function usage(): void {
   process.stderr.write(`usage: loom <command> [options]
 
 commands:
-  version                    print version info (spec §16.2)
-  check <path>               load + validate (spec §8.7)
-  fmt <path>                 reformat in place (not yet implemented)
-  project sql|atlas-yaml     project design schema to physical (not yet implemented)
-  lift <physical.yaml>       reverse-lift to design schema draft (not yet implemented)
+  version                                  print version info (spec §16.2)
+  check <path>                             load + validate (spec §8.7)
+  project sql --dialect <d> [--out <f>] <path>   project to SQL DDL (spec §8.8)
+  fmt <path>                               reformat in place (not yet implemented)
+  lift <physical.yaml>                     reverse-lift (not yet implemented)
 `);
+}
+
+function parseFlag(rest: readonly string[], name: string): { value: string | undefined; remaining: string[] } {
+  const idx = rest.indexOf(name);
+  if (idx < 0) return { value: undefined, remaining: [...rest] };
+  const value = rest[idx + 1];
+  const remaining = [...rest.slice(0, idx), ...rest.slice(idx + 2)];
+  return { value, remaining };
 }
 
 async function main(argv: string[]): Promise<number> {
@@ -45,6 +47,23 @@ async function main(argv: string[]): Promise<number> {
         return 64;
       }
       return await checkCommand({ path });
+    }
+    case 'project': {
+      const sub = rest[0];
+      if (sub !== 'sql') {
+        process.stderr.write(`error: unknown project target "${sub ?? ''}"\n`);
+        return 64;
+      }
+      const tail = rest.slice(1);
+      const dialect = parseFlag(tail, '--dialect').value;
+      const out = parseFlag(tail, '--out').value;
+      const { remaining } = parseFlag(parseFlag(tail, '--dialect').remaining, '--out');
+      const path = remaining[0];
+      if (path === undefined) {
+        process.stderr.write('error: project requires a path\n');
+        return 64;
+      }
+      return await projectCommand({ path, dialect, out });
     }
     case undefined:
     case '-h':
