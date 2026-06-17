@@ -21,10 +21,11 @@ export class MemoryFileSystem implements FileSystem {
   }
 
   async *listFiles(dir: string): AsyncIterable<string> {
-    const prefix = `${dir.replace(/\\/g, '/').replace(/\/$/, '')}/`;
+    const normalized = dir.replace(/\\/g, '/').replace(/\/$/, '');
+    const prefix = normalized === '' ? '' : `${normalized}/`;
     const out = new Set<string>();
     for (const key of this.files.keys()) {
-      if ((key === dir || key.startsWith(prefix)) && /\.(ya?ml)$/.test(key)) {
+      if ((key === normalized || key.startsWith(prefix)) && /\.(ya?ml)$/.test(key)) {
         out.add(key);
       }
     }
