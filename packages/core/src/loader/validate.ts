@@ -80,6 +80,7 @@ function checkScalarField(
   requiredProps: Map<string, Set<string>>,
   diag: Diagnostics,
 ): void {
+  if (scalarNames.size === 0) return;
   const base = f.base;
   if (typeof base !== 'string') return;
   if (!scalarNames.has(base)) {

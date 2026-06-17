@@ -1,12 +1,14 @@
-import type { Diagnostics } from '../errors.js';
-import type { IR } from '../ir/version.js';
 /**
  * Loader entry. Implements spec §13.1 four-pass pipeline.
- *
- * Phase 0 (current skeleton): only the API surface exists. Real passes
- * will be filled in during writing-plans execution.
  */
 import type { FileSystem } from './fs.js';
+import type { IR } from '../ir/version.js';
+import { CURRENT_VERSION } from '../ir/version.js';
+import { Diagnostics } from '../errors.js';
+import { discover } from './discovery.js';
+import { parseAll } from './parse.js';
+import { link } from './link.js';
+import { validate } from './validate.js';
 
 export interface LoadOptions {
   /** Injected FS adapter. Required — core never imports node:fs. */
@@ -15,7 +17,7 @@ export interface LoadOptions {
   readonly basePath: string;
   /** Restrict to these systems (faster for partial loads). */
   readonly systemFilter?: readonly string[];
-  /** Max parallel file reads. Default 8. */
+  /** Max parallel file reads. Reserved for future use; current impl is serial. */
   readonly maxConcurrency?: number;
 }
 
@@ -25,12 +27,35 @@ export interface LoadResult {
 }
 
 /**
- * Load and validate a loom schema tree.
- *
- * @throws never — all failures surface in `result.diagnostics`. Callers
- *   should check `diagnostics.hasErrors` and decide exit code.
+ * Load + link + validate a loom schema tree. Never throws — all failures
+ * surface in `result.diagnostics`. Callers check `hasErrors` and decide
+ * exit code.
  */
-export async function load(_opts: LoadOptions): Promise<LoadResult> {
-  // Phase 0 skeleton. Real implementation lands in writing-plans phases.
-  throw new Error('not implemented — see docs/specs/2026-06-17-loom-design.md §13');
+export async function load(opts: LoadOptions): Promise<LoadResult> {
+  const diagnostics = new Diagnostics();
+
+  // Pass 0 — discovery.
+  const { files } = await discover({
+    fs: opts.fs,
+    basePath: opts.basePath,
+    ...(opts.systemFilter !== undefined ? { systemFilter: opts.systemFilter } : {}),
+    diagnostics,
+  });
+
+  // Pass 1 — parse.
+  const { parsed } = await parseAll({ fs: opts.fs, files, diagnostics });
+
+  // Pass 2 — link. Always run even with parse errors so we surface as many
+  // diagnostics as possible; downstream passes operate on the partial map.
+  const { ir: linked } = await link({ parsed, diagnostics });
+
+  // Pass 3 — validate.
+  validate({ ir: linked, diagnostics });
+
+  const ir: IR = {
+    nodes: linked.nodes,
+    deps: linked.deps,
+    version: CURRENT_VERSION,
+  };
+  return { ir, diagnostics };
 }
