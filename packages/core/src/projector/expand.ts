@@ -8,7 +8,7 @@
  */
 
 import type { IR, IRNode } from '../ir/version.js';
-import type { Table, ValueType, Mixin, ExtensionFields } from '../ir/schemas.js';
+import type { Table, ValueType, ExtensionFields } from '../ir/schemas.js';
 import type {
   PhysicalModel,
   PhysicalTable,
@@ -204,14 +204,14 @@ function expandField(
   enums: Map<string, ReadonlyArray<string>>,
 ): PhysicalColumn[] {
   const fName = String(f.name);
-  let base: string;
-  let properties: Record<string, unknown> = {};
+  let scalar: string;
+  let props: Record<string, unknown> = {};
   let enumRef: string | undefined;
 
   if ('base' in f) {
     // Direct base scalar (e.g., bigint, string).
-    base = String(f.base);
-    properties = extractProperties(f);
+    scalar = String(f.base);
+    props = extractProperties(f);
   } else if ('ref' in f) {
     // Reference to a value_type or other construct.
     const ref = String(f.ref);
@@ -232,10 +232,10 @@ function expandField(
     // For single-field value_types, expose the inner field's base.
     if (isSingleFieldValueType(vtNodeForField)) {
       const inner = vt.fields[0] as Record<string, unknown>;
-      base = String(inner.base);
-      properties = extractProperties(inner);
+      scalar = String(inner.base);
+      props = extractProperties(inner);
       // If the inner field is an enum, record the reference.
-      if (base === 'enum' && 'values' in inner) {
+      if (scalar === 'enum' && 'values' in inner) {
         const values = inner.values;
         if (Array.isArray(values)) {
           enumRef = ref; // The value_type identity.
@@ -249,11 +249,10 @@ function expandField(
         const subField = vt.fields[idx] as Record<string, unknown>;
         const result: PhysicalColumn = {
           name: col.name,
-          base: String(subField.base),
+          scalar: String(subField.base),
           required: f.required === true,
           unique: f.unique === true,
-          properties: extractProperties(subField),
-          ...(f.default !== undefined ? { default: f.default } : {}),
+          props: extractProperties(subField),
           ...(subField.base === 'enum' && Array.isArray(subField.values) ? { enumRef: ref } : {}),
         };
         return result;
@@ -266,11 +265,10 @@ function expandField(
   // Single-field case (base or single-field value_type ref).
   const result: PhysicalColumn = {
     name: fName,
-    base,
+    scalar,
     required: f.required === true,
     unique: f.unique === true,
-    properties,
-    ...(f.default !== undefined ? { default: f.default } : {}),
+    props,
     ...(enumRef !== undefined ? { enumRef: enumRef } : {}),
   };
   return [result];
@@ -332,14 +330,31 @@ function collectExtensionFields(
 
     for (const f of ef.fields as ReadonlyArray<Record<string, unknown>>) {
       const fRec = f as Record<string, unknown>;
-      const entry: ExtensionFieldEntry = {
-        name: String(fRec.name),
-        base: String(fRec.base),
-        required: fRec.required === true,
-        properties: extractProperties(fRec),
-        ...(fRec.default_scope !== undefined ? { defaultScope: String(fRec.default_scope) } : {}),
-      };
-      entries.push(entry);
+
+      // Skip include entries (they're handled at parse time)
+      if ('include' in fRec) continue;
+
+      // Handle ref fields
+      if ('ref' in fRec) {
+        const entry: ExtensionFieldEntry = {
+          name: String(fRec.name),
+          scalar: '',
+          refValueTypeId: String(fRec.ref),
+          props: extractProperties(fRec),
+          ...(fRec.default_scope !== undefined ? { defaultScope: String(fRec.default_scope) } : {}),
+        };
+        entries.push(entry);
+      } else if ('base' in fRec) {
+        const entry: ExtensionFieldEntry = {
+          name: String(fRec.name),
+          scalar: String(fRec.base),
+          props: extractProperties(fRec),
+          ...(fRec.default_scope !== undefined ? { defaultScope: String(fRec.default_scope) } : {}),
+        };
+        entries.push(entry);
+      } else {
+        throw new Error(`Extension field must have 'base' or 'ref': ${JSON.stringify(fRec)}`);
+      }
     }
 
     extensionFields.set(entityRef, entries);

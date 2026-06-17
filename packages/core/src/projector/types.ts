@@ -5,8 +5,6 @@
  * Each PhysicalTable represents a database table (base, ext, or view).
  */
 
-import type { ValueType } from '../ir/schemas.js';
-
 /** Strategy for storing extension_fields. */
 export type ExtensionStrategy = 'none' | 'json_column' | 'sidecar_eav';
 
@@ -20,18 +18,20 @@ export type ExtensionStrategy = 'none' | 'json_column' | 'sidecar_eav';
 export interface PhysicalColumn {
   /** Column name (may be suffixed for multi-field value_types). */
   readonly name: string;
-  /** Base scalar type (e.g., 'bigint', 'string', 'decimal'). */
-  readonly base: string;
+  /** Logical scalar name from base_types (e.g. "decimal", "string", "enum"). */
+  readonly scalar: string;
+  /** Scalar properties carried through (e.g. precision, scale, max_length). */
+  readonly props: Readonly<Record<string, unknown>>;
   /** True if column is NOT NULL. */
   readonly required: boolean;
   /** True if column has a UNIQUE constraint. */
-  readonly unique?: boolean;
-  /** Default value (literal or expression). */
-  readonly default?: unknown;
-  /** If this column came from a value_type with base='enum', the enum identity. */
+  readonly unique: boolean;
+  /**
+   * If scalar === 'enum', this is the value_type identity (e.g.
+   * value_type:base.core.Status) used to look up the value list in the
+   * model's enum registry.
+   */
   readonly enumRef?: string;
-  /** Scalar properties (e.g., precision, scale, max_length). */
-  readonly properties: Readonly<Record<string, unknown>>;
 }
 
 /** A database index. */
@@ -58,8 +58,8 @@ export interface PhysicalForeignKey {
 export interface PhysicalTable {
   /** Simple table name (not schema-qualified). */
   readonly name: string;
-  /** Schema prefix from module_manifest.physical_schema (spec §6.2). */
-  readonly schema: string;
+  /** module_manifest physical_schema, e.g. "base_core". undefined if no manifest. */
+  readonly schema: string | undefined;
   /** Fully qualified name: `<schema>.<name>`. */
   readonly qualifiedName: string;
   /** Physical columns (including mixin-expanded, value_type-expanded). */
@@ -86,10 +86,10 @@ export interface PhysicalTable {
  */
 export interface ExtensionFieldEntry {
   readonly name: string;
-  readonly base: string;
-  readonly required: boolean;
+  readonly scalar: string;
+  readonly props: Readonly<Record<string, unknown>>;
+  readonly refValueTypeId?: string;
   readonly defaultScope?: string;
-  readonly properties: Readonly<Record<string, unknown>>;
 }
 
 /**
