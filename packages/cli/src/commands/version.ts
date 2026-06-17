@@ -9,7 +9,7 @@
 import process from 'node:process';
 import { CURRENT_VERSION, FORMAT_FAMILY, FORMAT_VERSION } from '@loom/core';
 
-export const CLI_VERSION = '0.0.1' as const;
+export const CLI_VERSION = '0.1.0' as const;
 
 export function versionCommand(): void {
   process.stdout.write(`loom ${CLI_VERSION}\n`);
