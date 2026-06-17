@@ -13,11 +13,11 @@ import type { AnyFile } from './schemas.js';
 /** Format family written to every schema file's `version:` line. */
 export const FORMAT_FAMILY = 'loom-schema' as const;
 /** Current wire version. Breaking changes must bump this. */
-export const FORMAT_VERSION = 'v1' as const;
+export const FORMAT_VERSION = 'v2' as const;
 /** Full version string written to schema files. */
 export const CURRENT_VERSION = `${FORMAT_FAMILY}/${FORMAT_VERSION}` as const;
 
-/** All file kinds recognized by loom-schema/v1. See spec §9. */
+/** All file kinds recognized by loom-schema/v2. See spec §9. */
 export const FILE_KIND = [
   'base_types',
   'module_manifest',
