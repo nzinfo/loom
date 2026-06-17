@@ -221,4 +221,38 @@ primary_key: [id]
     expect(diagnostics.hasErrors).toBe(true);
     expect(diagnostics.errors.some((d) => d.category === 'kind_mismatch')).toBe(true);
   });
+
+  it('rejects a two-segment type ref as invalid form', async () => {
+    const { diagnostics } = await linkFromStringMap({
+      'base_types.yaml': `version: loom-schema/v2
+kind: base_types
+scalars:
+  - { name: string, description: s, properties: [] }
+`,
+      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: base
+module: core
+physical_schema: base_core
+`,
+      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+kind: table
+name: Users
+table:
+  name: users
+  extension: { strategy: none }
+fields:
+  - { name: id, type: string, required: true }
+  - { name: x, type: Foo.Bar }
+primary_key: [id]
+`,
+    });
+
+    expect(diagnostics.hasErrors).toBe(true);
+    expect(
+      diagnostics.errors.some(
+        (d) => d.category === 'parse' && d.message.includes('invalid type reference'),
+      ),
+    ).toBe(true);
+  });
 });

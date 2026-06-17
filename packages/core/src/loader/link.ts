@@ -237,7 +237,6 @@ function resolveFieldTypes(
         using,
         scalars,
         valueTypes,
-        parsed,
         diag,
         deps,
       );
@@ -300,7 +299,6 @@ function resolveSingleSegment(
   using: readonly string[],
   scalars: ReadonlySet<string>,
   valueTypes: ReadonlySet<string>,
-  parsed: ReadonlyMap<string, AnyFile>,
   diag: Diagnostics,
   deps: Map<Identity, Set<Identity>>,
 ): void {
