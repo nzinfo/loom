@@ -1,0 +1,23 @@
+{
+  "name": "loom",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Loom — forward schema description language. Weaves design intent into physical schemas.",
+  "packageManager": "pnpm@10.11.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "check": "pnpm -r run check",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "clean": "pnpm -r exec rm -rf dist node_modules"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

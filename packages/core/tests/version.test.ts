@@ -1,0 +1,22 @@
+import { describe, expect, it } from 'vitest';
+import { CURRENT_VERSION, FORMAT_FAMILY, FORMAT_VERSION, FILE_KIND } from '../src/index.js';
+
+describe('format version', () => {
+  it('exposes the expected family and version', () => {
+    expect(FORMAT_FAMILY).toBe('loom-schema');
+    expect(FORMAT_VERSION).toBe('v1');
+    expect(CURRENT_VERSION).toBe('loom-schema/v1');
+  });
+
+  it('covers every file kind from spec §9', () => {
+    expect(FILE_KIND).toEqual([
+      'base_types',
+      'module_manifest',
+      'value_type',
+      'mixin',
+      'table',
+      'entity',
+      'extension_fields',
+    ]);
+  });
+});

@@ -1,0 +1,13 @@
+#!/bin/sh
+# loom — shell wrapper that runs the compiled CLI via Node.
+# After `pnpm build`, the dist/ tree contains the compiled main.js.
+# Until then, this falls back to running the TS source via tsx if available.
+DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$DIR/../dist/main.js" ]; then
+  exec node "$DIR/../dist/main.js" "$@"
+elif command -v tsx >/dev/null 2>&1; then
+  exec tsx "$DIR/../src/main.ts" "$@"
+else
+  echo "loom: not built. Run 'pnpm build' first, or install tsx globally." >&2
+  exit 64
+fi
