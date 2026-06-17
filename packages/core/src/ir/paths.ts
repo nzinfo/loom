@@ -54,6 +54,9 @@ export function pascalToKebab(pascal: string): string {
  *                 for root files); what we actually parse.
  */
 export function pathToIdentity(fullPath: string, relPath: string): DiscoveredFile | null {
+  // Reserved for future diagnostics; surfaced up front so it doesn't look dead.
+  void fullPath;
+
   // Root base_types.yaml
   if (relPath === 'base_types.yaml') {
     return { kind: 'base_types', system: '', module: '', name: '', identity: 'base_types:' };
@@ -100,6 +103,5 @@ export function pathToIdentity(fullPath: string, relPath: string): DiscoveredFil
   }
 
   // Allow deeper nesting inside kind dir? Spec is flat under <kind>/. Reject.
-  void fullPath;
   return null;
 }

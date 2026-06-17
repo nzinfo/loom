@@ -66,4 +66,23 @@ describe('paths', () => {
     expect(kebabToPascal('user-profile')).toBe('UserProfile');
     expect(pascalToKebab('UserProfile')).toBe('user-profile');
   });
+
+  it('rejects paths still carrying the systems/ prefix (contract regression)', () => {
+    // pathToIdentity expects relPath relative to systems/, not including it.
+    expect(
+      pathToIdentity('systems/base/core/entity/user.yaml', 'systems/base/core/entity/user.yaml'),
+    ).toBeNull();
+    expect(
+      pathToIdentity('systems/base/core/MANIFEST.yaml', 'systems/base/core/MANIFEST.yaml'),
+    ).toBeNull();
+  });
+
+  it('joins multi-word kebab → pascal correctly', () => {
+    expect(kebabToPascal('user-profile-settings')).toBe('UserProfileSettings');
+  });
+
+  it('handles empty kebab segments gracefully', () => {
+    expect(kebabToPascal('--double')).toBe('Double');
+    expect(kebabToPascal('')).toBe('');
+  });
 });
