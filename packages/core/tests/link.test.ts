@@ -6,6 +6,14 @@ import { parseAll } from '../src/loader/parse.js';
 import { buildBaseSchemaFs } from './fixtures/base_schema.js';
 import { MemoryFileSystem } from './fixtures/memory_fs.js';
 
+async function linkFromStringMap(files: Record<string, string>) {
+  const fs = new MemoryFileSystem(files);
+  const diag = new Diagnostics();
+  const { files: discovered } = await discover({ fs, basePath: '', diagnostics: diag });
+  const { parsed } = await parseAll({ fs, files: discovered, diagnostics: diag });
+  return link({ parsed, diagnostics: diag });
+}
+
 async function runLink(fs: ReturnType<typeof buildBaseSchemaFs>) {
   const diag = new Diagnostics();
   const { files } = await discover({ fs, basePath: '', diagnostics: diag });
@@ -53,5 +61,164 @@ describe('link (Pass 2)', () => {
     });
     const { diagnostics } = await runLink(fs);
     expect(diagnostics.errors.some((e) => e.category === 'cycle')).toBe(true);
+  });
+});
+
+describe('v2 link — type resolution', () => {
+  it('resolves a value_type short name via using wildcard', async () => {
+    const { ir, diagnostics } = await linkFromStringMap({
+      'base_types.yaml': `version: loom-schema/v2
+kind: base_types
+scalars:
+  - { name: bigint, description: i, properties: [] }
+  - { name: string, description: s, properties: [] }
+`,
+      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: base
+module: core
+physical_schema: base_core
+`,
+      'systems/base/core/value_type/email.yaml': `version: loom-schema/v2
+kind: value_type
+name: Email
+fields:
+  - { name: value, type: string }
+`,
+      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+kind: table
+name: Users
+using:
+  - base.core.*
+table:
+  name: users_base
+  extension: { strategy: none }
+fields:
+  - { name: id, type: bigint, required: true }
+  - { name: email, type: Email, required: true, unique: true }
+primary_key: [id]
+`,
+    });
+
+    expect(diagnostics.hasErrors).toBe(false);
+    const usersNode = [...ir.nodes.values()].find((n) => n.kind === 'table');
+    expect(usersNode).toBeDefined();
+    const fields = (usersNode?.data as { fields: Array<Record<string, unknown>> }).fields;
+    // Short name "Email" should be rewritten to its fqn after link.
+    const emailField = fields.find((f) => f.name === 'email');
+    expect(emailField?.type).toBe('base.core.Email');
+  });
+
+  it('reports ambiguous when using imports two modules with the same type name', async () => {
+    const { diagnostics } = await linkFromStringMap({
+      'base_types.yaml': `version: loom-schema/v2
+kind: base_types
+scalars:
+  - { name: string, description: s, properties: [] }
+`,
+      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: base
+module: core
+physical_schema: base_core
+`,
+      'systems/base/core/value_type/money.yaml': `version: loom-schema/v2
+kind: value_type
+name: Money
+fields:
+  - { name: amount, type: string }
+`,
+      'systems/retail/types/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: retail
+module: types
+physical_schema: retail_types
+`,
+      'systems/retail/types/value_type/money.yaml': `version: loom-schema/v2
+kind: value_type
+name: Money
+fields:
+  - name: value
+    type: string
+`,
+      'systems/retail/pos/table/orders.yaml': `version: loom-schema/v2
+kind: table
+name: Orders
+using:
+  - base.core.*
+  - retail.types.*
+table:
+  name: orders
+  extension: { strategy: none }
+fields:
+  - { name: id, type: string, required: true }
+  - { name: total, type: Money }
+primary_key: [id]
+`,
+    });
+
+    expect(diagnostics.hasErrors).toBe(true);
+    const ambiguousMsgs = diagnostics.errors.filter((d) => d.message.includes('ambiguous'));
+    expect(ambiguousMsgs.length).toBeGreaterThan(0);
+  });
+
+  it('reports unknown type when short name matches nothing', async () => {
+    const { diagnostics } = await linkFromStringMap({
+      'base_types.yaml': `version: loom-schema/v2
+kind: base_types
+scalars:
+  - { name: string, description: s, properties: [] }
+`,
+      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: base
+module: core
+physical_schema: base_core
+`,
+      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+kind: table
+name: Users
+table:
+  name: users
+  extension: { strategy: none }
+fields:
+  - { name: id, type: string, required: true }
+  - { name: x, type: Nonexistent }
+primary_key: [id]
+`,
+    });
+
+    expect(diagnostics.hasErrors).toBe(true);
+    expect(diagnostics.errors.some((d) => d.message.includes('unknown type'))).toBe(true);
+  });
+
+  it('reports kind_mismatch when a three-segment type ref targets a non-value_type', async () => {
+    const { diagnostics } = await linkFromStringMap({
+      'base_types.yaml': `version: loom-schema/v2
+kind: base_types
+scalars:
+  - { name: string, description: s, properties: [] }
+`,
+      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: base
+module: core
+physical_schema: base_core
+`,
+      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+kind: table
+name: Users
+table:
+  name: users
+  extension: { strategy: none }
+fields:
+  - { name: id, type: string, required: true }
+  - { name: x, type: base.core.Users }
+primary_key: [id]
+`,
+    });
+
+    expect(diagnostics.hasErrors).toBe(true);
+    expect(diagnostics.errors.some((d) => d.category === 'kind_mismatch')).toBe(true);
   });
 });
