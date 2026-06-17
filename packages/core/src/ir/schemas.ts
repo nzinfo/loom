@@ -7,9 +7,38 @@
  *
  * `base`/`ref` mutex (spec §10) is enforced per-field via a Zod refinement.
  */
+//
+// ── Adding a new file kind ──────────────────────────────────────────
+// To add a new kind, touch ALL of these (missing any one causes silent bugs):
+//   1. version.ts → FILE_KIND array
+//   2. schemas.ts → new `XxxSchema` export
+//   3. schemas.ts → inferred `type Xxx = z.infer<...>`
+//   4. schemas.ts → new arm in `AnyFile` union
+//   5. schemas.ts → entry in `SCHEMA_BY_KIND`
+//   6. paths.ts  → entry in `KIND_DIRS` (if it has its own directory)
+// ────────────────────────────────────────────────────────────────────
 import { parse as yamlParse } from 'yaml';
 import { z } from 'zod';
 import { CURRENT_VERSION, FILE_KIND, type FileKind } from './version.js';
+
+/** Category of failure surfaced by {@link parseFile}. */
+export type ParseErrorCategory = 'parse' | 'version' | 'kind';
+
+/**
+ * Typed error thrown by {@link parseFile}. The Pass 1 loader catches this
+ * and routes the category into a Diagnostic. Plain YAML syntax errors are
+ * wrapped as category 'parse'.
+ */
+export class ParseError extends Error {
+  readonly category: ParseErrorCategory;
+  readonly file: string;
+  constructor(category: ParseErrorCategory, file: string, message: string) {
+    super(`${category}: ${file}: ${message}`);
+    this.name = 'ParseError';
+    this.category = category;
+    this.file = file;
+  }
+}
 
 const versionSchema = z.literal(CURRENT_VERSION);
 
@@ -217,27 +246,41 @@ const SCHEMA_BY_KIND = {
 } as const;
 
 /**
- * Parse a single file's text into an AnyFile. Throws on version/kind mismatch
- * or schema violation. The loader wraps thrown errors into `parse` diagnostics.
+ * Parse a single file's text into an AnyFile. Throws {@link ParseError} on
+ * version/kind mismatch, schema violation, or YAML syntax error. The Pass 1
+ * loader catches ParseError and routes `category` into a Diagnostic.
  *
  * `file` is the basePath-relative path for error messages; line/column default
  * to 1:1 — the YAML parser supplies real positions in Pass 1.
  */
 export function parseFile(text: string, file: string): AnyFile {
-  const raw = yamlParse(text);
+  let raw: unknown;
+  try {
+    raw = yamlParse(text);
+  } catch (e) {
+    throw new ParseError('parse', file, `YAML syntax: ${(e as Error).message}`);
+  }
   if (typeof raw !== 'object' || raw === null) {
-    throw new Error(`parse: ${file}: not a YAML mapping`);
+    throw new ParseError('parse', file, 'not a YAML mapping');
   }
   const version = (raw as { version?: unknown }).version;
   if (version !== CURRENT_VERSION) {
-    throw new Error(`version: ${file}: expected ${CURRENT_VERSION}, got ${String(version)}`);
+    throw new ParseError('version', file, `expected ${CURRENT_VERSION}, got ${String(version)}`);
   }
   const kind = (raw as { kind?: unknown }).kind;
   if (typeof kind !== 'string' || !(kind in SCHEMA_BY_KIND)) {
-    throw new Error(`kind: ${file}: unknown kind ${String(kind)}`);
+    throw new ParseError('kind', file, `unknown kind ${String(kind)}`);
   }
   const schema = SCHEMA_BY_KIND[kind as FileKind];
-  const data = schema.parse(raw);
+  let data: unknown;
+  try {
+    data = schema.parse(raw);
+  } catch (e) {
+    // Zod errors carry full path information; surface the first issue.
+    const zodErr = e as { errors?: Array<{ message: string }> };
+    const first = zodErr.errors?.[0]?.message ?? (e as Error).message;
+    throw new ParseError('parse', file, `schema: ${first}`);
+  }
   return { kind: kind as FileKind, raw, file, line: 1, column: 1, data } as AnyFile;
 }
 
