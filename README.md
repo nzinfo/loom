@@ -2,7 +2,8 @@
 
 Forward schema description language. Weaves design intent into physical schemas.
 
-See `docs/specs/2026-06-17-loom-design.md` for the full design.
+See `docs/USER_GUIDE.md` for the user manual (Chinese), or
+`docs/specs/2026-06-17-loom-design.md` for the full design.
 
 ## Quick start
 
@@ -19,6 +20,7 @@ loom project sql --dialect mysql --out db.sql systems/
 
 - `packages/core` — engine (environment-agnostic, injectable FileSystem)
 - `packages/cli`  — Node.js CLI
+- `docs/USER_GUIDE.md` — user manual (Chinese)
 - `docs/specs/`   — design specs
 
 ## Status
