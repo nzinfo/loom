@@ -25,5 +25,11 @@ loom project sql --dialect mysql --out db.sql systems/
 
 ## Status
 
-v0.1.0 — `check` + `project sql` for PG/MySQL/SQLite.
-`fmt`, `lift`, `project atlas-yaml` are follow-up work.
+v0.2.0 — unified type system (`type:` + `using` imports), `check` +
+`project sql` for PG/MySQL/SQLite.
+
+v0.1.0 used `base`/`ref` field keys (v1 wire format); v0.2.0 migrates
+to a single `type:` key with a `using` import mechanism (v2 wire format).
+See `docs/specs/2026-06-18-loom-v2-type-system.md`.
+
+`fmt`, `lift`, `project atlas-yaml` are still follow-up work.
