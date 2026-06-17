@@ -8,6 +8,7 @@
  * File system access is injected via the `FileSystem` interface so the
  * same engine can run in browsers, workers, Node, Deno, Bun.
  */
+import type { AnyFile } from './schemas.js';
 
 /** Format family written to every schema file's `version:` line. */
 export const FORMAT_FAMILY = 'loom-schema' as const;
@@ -45,12 +46,11 @@ export interface IR {
   readonly version: typeof CURRENT_VERSION;
 }
 
-/** Discriminated union placeholder for all schema node kinds. */
-export type IRNode =
-  | { readonly kind: 'base_types'; readonly identity: Identity }
-  | { readonly kind: 'module_manifest'; readonly identity: Identity }
-  | { readonly kind: 'value_type'; readonly identity: Identity }
-  | { readonly kind: 'mixin'; readonly identity: Identity }
-  | { readonly kind: 'table'; readonly identity: Identity }
-  | { readonly kind: 'entity'; readonly identity: Identity }
-  | { readonly kind: 'extension_fields'; readonly identity: Identity };
+/**
+ * A loaded schema node. Mirrors `AnyFile` but carries the canonical identity
+ * (derived from path) and is fully resolved (refs linked, mixins expanded).
+ * See spec §13.
+ */
+export type IRNode = AnyFile & {
+  readonly identity: Identity;
+};

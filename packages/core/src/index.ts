@@ -11,3 +11,4 @@ export type { LoadOptions, LoadResult } from './loader/index.js';
 export type { FileSystem } from './loader/fs.js';
 export * from './ir/refs.js';
 export * from './ir/paths.js';
+export * from './ir/schemas.js';
