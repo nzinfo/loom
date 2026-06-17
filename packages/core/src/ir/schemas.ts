@@ -5,7 +5,9 @@
  * These schemas are the per-file shape contract. Cross-file semantic rules
  * (dangling $ref, mixin cycle, primary_key required) live in the validator.
  *
- * `base`/`ref` mutex (spec §10) is enforced per-field via a Zod refinement.
+ * Fields use a single `type:` key (spec v2 §3); form discrimination between
+ * single-segment base_types names and three-segment value_type refs happens
+ * in the typespace resolver, not here.
  */
 //
 // ── Adding a new file kind ──────────────────────────────────────────
@@ -42,20 +44,22 @@ export class ParseError extends Error {
 
 const versionSchema = z.literal(CURRENT_VERSION);
 
-const baseField = z
+/**
+ * A field with a type reference (spec v2 §3).
+ *
+ * `type:` is the single key. Value is a type name — single-segment
+ * (base_types short name, e.g. "integer") or three-segment (value_type
+ * node, e.g. "base.core.Email"). Form discrimination happens in the
+ * typespace resolver, not here.
+ *
+ * `catchall` allows scalar-specific properties (max_length, precision,
+ * scale, values, ...) to pass through; validation against base_types
+ * property schemas happens in Pass 3.
+ */
+const typeField = z
   .object({
     name: z.string().min(1),
-    base: z.string().min(1),
-    required: z.boolean().optional(),
-    unique: z.boolean().optional(),
-    default: z.unknown().optional(),
-  })
-  .catchall(z.unknown());
-
-const refField = z
-  .object({
-    name: z.string().min(1),
-    ref: z.string().min(1),
+    type: z.string().min(1),
     required: z.boolean().optional(),
     unique: z.boolean().optional(),
     default: z.unknown().optional(),
@@ -64,14 +68,7 @@ const refField = z
 
 const includeEntry = z.object({ include: z.string().min(1) }).strict();
 
-const fieldOrInclude = z.union([baseField, refField, includeEntry]).superRefine((val, ctx) => {
-  if ('base' in val && 'ref' in val) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'field cannot have both base and ref (spec §10)',
-    });
-  }
-});
+const fieldOrInclude = z.union([typeField, includeEntry]);
 
 const constraintSchema = z.object({ kind: z.literal('check'), expr: z.string().min(1) }).strict();
 

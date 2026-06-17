@@ -12,6 +12,59 @@ import {
   parseFile,
 } from '../src/ir/schemas.js';
 
+describe('v2 field schema', () => {
+  it('accepts a field with type: <single-segment>', () => {
+    const yaml = `version: loom-schema/v2
+kind: mixin
+name: M
+fields:
+  - name: age
+    type: integer
+`;
+    const f = parseFile(yaml, 'test.yaml');
+    expect(f.kind).toBe('mixin');
+    const fields = (f.data as { fields: Array<Record<string, unknown>> }).fields;
+    expect(fields[0]?.type).toBe('integer');
+    expect((fields[0] as Record<string, unknown>).base).toBeUndefined();
+    expect((fields[0] as Record<string, unknown>).ref).toBeUndefined();
+  });
+
+  it('accepts a field with type: <three-segment>', () => {
+    const yaml = `version: loom-schema/v2
+kind: mixin
+name: M
+fields:
+  - name: email
+    type: base.core.Email
+`;
+    const f = parseFile(yaml, 'test.yaml');
+    const fields = (f.data as { fields: Array<Record<string, unknown>> }).fields;
+    expect(fields[0]?.type).toBe('base.core.Email');
+  });
+
+  it('rejects a field with the v1 base: key', () => {
+    const yaml = `version: loom-schema/v2
+kind: mixin
+name: M
+fields:
+  - name: age
+    base: integer
+`;
+    expect(() => parseFile(yaml, 'test.yaml')).toThrow();
+  });
+
+  it('rejects a field with the v1 ref: key', () => {
+    const yaml = `version: loom-schema/v2
+kind: mixin
+name: M
+fields:
+  - name: email
+    ref: value_type:base.core.Email
+`;
+    expect(() => parseFile(yaml, 'test.yaml')).toThrow();
+  });
+});
+
 describe('schemas', () => {
   it('parses base_types.yaml', () => {
     const f = parseFile(
