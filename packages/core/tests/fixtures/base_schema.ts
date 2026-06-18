@@ -47,7 +47,7 @@ module: core
 physical_schema: base_core
 description: core module
 `,
-    'systems/base/_shared/mixin/audit.yaml': `version: loom-schema/v2
+    'systems/base/core/mixin/audit.yaml': `version: loom-schema/v2
 kind: mixin
 name: Audit
 fields:
@@ -93,7 +93,7 @@ fields:
   - name: id
     type: bigint
     required: true
-  - include: mixin:base._shared.Audit
+  - include: mixin:base.core.Audit
   - name: email
     type: base.core.Email
     required: true

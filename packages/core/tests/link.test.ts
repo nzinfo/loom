@@ -30,7 +30,7 @@ describe('link (Pass 2)', () => {
     const deps = ir.deps.get('table:base.core.Users');
     expect(deps?.has('value_type:base.core.Email')).toBe(true);
     expect(deps?.has('value_type:base.core.Money')).toBe(true);
-    expect(deps?.has('mixin:base._shared.Audit')).toBe(true);
+    expect(deps?.has('mixin:base.core.Audit')).toBe(true);
   });
 
   it('reports dangling refs', async () => {

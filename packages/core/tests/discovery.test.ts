@@ -18,7 +18,7 @@ describe('discovery (Pass 0)', () => {
     expect(ids.has('module_manifest:base.core')).toBe(true);
     expect(ids.has('value_type:base.core.Email')).toBe(true);
     expect(ids.has('value_type:base.core.Money')).toBe(true);
-    expect(ids.has('mixin:base._shared.Audit')).toBe(true);
+    expect(ids.has('mixin:base.core.Audit')).toBe(true);
     expect(ids.has('table:base.core.Users')).toBe(true);
     expect(ids.has('entity:base.core.User')).toBe(true);
     expect(ids.has('extension_fields:base.core.User_fields')).toBe(true);
