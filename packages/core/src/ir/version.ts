@@ -36,6 +36,38 @@ export type FileKind = (typeof FILE_KIND)[number];
  */
 export type Identity = string;
 
+/**
+ * The owner dimension — who provides a node. See spec
+ * `2026-06-18-loom-v2-owner-dimension.md`.
+ *
+ * Owner is derived from the directory path (not declared in file content):
+ *   platform/<sys>/<mod>/...            → platform
+ *   ext/<provider>/<sys>/<mod>/...      → ext:<provider>
+ *   tenants/<id>/<sys>/<mod>/...        → tenant:<id>
+ *
+ * Identity (kind:sys.mod.Name) is unchanged; owner is an orthogonal node
+ * attribute. Cross-owner references are implicit (refs carry no owner).
+ */
+export type Owner =
+  | { readonly kind: 'platform' }
+  | { readonly kind: 'ext'; readonly provider: string }
+  | { readonly kind: 'tenant'; readonly id: string };
+
+/**
+ * A single extension_fields entry flattened for registry use.
+ *
+ * Source of truth lives here (ir/) so the loader's link pass can populate
+ * IR.extensionFields without depending on the projector package.
+ * projector/types.ts re-exports this as ExtensionFieldEntry.
+ */
+export interface ExtensionFieldEntry {
+  readonly name: string;
+  readonly scalar: string;
+  readonly props: Readonly<Record<string, unknown>>;
+  readonly refValueTypeId?: string;
+  readonly defaultScope?: string;
+}
+
 /** Placeholder — full IR types will be added in implementation phases. */
 export interface IR {
   /** Schema files successfully loaded, keyed by Identity. */
@@ -44,13 +76,25 @@ export interface IR {
   readonly deps: ReadonlyMap<Identity, ReadonlySet<Identity>>;
   /** Format version that was loaded. */
   readonly version: typeof CURRENT_VERSION;
+  /**
+   * Extension fields registry: entity identity → ExtensionFieldEntry array.
+   *
+   * Aggregated from all extension_fields files across owners (ext/tenant).
+   * Same-name field across owners on the same entity is a hard error
+   * (detected during link). See spec §7.
+   */
+  readonly extensionFields: ReadonlyMap<Identity, ReadonlyArray<ExtensionFieldEntry>>;
 }
 
 /**
  * A loaded schema node. Mirrors `AnyFile` but carries the canonical identity
  * (derived from path) and is fully resolved (refs linked, mixins expanded).
  * See spec §13.
+ *
+ * `owner` is derived from the directory path (platform/ext/tenants prefix).
+ * See spec `2026-06-18-loom-v2-owner-dimension.md` §4.
  */
 export type IRNode = AnyFile & {
   readonly identity: Identity;
+  readonly owner: Owner;
 };

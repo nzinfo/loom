@@ -2,9 +2,17 @@ import type { Diagnostics } from '../errors.js';
 import { parseRef } from '../ir/refs.js';
 import type { AnyFile, BaseTypes, TypeDescriptor } from '../ir/schemas.js';
 import { type TypeRef, normalizeType, parseTypeRef, resolveShortName } from '../ir/typespace.js';
-import type { IR, IRNode, Identity } from '../ir/version.js';
+import type { ExtensionFieldEntry, IR, IRNode, Identity, Owner } from '../ir/version.js';
 import type { FileKind } from '../ir/version.js';
 import { CURRENT_VERSION } from '../ir/version.js';
+
+/**
+ * Default owner when discovery metadata is unavailable (stub until the link
+ * pass receives the discovery `files` map in a follow-up commit). Real owner
+ * is derived from the directory path; this placeholder keeps the type system
+ * green in the interim.
+ */
+const DEFAULT_OWNER: Owner = { kind: 'platform' };
 
 /**
  * Pass 2 — link. See spec §13.1, §12.
@@ -34,8 +42,10 @@ export async function link(opts: LinkOptions): Promise<LinkResult> {
   const deps = new Map<Identity, Set<Identity>>();
 
   // Lift all parsed files into IRNodes keyed by identity.
+  // Owner is stubbed to DEFAULT_OWNER here; a follow-up commit wires real
+  // owner from the discovery `files` map (derived from directory path).
   for (const [identity, file] of opts.parsed) {
-    nodes.set(identity, { ...file, identity });
+    nodes.set(identity, { ...file, identity, owner: DEFAULT_OWNER });
     deps.set(identity, new Set());
   }
 
@@ -72,6 +82,9 @@ export async function link(opts: LinkOptions): Promise<LinkResult> {
     nodes: nodes as ReadonlyMap<Identity, IRNode>,
     deps: deps as ReadonlyMap<Identity, ReadonlySet<Identity>>,
     version: CURRENT_VERSION,
+    // Stub: empty until the link pass aggregates extension_fields from the
+    // parsed set in a follow-up commit.
+    extensionFields: new Map<Identity, ReadonlyArray<ExtensionFieldEntry>>(),
   };
   return { ir, diagnostics: opts.diagnostics };
 }

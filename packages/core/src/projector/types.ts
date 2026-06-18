@@ -4,6 +4,10 @@
  * These are the output of the design→physical projector.
  * Each PhysicalTable represents a database table (base, ext, or view).
  */
+import type { ExtensionFieldEntry } from '../ir/version.js';
+
+/** Re-exported for projector consumers; source of truth is ir/version.ts. */
+export type { ExtensionFieldEntry };
 
 /** Strategy for storing extension_fields. */
 export type ExtensionStrategy = 'none' | 'json_column' | 'sidecar_eav';
@@ -76,20 +80,6 @@ export interface PhysicalTable {
   readonly extTableName?: string;
   /** If strategy=sidecar_eav, the view name that unions base+ext. */
   readonly viewName?: string;
-}
-
-/**
- * A single extension_fields entry flattened for physical use.
- *
- * This is an intermediate representation used to populate the registry.
- * The projector ultimately surfaces these via the extensionFields Map.
- */
-export interface ExtensionFieldEntry {
-  readonly name: string;
-  readonly scalar: string;
-  readonly props: Readonly<Record<string, unknown>>;
-  readonly refValueTypeId?: string;
-  readonly defaultScope?: string;
 }
 
 /**

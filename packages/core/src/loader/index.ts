@@ -56,6 +56,7 @@ export async function load(opts: LoadOptions): Promise<LoadResult> {
     nodes: linked.nodes,
     deps: linked.deps,
     version: CURRENT_VERSION,
+    extensionFields: linked.extensionFields,
   };
   return { ir, diagnostics };
 }
