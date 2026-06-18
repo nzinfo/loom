@@ -1,0 +1,120 @@
+# 快速上手：第一个 Schema
+
+我们从最小可运行的例子开始，逐步加料。完整版见
+[15 完整示例](./15-full-example.md)。
+
+## 创建项目骨架
+
+```sh
+mkdir -p my-schema/platform/base/core/{value_type,table,entity,extension,mixin}
+touch my-schema/platform/base/core/base_types.yaml
+```
+
+## 写 base_types.yaml
+
+先声明两个最常用的标量：
+
+```yaml
+# my-schema/platform/base/core/base_types.yaml
+version: loom-schema/v2
+kind: base_types
+
+scalars:
+  - name: bigint
+    description: 64-bit integer
+    properties: []
+  - name: string
+    description: var-length string
+    properties:
+      - name: max_length
+        type: integer
+        required: true
+  - name: datetime
+    description: timestamp
+    properties: []
+```
+
+标量目录的完整说明见 [03 base_types](./03-base-types.md)。
+
+## 写 MANIFEST.yaml
+
+```yaml
+# my-schema/platform/base/core/MANIFEST.yaml
+version: loom-schema/v2
+kind: module_manifest
+system: base
+module: core
+physical_schema: base_core
+description: core module
+```
+
+`physical_schema` 决定了这个模块下所有表的物理 schema 前缀（PG schema / MySQL database）。
+详见 [07 entity 与 module_manifest](./07-entity-and-manifest.md)。
+
+## 写第一张表
+
+```yaml
+# my-schema/platform/base/core/table/users.yaml
+version: loom-schema/v2
+kind: table
+name: Users
+table:
+  name: users
+  extension:
+    strategy: none
+fields:
+  - name: id
+    type: bigint
+    required: true
+  - name: email
+    type:
+      ref: string
+      args: { max_length: 254 }
+    required: true
+primary_key: [id]
+```
+
+v2 用单一 `type:` 键表达字段类型（替代 v1 的 `base` / `ref` 互斥键）：
+单段短名（如 `bigint`、`string`）解析到 base_types 标量；三段全限定名
+（如 `base.core.Email`）解析到 value_type 节点。
+
+`type:` 支持两种形式：
+- **简写**：裸字符串 `type: bigint`、`type: base.core.Email`
+- **详写**（type descriptor）：`type: { ref: string, args: {...}, meta: {...} }`
+  ——所有标量参数（`max_length`、`precision`、`scale`、`pattern`）都收拢到
+  `args`，不再写在 field 顶层
+
+详见 [04 value_type](./04-value-type.md) §单一 type: 键。
+
+## 校验
+
+```sh
+loom check my-schema/
+```
+
+无输出 = 通过。退出码 0。诊断管线详见 [11 加载管线](./11-pipeline.md)。
+
+## 投影
+
+```sh
+loom project sql --dialect pg my-schema/
+```
+
+输出（节选）：
+
+```sql
+CREATE TABLE base_core.users (
+  id BIGINT NOT NULL,
+  email VARCHAR(254) NOT NULL,
+  PRIMARY KEY (id)
+);
+```
+
+试试其他方言：
+
+```sh
+loom project sql --dialect mysql my-schema/    # DECIMAL 不带方言语义
+loom project sql --dialect sqlite my-schema/   # 主键自增、CHECK IN 等
+```
+
+CLI 完整参考见 [10 cli](./10-cli.md)。
