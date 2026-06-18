@@ -19,6 +19,7 @@
 - [第 4 章 base_types：可用标量目录](#第-4-章-base_types可用标量目录)
 - [第 5 章 value_type：语义类型包装](#第-5-章-value_type语义类型包装)
 - [第 5.5 章 using 导入机制](#第-55-章-using-导入机制)
+- [第 5.6 章 type_parameters：参数化 value_type](#第-56-章-type_parameters参数化-value_type)
 - [第 6 章 mixin：字段组复用](#第-6-章-mixin字段组复用)
 - [第 7 章 entity 与 module_manifest](#第-7-章-entity-与-module_manifest)
 - [第 8 章 三种扩展策略与 sidecar EAV](#第-8-章-三种扩展策略与-sidecar-eav)
@@ -209,15 +210,24 @@ fields:
     type: bigint
     required: true
   - name: email
-    type: string
-    max_length: 254
+    type:
+      ref: string
+      args: { max_length: 254 }
     required: true
 primary_key: [id]
 ```
 
 v2 用单一 `type:` 键表达字段类型（替代 v1 的 `base` / `ref` 互斥键）：
 单段短名（如 `bigint`、`string`）解析到 base_types 标量；三段全限定名
-（如 `base.core.Email`）解析到 value_type 节点。详见第 5 章。
+（如 `base.core.Email`）解析到 value_type 节点。
+
+`type:` 支持两种形式：
+- **简写**：裸字符串 `type: bigint`、`type: base.core.Email`
+- **详写**（type descriptor）：`type: { ref: string, args: {...}, meta: {...} }`
+  ——所有标量参数（`max_length`、`precision`、`scale`、`pattern`）都收拢到
+  `args`，不再写在 field 顶层
+
+详见第 5 章。
 
 ### 3.5 校验
 
@@ -288,11 +298,10 @@ scalars:
   - { name: uuid, description: UUID, properties: [{name: version, type: integer}] }
   - { name: bytes, description: 二进制, properties: [{name: max_length, type: integer}] }
   - { name: json, description: JSON, properties: [] }
-  - name: enum
-    description: 枚举（值列表在 value_type 定义）
-    properties:
-      - { name: values, type: array<string>, required: true }
 ```
+
+> **注意**：v2 不再为枚举保留 `enum` 标量。枚举（求和类型）由 value_type 的
+> `variants` 顶层形态表达，详见 §10.1。
 
 ### 4.3 关键约束
 
@@ -324,8 +333,9 @@ name: Email
 display_name: 邮箱
 fields:
   - name: value
-    type: string
-    max_length: 254
+    type:
+      ref: string
+      args: { max_length: 254 }
 ```
 
 引用它，列名 = 字段名（无后缀）：
@@ -358,13 +368,14 @@ kind: value_type
 name: Money
 fields:
   - name: amount
-    type: decimal
-    precision: 18
-    scale: 4
+    type:
+      ref: decimal
+      args: { precision: 18, scale: 4 }
     required: true
   - name: currency_code
-    type: string
-    max_length: 3
+    type:
+      ref: string
+      args: { max_length: 3 }
     required: true
 ```
 
@@ -410,6 +421,27 @@ fields:
 从类型论看是同类东西——都是"类型"。"是不是类型"由被引用节点自身的 `kind` 决定，
 引用者只需说"我的类型是 X"，不需要再标 kind 前缀。
 
+#### 5.4.1 Type Descriptor：详写形式
+
+`type:` 除了裸字符串简写，还可以写成**结构化对象**：
+
+```yaml
+- name: email
+  type:
+    ref: string
+    args: { max_length: 254 }
+    meta: { since: v0.2.0 }
+```
+
+| 键 | 作用 | 备注 |
+|---|---|---|
+| `ref` | 类型引用（同简写字符串） | 单段=标量短名，三段=value_type fqn |
+| `args` | 类型参数 | 所有标量参数都收拢在此，不再写 field 顶层 |
+| `meta` | 元数据黑袋（`since`/`deprecated`/标签） | v2 不校验内容 |
+
+简写 `type: integer` 在 link 阶段被规范化为 `{ ref: 'integer' }`，下游 pass 看到的
+一律是对象。两种形式语义等价，但**带参数时必须用详写**（参数无处可放）。
+
 **错误情况**：
 
 - field 没有 `type:` → `field must have a type`
@@ -417,6 +449,8 @@ fields:
 - `type: foo.bar.Baz` 目标 kind 不是 value_type →
   `type reference "foo.bar.Baz" resolves to kind=entity, expected value_type`
 - `type: integer` base_types 里没有 → `unknown scalar "integer"`
+- 在 field 顶层写 `max_length`、`precision` 等参数键 → `Unrecognized key(s) in object`
+  （v2 要求参数走 `type.args`）
 
 ---
 
@@ -541,6 +575,61 @@ fields:
 
 - using 条目的命名空间或精确名必须存在 → 否则 `unknown using target "..."`
 - using 列表为空时可省略 `using:` 键
+
+---
+
+## 第 5.6 章 type_parameters：参数化 value_type
+
+当一个 value_type 的内部字段类型本身需要由引用方决定时，用 `type_parameters`
+声明类型参数，让它成为"泛型 value_type"。
+
+### 5.6.1 声明
+
+```yaml
+# systems/base/core/value_type/range.yaml
+version: loom-schema/v2
+kind: value_type
+name: Range
+type_parameters:
+  - name: T
+    constraint: value              # type | value（默认 type）
+    default: base.core.bigint
+    description: 元素类型
+fields:
+  - name: low
+    type: T                        # 引用类型参数
+  - name: high
+    type: T
+```
+
+- **`name`**：参数标识符。在 fields 里以 `type: <name>` 引用
+- **`constraint`**：
+  - `value`：实参必须是具体类型（标量短名或 value_type fqn）
+  - `type`（默认）：实参可为任何类型，含另一个类型参数（用于泛型递归 `Map<K,V>`）
+- **`default`**：引用方未传该参数时使用
+
+### 5.6.2 引用方传参
+
+引用方在 `type.args` 里以 `{ <ParamName>: <TypeRef> }` 传实参：
+
+```yaml
+fields:
+  - name: price_range
+    type:
+      ref: base.core.Range
+      args: { T: decimal }
+  - name: timestamp_range
+    type:
+      ref: base.core.Range
+      args: { T: datetime }
+# → price_range_low NUMERIC, price_range_high NUMERIC
+# → timestamp_range_low TIMESTAMPTZ, timestamp_range_high TIMESTAMPTZ
+```
+
+投影器自动把 fields 里的 `T` 替换为实参类型。
+
+> **类型参数与值参数共享 `type.args`**：`max_length`（值参数）和 `T`（类型参数）
+> 都写在 args 里，加载器按"是否为声明的 type parameter 名"区分。
 
 ---
 
@@ -749,14 +838,15 @@ kind: extension_fields
 entity: entity:base.core.User           # 作用于哪个 entity（身份引用，kind 前缀保留）
 fields:
   - name: nickname
-    type: string
-    max_length: 50
+    type:
+      ref: string
+      args: { max_length: 50 }
     default_scope: tenant              # 租户级自定义
   - name: credit_limit
     type: base.core.Money              # 多字段 value_type 也能用
     default_scope: tenant
   - name: customer_grade
-    type: base.core.CustomerGrade      # enum 强制走 value_type（详见 §10.1）
+    type: base.core.CustomerGrade      # variants 形态的 value_type（详见 §10.1）
     default_scope: tenant
 ```
 
@@ -775,22 +865,28 @@ entity/table（开发期）不同。混在一起，diff 会被频繁的部署配
 
 ## 第 10 章 枚举、索引、外键
 
-### 10.1 枚举
+### 10.1 variants：枚举的求和类型形态
 
-enum 在 base_types 列为 scalar，但**值列表在 value_type 定义**。v2 取消了 v1 的
-inline enum 写法（在 table / extension_fields 的 field 里直接写
-`base: enum, values: [...]`），enum 值列表**只能**在 value_type 文件里声明：
+v2 用类型论术语 **variants**（sum type）替代 v1 的工业惯用词 `enum`。variants 是
+value_type 的**两种互斥形态之一**（另一种是 `fields`）：
 
 ```yaml
 # systems/base/core/value_type/user_status.yaml
 version: loom-schema/v2
 kind: value_type
 name: UserStatus
-fields:
-  - name: value
-    type: enum                         # enum 是 base_types 短名
-    values: [active, inactive, suspended]
+variants: [active, inactive, suspended]
+# 或详写（带显示名/描述）：
+variants:
+  - value: active
+    display_name: Active
+  - value: inactive
+  - value: suspended
 ```
+
+- `fields` 与 `variants` 互斥（reader 校验）
+- variants 元素支持双形式：字符串视为 `{ value: <str> }`；详写用 `value` 作为键
+  （**不是** `name`——`value` 更贴切，对齐 sum type 的"分支值"概念）
 
 引用处和其他 value_type 完全一样：
 
@@ -800,12 +896,15 @@ fields:
     type: base.core.UserStatus         # 或经 using 短名：type: UserStatus
 ```
 
-enum 不再特殊——它就是一个内部字段类型为 `enum` 标量的 value_type。
+投影器自动识别目标 value_type 是 fields 形态还是 variants 形态，把 variants 投成
+单列（列标量报告为 `string`），值列表进入 enum registry 驱动方言生成。
 
-> **v2 破坏性变更**：v1 允许在任意 field 处 inline 写 `base: enum, values: [...]`，
-> v2 取消。inline enum 让"值列表放哪"暧昧（同一组 enum 可能散落在多处重复声明），
-> 无法统一管理。迁移方法：把每个 inline enum 提到独立的 value_type 文件，引用处
-> 改为 `type: <fqn>`。
+> **v2 破坏性变更**：
+>
+> 1. v1 inline 写法（`base: enum, values: [...]`）取消，迁移到独立 value_type
+>    文件用 `variants:` 形态。
+> 2. base_types 里的 `enum` scalar 移除——求和类型现在由 value_type 顶层形态表达，
+>    不再需要"假装是标量"。
 
 物理投影：
 
@@ -1241,7 +1340,8 @@ version: loom-schema/v2
 kind: value_type
 name: Email
 fields:
-  - { name: value, type: string, max_length: 254 }
+  - name: value
+    type: { ref: string, args: { max_length: 254 } }
 ```
 
 ```yaml
@@ -1250,8 +1350,12 @@ version: loom-schema/v2
 kind: value_type
 name: Money
 fields:
-  - { name: amount,        type: decimal, precision: 18, scale: 4, required: true }
-  - { name: currency_code, type: string,  max_length: 3, required: true }
+  - name: amount
+    type: { ref: decimal, args: { precision: 18, scale: 4 } }
+    required: true
+  - name: currency_code
+    type: { ref: string, args: { max_length: 3 } }
+    required: true
 ```
 
 ### A.5 systems/base/core/table/users.yaml
@@ -1298,7 +1402,9 @@ version: loom-schema/v2
 kind: extension_fields
 entity: entity:base.core.User
 fields:
-  - { name: nickname, type: string, max_length: 50, default_scope: tenant }
+  - name: nickname
+    type: { ref: string, args: { max_length: 50 } }
+    default_scope: tenant
 ```
 
 ### A.8 投影输出（PG）

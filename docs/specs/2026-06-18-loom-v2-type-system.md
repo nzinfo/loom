@@ -115,7 +115,40 @@ fields:
 
 形态从语法上就分得开（点号数量不同），不需要 kind 前缀消歧。
 
-### 3.3 错误情况
+### 3.3 Type Descriptor（详写形式）
+
+`type:` 支持两种**书写**形式：简写（裸字符串）与详写（结构化对象）。简写经
+`normalizeType` 在 link 阶段被规范化为详写，下游 pass（validate / expand）只看到对象。
+
+```yaml
+# 简写（向后兼容）
+- name: email
+  type: string
+
+# 详写（携带 args / meta）
+- name: email
+  type:
+    ref: string
+    args: { max_length: 254 }
+    meta: { since: v0.2.0 }
+```
+
+- **`ref`**：类型引用。单段（标量短名）或三段（value_type fqn）。语义同简写字符串。
+- **`args`**：类型参数。统一承载两类参数：
+  - **值参数**：标量属性（`max_length`、`precision`、`scale`、`pattern`）
+  - **类型参数**：泛型实例化的实参（`T: decimal`，详见 §12）
+  
+  v1 里散落在 field 顶层的 `max_length` / `precision` / `scale` 等键**全部移除**，
+  只接受 `type.args`。
+- **`meta`**：`Record<string, unknown>` 黑袋。承载 `since` / `deprecated` / 标签等
+  非语义元数据，v2 不校验其内容。
+
+**为什么用 args 统一两类参数**：从类型论看，值参数（"字符串长度 254"）与类型参数
+（"Range 的元素类型是 decimal"）都是"类型被实参化"的同一个动作——前者是值级别的
+实参，后者是类型级别的实参。统一到一个通道让 v2 的泛型机制可以平滑接入而无需
+引入第二套语法。
+
+### 3.4 错误情况
 
 - `type: base.core.Money` 但 `base.core.Money` 节点的 kind 是 entity（非 value_type）
   → 报错 `type reference "base.core.Money" resolves to kind=entity, expected value_type`
@@ -126,14 +159,15 @@ fields:
 - field 没有 `type`
   → 报错 `field must have a type`
 
-### 3.4 与 v1 的对照
+### 3.5 与 v1 的对照
 
 | 场景 | v1 | v2 |
 |---|---|---|
-| 内置标量字段 | `base: integer` | `type: integer` |
+| 内置标量字段 | `base: integer` | `type: integer`（或详写 `type: {ref: integer}`） |
 | 单字段 value_type 引用 | `ref: value_type:base.core.Email` | `type: base.core.Email` |
 | 多字段 value_type 引用 | `ref: value_type:base.core.Money` | `type: base.core.Money` |
-| enum（强制走 value_type） | inline `base: enum, values: [...]` 或 value_type | **仅** value_type（取消 inline） |
+| 类型参数（max_length 等） | 散落 field 顶层 | `type.args: { max_length: 254 }` |
+| 枚举 | inline `base: enum, values: [...]` 或 value_type | `variants:` 顶层形态（详见 §6） |
 | field 缺类型 | 报 `must have either base or ref` | 报 `must have a type` |
 
 ## 4. using 导入机制
@@ -243,11 +277,11 @@ v2.1 候选议题，届时需要回答：
 
 本文档先不展开。
 
-## 6. enum：强制走 value_type
+## 6. variants：value_type 的求和类型形态
 
 ### 6.1 v1 现状
 
-v1 允许两种 enum 写法：
+v1 用工业惯用的 `enum` 表达"有限取值集合"，且语法上分散：
 
 ```yaml
 # v1 inline（散落在任意 field 处）
@@ -256,32 +290,53 @@ fields:
     base: enum
     values: [active, inactive, suspended]
 
-# v1 value_type（集中定义）
-# value_type/user_status.yaml
+# v1 value_type（集中定义但语法重复）
 fields:
   - name: value
     base: enum
     values: [active, inactive, suspended]
 ```
 
-inline enum 让"值列表放哪"这件事暧昧——同一个 enum 可能在多处重复声明，无法统一管理。
+两个问题：
+1. **inline enum 让"值列表放哪"暧昧**——同一组值可能在多处重复声明
+2. **`enum` 是工业惯用词，不是类型论术语**——和值对象（record / product type）混在
+   同一个 value_type 概念下时，缺一个明确的"它是 sum type"的标签
 
-### 6.2 v2 决策
+### 6.2 v2 决策：variants 作为 value_type 的顶层形态
 
-**取消 inline enum**。enum 值列表只能在 value_type 文件里声明：
+v2 把 value_type 明确区分为**两种互斥形态**：
 
 ```yaml
-# value_type/user_status.yaml
-version: loom-schema/v2
+# 形态 A：组合类型（值对象 / product type）
+kind: value_type
+name: Money
+fields:
+  - name: amount
+    type: { ref: decimal, args: { precision: 18, scale: 4 } }
+    required: true
+
+# 形态 B：variants（求和类型 / sum type，取代 enum）
 kind: value_type
 name: UserStatus
-fields:
-  - name: value
-    type: enum                       # enum 现在是 base_types 短名
-    values: [active, inactive, suspended]
+variants: [active, inactive, suspended]
+# 或详写：
+variants:
+  - value: active
+    display_name: 活跃
+  - value: inactive
 ```
 
-引用处和其他 value_type 完全一样：
+- `fields` 与 `variants` 互斥（reader 校验：二者同时存在或同时缺失都报错）
+- **`enum` 标量从 base_types 移除**——不再需要"假装是标量"，求和类型由 value_type
+  顶层形态直接表达
+- variants 元素支持双形式：
+  - 简写：裸字符串 → 视为 `{ value: <str> }`
+  - 详写：`{ value, display_name?, description? }`，键是 `value`（不是 `name`）
+
+### 6.3 引用方
+
+引用方与其他 value_type 完全一样——投影器自动检测目标 value_type 是 fields 形态
+还是 variants 形态：
 
 ```yaml
 fields:
@@ -289,13 +344,24 @@ fields:
     type: base.core.UserStatus       # 或经 using 短名 UserStatus
 ```
 
-enum 不再特殊——它就是一个内部字段类型为 `enum` 标量的 value_type。
+- variants 形态投影为**单列**，列的标量报告为 `string`（供方言生成器选用合适的字面类型）
+- 枚举值列表进入 `model.enums` registry（identity → string[]），驱动 PG `CREATE TYPE
+  AS ENUM` / MySQL `ENUM(...)` / SQLite `CHECK` 子句
+- registry 结构不变，方言生成器**无需改动**
 
-### 6.3 收益
+### 6.4 为什么用 `variants` 而不是 `enum`
+
+类型论里，"有限取值集合"叫 **sum type** / **tagged union**，与 record / product type
+（v2 的 fields 形态）对偶。`variants` 直接对应该术语，让 value_type 的两种形态在
+概念上对仗整齐。`enum` 是 C/Java 借用的工业词，且历史上和"标量+values 列表"耦合，
+含义偏窄；用 `variants` 撕掉这层历史包袱，统一在类型论词汇下描述。
+
+### 6.5 收益
 
 - "值列表放哪"不再暧昧，统一在 value_type 文件
-- enum 与其他 value_type 走完全相同的引用与投影路径
-- 复用性：同一组 enum 值跨表引用无需复制
+- 概念对仗：value_type = fields（product） ∨ variants（sum）
+- 复用性：同一组 variants 跨表引用无需复制
+- 方言投影路径与其他 value_type 共用（registry 结构不变）
 
 ## 7. 身份系统的影响
 
@@ -337,20 +403,36 @@ base_types 文件自身身份 = `base_types:base.core`（kind=base_types，sys=b
 - **ir/schemas.ts**：
   - 新增 `using` 字段到 ParsedFileBase（所有 kind 共享）
   - field schema 从 `base`/`ref` 互斥改为单一 `type:` 键
-  - 移除 inline enum 的 `base: enum` 分支（enum 强制走 value_type）
+  - **Type Descriptor**（§3.3）：`type:` 接受 `z.union([z.string(), TypeDescriptorSchema])`
+    双形式；移除 field 顶层散落的参数键（`.catchall(z.unknown())`），所有标量参数
+    收拢到 `type.args`
+  - **variants**（§6）：新增 `variantSchema` + `ValueTypeSchema.variants`，与
+    `fields` 经 `.superRefine` 互斥校验；移除 base_types 里的 `enum` 标量
+  - **type_parameters**（§12）：新增 `typeParameterSchema` + `ValueTypeSchema.type_parameters`
   - base_types 节点的 scalar 不变（仍是 data.scalars 数组）
+- **ir/typespace.ts**：新增 `normalizeType` 把 string 简写规范化为 descriptor 对象
 - **ir/refs.ts**：新增类型引用解析（`sys.mod.Name` 三段）；与身份 ref（四段）分离
 - **loader/link.ts**：
   - 新增 using 解析（default `base.core.*` + 文件 using 列表）
   - 新增类型名字空间查表（base_types scalars + value_type nodes）
   - 短名歧义检测
   - 验证 `type:` 三段名目标 kind === 'value_type'
+  - 入口 `normalizeType`：所有下游 pass 看到的 type 一律是对象
+  - 识别 type_parameters：fields 里 `type: T` 若 T 是声明的 type parameter，跳过解析
 - **loader/validate.ts**：
-  - `checkScalarField` → `checkTypedField`（基于 `type:` 解析结果）
-  - 属性 schema 校验从 `base` 上下文改为 `type` 解析后的目标类型
-- **projector/expand.ts**：`expandField` 从 base/ref 分支改为单一 type 分支
+  - `checkScalarField` → `checkTypedField`（基于 `type.ref`）
+  - required 参数检查改为查 `type.args`
+  - value_type 若有 variants，跳过 fields 校验
+  - type parameter 引用跳过 unknown-scalar 检查
+- **projector/expand.ts**：
+  - `expandField` 从 base/ref 分支改为单一 `type.ref` 分支
+  - 参数来源改为 `type.args`（移除 `extractProperties`）
+  - `collectEnums` → `collectVariants`：扫描 `variants` 顶层（而非 fields 里的
+    `enum`+`values`），registry 结构不变
+  - `instantiateFields`：generic value_type 引用方传 `args.T` 时实例化 fields
 - **projector/types.ts**：`PhysicalColumn` 形态基本不变（仍是 name/scalar/props/...）
-- **projector/dialects/**：枚举 DDL 生成逻辑不变（输入仍是 model.enums）
+- **projector/dialects/**：方言生成器从 `c.scalar === 'enum'` 改为只看 `c.enumRef`
+  （因为 variants 列的 scalar 现在报告为 `string`，但 enumRef 仍指向 registry 项）
 
 ### 9.2 cli 包
 
@@ -360,15 +442,101 @@ base_types 文件自身身份 = `base_types:base.core`（kind=base_types，sys=b
 ### 9.3 测试与固件
 
 - 所有测试固件（base_schema.ts 等）从 v1 语法改为 v2 语法
-- 黄金固件 base_schema.pg.sql 重新生成（语义等价，但来源 schema 改了）
+- 4 处标量参数迁移到 `type.args`：email.max_length、money.precision/scale、
+  money.currency_code.max_length、user_fields.nickname.max_length
+- 新增 `Range<T>` type_parameters 示例 + `Status` variants 示例
+- 黄金固件 base_schema.pg.sql 重新生成（含 price_range_low/high + status enum）
 - 新增 using 专项测试（短名、模块通配、精确、歧义、unknown target）
-- 新增 enum-only-through-value_type 测试
+- 新增 variants 双形式 + fields/variants 互斥测试
+- 新增 type_parameters 声明 + 实例化测试
 
 ### 9.4 文档
 
 - 本 spec 文档（已在写）
 - `docs/USER_GUIDE.md` 第 5/10/11 章重写（value_type / enum / ref → type + using）
 - README 的 Status 段更新为 v2
+
+## 12. type_parameters：参数化 value_type
+
+### 12.1 动机
+
+v2 之前，`Money` 这种值对象是写死的——amount 必是 decimal。但很多值对象本质是
+**参数化**的：`Range` 的下界/上界可以是 int、decimal、datetime……element 类型应该
+由引用方决定。这正是类型论里的 **parameterized type** / **generic**（`List<T>`、
+`Map<K,V>`）。
+
+v2 通过 `type_parameters` 把这一能力引入 value_type，让一个 value_type 定义服务
+多种实例化。
+
+### 12.2 声明
+
+```yaml
+kind: value_type
+name: Range
+type_parameters:
+  - name: T
+    constraint: value              # type | value
+    default: base.core.bigint
+    description: 元素类型
+fields:
+  - name: low
+    type: T                        # 引用 type parameter
+  - name: high
+    type: T
+```
+
+- **`name`**：参数标识符。在 value_type 的 fields 里被 `type: <name>` 引用
+- **`constraint`**：
+  - `type`（默认）：实参可为任何类型，**包括另一个 type parameter**——用于泛型递归
+    （如 `Map<K,V>` 里 K、V 可再绑定到上层 generic 的参数）
+  - `value`：实参必须是**具体类型**（标量短名或 value_type fqn），不接受 type
+    parameter 名——用于"这个位置必须是落地类型"的约束
+- **`default`**：可选。引用方未传该参数时使用（必须是具体类型 fqn 或短名）
+- **`description`**：人类可读说明
+
+### 12.3 引用方传参
+
+引用方在 `type.args` 里以 `{ <ParamName>: <TypeRef> }` 形式传实参：
+
+```yaml
+fields:
+  - name: price_range
+    type:
+      ref: base.core.Range
+      args: { T: decimal }
+  - name: timestamp_range
+    type:
+      ref: base.core.Range
+      args: { T: datetime }
+```
+
+实参（`decimal` / `datetime`）经过与字段 type 同样的解析路径（单段→标量，三段→
+value_type fqn）。注意：**类型参数与值参数共享 `type.args` 通道**——`max_length`
+（值参数）和 `T`（类型参数）都在 args 里，discrimination 在解析时按"是否为声明的
+type parameter 名"判断。
+
+### 12.4 实例化
+
+投影器在 `expandField` 阶段做替换：
+
+1. 读目标 value_type 的 `type_parameters` 声明
+2. 读引用方 `type.args` 里对应的绑定（缺失则用 `default`；都没则保留参数名——
+   投影会失败并报错）
+3. 遍历 fields，对每个 `type.ref === <ParamName>` 的字段，把 ref 替换为绑定的类型
+4. 投影替换后的 fields
+
+替换是**浅替换**——args/meta 不透传（v2 只支持绑定到裸类型名）。
+
+### 12.5 与 type descriptor 的协同
+
+type_parameters 与 §3.3 type descriptor 是同一套机制的延伸：
+
+- 字段 type 的 `args` 通道统一承载值参数（`max_length`）与类型参数（`T`）
+- 简写 `type: T` 与详写 `type: { ref: T }` 等价
+- 引用方传 `args: { T: decimal }` 时，args 既被 generic 实例化消费（`T` 被绑定），
+  也可能被标量属性消费（`max_length` 被读取）——视目标 value_type 的形态而定
+
+这就是 §3.3 选 args 而非另起一个键的原因：值参数与类型参数本是同一抽象的两种实例。
 
 ## 10. 未决 / 挂起项
 
@@ -378,17 +546,21 @@ base_types 文件自身身份 = `base_types:base.core`（kind=base_types，sys=b
 | mixin using 化 | 挂起 | v2.1 候选；mixin 不是类型，纳入 using 需独立设计 |
 | using 列表去重的校验严格度 | 待定 | 警告 or 报错 |
 | 短名歧义错误的候选列表格式 | 待定 | 排序、是否含 kind |
+| type_parameters 深替换 | 待定 | v2 仅浅替换（绑定到裸类型名）；若需透传 args/meta 留作 v2.1 |
+| `meta` 内容约束 | 待定 | v2 是 `Record<string, unknown>` 黑袋；未来或收紧 `since`/`deprecated` schema |
 
 ## 11. 与 v1 spec 的差异速查
 
 | 维度 | v1（2026-06-17） | v2（本文档） |
 |---|---|---|
-| 字段类型键 | `base` / `ref` 互斥 | 单一 `type:` |
+| 字段类型键 | `base` / `ref` 互斥 | 单一 `type:`（简写或详写 descriptor，§3.3） |
 | 类型引用语法 | `value_type:base.core.Email`（带 kind） | `base.core.Email`（无 kind） |
 | 内置标量名 | 单段 `integer` | 短名 `integer` 或全限定 `base.core.integer` |
 | 类型名字空间 | 复用身份空间（带 kind） | 独立三段名空间 |
+| 标量参数位置 | 散落 field 顶层（`max_length`、`precision`...） | 统一收拢到 `type.args`（§3.3） |
 | 导入机制 | 无 | `using:` 文件级，默认 `base.core.*` |
-| enum 写法 | inline 或 value_type | 仅 value_type |
+| 枚举表达 | inline `base: enum` 或 value_type 内部 | value_type 顶层 `variants:` 形态（§6） |
+| 参数化类型 | 不支持 | `type_parameters` + 引用方 `args.T`（§12） |
 | wire 版本 | `loom-schema/v1` | `loom-schema/v2` |
 | mixin include 语法 | `- include: mixin:...` | 不变（v2.1 候选改造） |
 
