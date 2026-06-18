@@ -19,11 +19,11 @@ describe('projector views (spec §7.4)', () => {
   it('emits no view when strategy != sidecar_eav', async () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
-      'base_types.yaml':
+      'platform/base/core/base_types.yaml':
         'version: loom-schema/v2\nkind: base_types\nscalars:\n  - name: bigint\n    properties: []\n',
-      'systems/base/core/MANIFEST.yaml':
+      'platform/base/core/MANIFEST.yaml':
         'version: loom-schema/v2\nkind: module_manifest\nsystem: base\nmodule: core\nphysical_schema: base_core\n',
-      'systems/base/core/table/t.yaml':
+      'platform/base/core/table/t.yaml':
         'version: loom-schema/v2\nkind: table\nname: T\ntable:\n  name: t\n  extension:\n    strategy: none\nfields:\n  - name: id\n    type: bigint\n    required: true\nprimary_key: [id]\n',
     });
     const { ir } = await load({ fs, basePath: '' });
@@ -35,17 +35,17 @@ describe('projector views (spec §7.4)', () => {
   it('expands multi-field value_type refs (e.g. Money) into multiple pivot columns (spec §7.4)', async () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
-      'base_types.yaml':
+      'platform/base/core/base_types.yaml':
         'version: loom-schema/v2\nkind: base_types\nscalars:\n  - name: bigint\n    properties: []\n  - name: decimal\n    properties:\n      - name: precision\n        type: integer\n        required: true\n      - name: scale\n        type: integer\n        required: true\n  - name: string\n    properties:\n      - name: max_length\n        type: integer\n        required: true\n',
-      'systems/base/core/MANIFEST.yaml':
+      'platform/base/core/MANIFEST.yaml':
         'version: loom-schema/v2\nkind: module_manifest\nsystem: base\nmodule: core\nphysical_schema: base_core\n',
-      'systems/base/core/value_type/money.yaml':
+      'platform/base/core/value_type/money.yaml':
         'version: loom-schema/v2\nkind: value_type\nname: Money\nfields:\n  - name: amount\n    type:\n      ref: decimal\n      args: { precision: 18, scale: 4 }\n  - name: currency_code\n    type:\n      ref: string\n      args: { max_length: 3 }\n',
-      'systems/base/core/table/users.yaml':
+      'platform/base/core/table/users.yaml':
         'version: loom-schema/v2\nkind: table\nname: Users\ntable:\n  name: users_base\n  extension:\n    strategy: sidecar_eav\n    ext_table: users_ext\n    view: users\nfields:\n  - name: id\n    type: bigint\n    required: true\nprimary_key: [id]\n',
-      'systems/base/core/entity/user.yaml':
+      'platform/base/core/entity/user.yaml':
         'version: loom-schema/v2\nkind: entity\nname: User\nprimary_table: table:base.core.Users\n',
-      'systems/base/core/extension/user_fields.yaml':
+      'platform/base/core/extension/user_fields.yaml':
         'version: loom-schema/v2\nkind: extension_fields\nentity: entity:base.core.User\nfields:\n  - name: credit_limit\n    type: base.core.Money\n    default_scope: tenant\n',
     });
     const { ir } = await load({ fs, basePath: '' });

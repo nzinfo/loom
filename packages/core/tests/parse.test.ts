@@ -21,7 +21,7 @@ describe('parse (Pass 1)', () => {
   it('emits a version diagnostic on mismatched version', async () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
-      'base_types.yaml':
+      'platform/base/core/base_types.yaml':
         'version: loom-schema/v9\nkind: base_types\nscalars:\n  - name: string\n    properties: []\n',
     });
     const diag = new Diagnostics();
@@ -34,7 +34,7 @@ describe('parse (Pass 1)', () => {
   it('emits a parse diagnostic on schema violation', async () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
-      'systems/base/core/mixin/a.yaml':
+      'platform/base/core/mixin/a.yaml':
         'version: loom-schema/v2\nkind: mixin\nname: A\nfields:\n  - base: string\n',
     });
     const diag = new Diagnostics();

@@ -54,19 +54,19 @@ describe('projector expand', () => {
   it('produces no ext columns for strategy=none', async () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - name: bigint
     properties: []
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/table/t.yaml': `version: loom-schema/v2
+      'platform/base/core/table/t.yaml': `version: loom-schema/v2
 kind: table
 name: T
 table:
@@ -90,19 +90,19 @@ primary_key: [id]
   it('exposes enum registry keyed by value_type identity (spec §11)', async () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - name: bigint
     properties: []
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/value_type/status.yaml': `version: loom-schema/v2
+      'platform/base/core/value_type/status.yaml': `version: loom-schema/v2
 kind: value_type
 name: Status
 variants: [active, inactive]
@@ -125,7 +125,7 @@ variants: [active, inactive]
 describe('v2 projector — expandField via type:', () => {
   it('expands a single-segment type to one column', async () => {
     const model = await expandFromStringMap({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - { name: bigint, description: i, properties: [] }
@@ -134,13 +134,13 @@ scalars:
     properties:
       - { name: max_length, type: integer, required: true }
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
 name: Users
 table:
@@ -164,7 +164,7 @@ primary_key: [id]
 
   it('expands a three-segment single-field value_type ref to one column (no suffix)', async () => {
     const model = await expandFromStringMap({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - { name: bigint, description: i, properties: [] }
@@ -173,13 +173,13 @@ scalars:
     properties:
       - { name: max_length, type: integer, required: true }
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/value_type/email.yaml': `version: loom-schema/v2
+      'platform/base/core/value_type/email.yaml': `version: loom-schema/v2
 kind: value_type
 name: Email
 fields:
@@ -188,7 +188,7 @@ fields:
       ref: string
       args: { max_length: 254 }
 `,
-      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
 name: Users
 using:
@@ -210,7 +210,7 @@ primary_key: [id]
 
   it('expands a multi-field value_type ref to N prefixed columns', async () => {
     const model = await expandFromStringMap({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - { name: bigint, description: i, properties: [] }
@@ -224,13 +224,13 @@ scalars:
     properties:
       - { name: max_length, type: integer, required: true }
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/value_type/money.yaml': `version: loom-schema/v2
+      'platform/base/core/value_type/money.yaml': `version: loom-schema/v2
 kind: value_type
 name: Money
 fields:
@@ -243,7 +243,7 @@ fields:
       ref: string
       args: { max_length: 3 }
 `,
-      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
 name: Users
 using:
@@ -265,23 +265,23 @@ primary_key: [id]
 
   it('records enumRef as the full value_type identity for an enum value_type', async () => {
     const model = await expandFromStringMap({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - { name: bigint, description: i, properties: [] }
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/value_type/status.yaml': `version: loom-schema/v2
+      'platform/base/core/value_type/status.yaml': `version: loom-schema/v2
 kind: value_type
 name: Status
 variants: [active, inactive]
 `,
-      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
 name: Users
 using:

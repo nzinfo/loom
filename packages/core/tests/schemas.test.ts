@@ -154,7 +154,7 @@ fields:
       ref: string
       args: { max_length: 254 }
 `;
-    const f = parseFile(src, 'systems/base/core/value_type/email.yaml');
+    const f = parseFile(src, 'platform/base/core/value_type/email.yaml');
     expect(f.kind).toBe('value_type');
     const vt = ValueTypeSchema.parse((f as { raw: unknown }).raw);
     expect((vt.fields[0]?.type as { ref: string }).ref).toBe('string');
@@ -178,7 +178,7 @@ constraints:
   - kind: check
     expr: amount >= 0
 `;
-    const f = parseFile(src, 'systems/base/core/value_type/money.yaml');
+    const f = parseFile(src, 'platform/base/core/value_type/money.yaml');
     expect(f.kind).toBe('value_type');
     expect(() => ValueTypeSchema.parse((f as { raw: unknown }).raw)).not.toThrow();
   });
@@ -211,7 +211,7 @@ fields:
     required: true
 primary_key: [id]
 `;
-    const f = parseFile(src, 'systems/base/core/table/users.yaml');
+    const f = parseFile(src, 'platform/base/core/table/users.yaml');
     const t = TableSchema.parse((f as { raw: unknown }).raw);
     expect(t.table.extension.strategy).toBe('sidecar_eav');
   });
@@ -223,7 +223,7 @@ name: User
 primary_table: table:base.core.Users
 business_keys: [email]
 `;
-    const f = parseFile(src, 'systems/base/core/entity/user.yaml');
+    const f = parseFile(src, 'platform/base/core/entity/user.yaml');
     expect(() => EntitySchema.parse((f as { raw: unknown }).raw)).not.toThrow();
   });
 
@@ -238,7 +238,7 @@ fields:
       args: { max_length: 50 }
     default_scope: tenant
 `;
-    const f = parseFile(src, 'systems/base/core/extension/user_fields.yaml');
+    const f = parseFile(src, 'platform/base/core/extension/user_fields.yaml');
     expect(() => ExtensionFieldsSchema.parse((f as { raw: unknown }).raw)).not.toThrow();
   });
 

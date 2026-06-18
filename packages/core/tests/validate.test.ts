@@ -23,13 +23,13 @@ describe('validate (Pass 3)', () => {
 
   it('flags unknown scalar base', async () => {
     const fs = new MemoryFileSystem({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - name: string
     properties: []
 `,
-      'systems/base/core/mixin/a.yaml': `version: loom-schema/v2
+      'platform/base/core/mixin/a.yaml': `version: loom-schema/v2
 kind: mixin
 name: A
 fields:
@@ -45,7 +45,7 @@ fields:
 
   it('flags primary_key field that is not required', async () => {
     const fs = new MemoryFileSystem({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - name: bigint
@@ -53,13 +53,13 @@ scalars:
   - name: string
     properties: []
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/table/t.yaml': `version: loom-schema/v2
+      'platform/base/core/table/t.yaml': `version: loom-schema/v2
 kind: table
 name: T
 table:
@@ -80,7 +80,7 @@ primary_key: [id]
 
   it('flags extension_fields targeting a non-sidecar entity', async () => {
     const fs = new MemoryFileSystem({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - name: bigint
@@ -88,13 +88,13 @@ scalars:
   - name: string
     properties: []
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/table/t.yaml': `version: loom-schema/v2
+      'platform/base/core/table/t.yaml': `version: loom-schema/v2
 kind: table
 name: T
 table:
@@ -107,12 +107,12 @@ fields:
     required: true
 primary_key: [id]
 `,
-      'systems/base/core/entity/t.yaml': `version: loom-schema/v2
+      'platform/base/core/entity/t.yaml': `version: loom-schema/v2
 kind: entity
 name: T
 primary_table: table:base.core.T
 `,
-      'systems/base/core/extension/t_fields.yaml': `version: loom-schema/v2
+      'platform/base/core/extension/t_fields.yaml': `version: loom-schema/v2
 kind: extension_fields
 entity: entity:base.core.T
 fields:
@@ -130,7 +130,7 @@ fields:
 
   it('validates scalar property presence (decimal requires precision/scale)', async () => {
     const fs = new MemoryFileSystem({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - name: decimal
@@ -142,7 +142,7 @@ scalars:
         type: integer
         required: true
 `,
-      'systems/base/core/mixin/a.yaml': `version: loom-schema/v2
+      'platform/base/core/mixin/a.yaml': `version: loom-schema/v2
 kind: mixin
 name: A
 fields:
@@ -170,18 +170,18 @@ async function validateFromStringMap(files: Record<string, string>) {
 describe('v2 validate — typed fields', () => {
   it('reports unknown scalar for a single-segment type not in base_types', async () => {
     const diag = await validateFromStringMap({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - { name: string, description: s, properties: [] }
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
 name: Users
 table:
@@ -204,7 +204,7 @@ primary_key: [id]
 
   it('reports missing required scalar property (decimal needs precision/scale)', async () => {
     const diag = await validateFromStringMap({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - name: decimal
@@ -214,13 +214,13 @@ scalars:
       - { name: scale, type: integer, required: true }
   - { name: string, description: s, properties: [] }
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/value_type/money.yaml': `version: loom-schema/v2
+      'platform/base/core/value_type/money.yaml': `version: loom-schema/v2
 kind: value_type
 name: Money
 fields:
@@ -229,7 +229,7 @@ fields:
       ref: decimal
       args: { precision: 18 }
 `,
-      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
 name: Users
 using:
@@ -250,24 +250,24 @@ primary_key: [id]
 
   it('passes when a three-segment value_type ref is used (no scalar check on the ref)', async () => {
     const diag = await validateFromStringMap({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - { name: string, description: s, properties: [] }
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/value_type/email.yaml': `version: loom-schema/v2
+      'platform/base/core/value_type/email.yaml': `version: loom-schema/v2
 kind: value_type
 name: Email
 fields:
   - { name: value, type: string }
 `,
-      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
 name: Users
 using:
@@ -287,18 +287,18 @@ primary_key: [id]
 
   it('still checks primary_key fields are required:true', async () => {
     const diag = await validateFromStringMap({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - { name: string, description: s, properties: [] }
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
 name: Users
 table:
@@ -318,18 +318,18 @@ primary_key: [id]
 
   it('rejects a bare "enum" type ref in a table (enum scalar was removed; use variants in a value_type)', async () => {
     const diag = await validateFromStringMap({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - { name: string, description: s, properties: [] }
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
 name: Users
 table:
@@ -349,23 +349,23 @@ primary_key: [id]
 
   it('allows variants in a value_type file (sum type form)', async () => {
     const diag = await validateFromStringMap({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - { name: string, description: s, properties: [] }
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/value_type/status.yaml': `version: loom-schema/v2
+      'platform/base/core/value_type/status.yaml': `version: loom-schema/v2
 kind: value_type
 name: Status
 variants: [active, inactive]
 `,
-      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
 name: Users
 using:

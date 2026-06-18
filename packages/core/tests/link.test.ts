@@ -35,7 +35,7 @@ describe('link (Pass 2)', () => {
 
   it('reports dangling refs', async () => {
     const fs = new MemoryFileSystem({
-      'systems/base/core/mixin/a.yaml':
+      'platform/base/core/mixin/a.yaml':
         'version: loom-schema/v2\nkind: mixin\nname: A\nfields:\n  - name: x\n    type: base.core.DoesNotExist\n',
     });
     const { diagnostics } = await runLink(fs);
@@ -45,9 +45,9 @@ describe('link (Pass 2)', () => {
 
   it('reports kind_mismatch when ref points at wrong kind', async () => {
     const fs = new MemoryFileSystem({
-      'systems/base/core/mixin/a.yaml':
+      'platform/base/core/mixin/a.yaml':
         'version: loom-schema/v2\nkind: mixin\nname: A\nfields:\n  - name: x\n    type: base.core.Users\n',
-      'systems/base/core/table/users.yaml':
+      'platform/base/core/table/users.yaml':
         'version: loom-schema/v2\nkind: table\nname: Users\ntable:\n  name: users\n  extension:\n    strategy: none\nfields:\n  - name: id\n    type: string\n    required: true\nprimary_key: [id]\n',
     });
     const { diagnostics } = await runLink(fs);
@@ -56,9 +56,9 @@ describe('link (Pass 2)', () => {
 
   it('reports mixin cycles', async () => {
     const fs = new MemoryFileSystem({
-      'systems/base/core/mixin/a.yaml':
+      'platform/base/core/mixin/a.yaml':
         'version: loom-schema/v2\nkind: mixin\nname: A\nfields:\n  - include: mixin:base.core.B\n  - name: xa\n    type: string\n',
-      'systems/base/core/mixin/b.yaml':
+      'platform/base/core/mixin/b.yaml':
         'version: loom-schema/v2\nkind: mixin\nname: B\nfields:\n  - include: mixin:base.core.A\n  - name: xb\n    type: string\n',
     });
     const { diagnostics } = await runLink(fs);
@@ -69,25 +69,25 @@ describe('link (Pass 2)', () => {
 describe('v2 link — type resolution', () => {
   it('resolves a value_type short name via using wildcard', async () => {
     const { ir, diagnostics } = await linkFromStringMap({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - { name: bigint, description: i, properties: [] }
   - { name: string, description: s, properties: [] }
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/value_type/email.yaml': `version: loom-schema/v2
+      'platform/base/core/value_type/email.yaml': `version: loom-schema/v2
 kind: value_type
 name: Email
 fields:
   - { name: value, type: string }
 `,
-      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
 name: Users
 using:
@@ -113,37 +113,37 @@ primary_key: [id]
 
   it('reports ambiguous when using imports two modules with the same type name', async () => {
     const { diagnostics } = await linkFromStringMap({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - { name: string, description: s, properties: [] }
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/value_type/money.yaml': `version: loom-schema/v2
+      'platform/base/core/value_type/money.yaml': `version: loom-schema/v2
 kind: value_type
 name: Money
 fields:
   - { name: amount, type: string }
 `,
-      'systems/retail/types/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/retail/types/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: retail
 module: types
 physical_schema: retail_types
 `,
-      'systems/retail/types/value_type/money.yaml': `version: loom-schema/v2
+      'platform/retail/types/value_type/money.yaml': `version: loom-schema/v2
 kind: value_type
 name: Money
 fields:
   - name: value
     type: string
 `,
-      'systems/retail/pos/table/orders.yaml': `version: loom-schema/v2
+      'platform/retail/pos/table/orders.yaml': `version: loom-schema/v2
 kind: table
 name: Orders
 using:
@@ -166,18 +166,18 @@ primary_key: [id]
 
   it('reports unknown type when short name matches nothing', async () => {
     const { diagnostics } = await linkFromStringMap({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - { name: string, description: s, properties: [] }
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
 name: Users
 table:
@@ -196,18 +196,18 @@ primary_key: [id]
 
   it('reports kind_mismatch when a three-segment type ref targets a non-value_type', async () => {
     const { diagnostics } = await linkFromStringMap({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - { name: string, description: s, properties: [] }
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
 name: Users
 table:
@@ -226,18 +226,18 @@ primary_key: [id]
 
   it('rejects a two-segment type ref as invalid form', async () => {
     const { diagnostics } = await linkFromStringMap({
-      'base_types.yaml': `version: loom-schema/v2
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - { name: string, description: s, properties: [] }
 `,
-      'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 `,
-      'systems/base/core/table/users.yaml': `version: loom-schema/v2
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
 name: Users
 table:

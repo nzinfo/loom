@@ -7,10 +7,14 @@ import { MemoryFileSystem } from './memory_fs.js';
  * refs. Covers: base_types, module_manifest, single & multi value_types,
  * mixin include, sidecar_eav table, entity referencing the table,
  * extension_fields targeting the entity.
+ *
+ * Directory layout uses the v2 owner prefixes (platform/ext/tenants).
+ * This fixture only contains platform-owned nodes; ext/tenant examples
+ * are added by dedicated fixtures in their own tests.
  */
 export function buildBaseSchemaFs(): FileSystem {
   return new MemoryFileSystem({
-    'base_types.yaml': `version: loom-schema/v2
+    'platform/base/core/base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
   - name: bigint
@@ -40,14 +44,14 @@ scalars:
     description: boolean
     properties: []
 `,
-    'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
+    'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 description: core module
 `,
-    'systems/base/core/mixin/audit.yaml': `version: loom-schema/v2
+    'platform/base/core/mixin/audit.yaml': `version: loom-schema/v2
 kind: mixin
 name: Audit
 fields:
@@ -58,7 +62,7 @@ fields:
     type: datetime
     required: true
 `,
-    'systems/base/core/value_type/email.yaml': `version: loom-schema/v2
+    'platform/base/core/value_type/email.yaml': `version: loom-schema/v2
 kind: value_type
 name: Email
 fields:
@@ -67,7 +71,7 @@ fields:
       ref: string
       args: { max_length: 254 }
 `,
-    'systems/base/core/value_type/money.yaml': `version: loom-schema/v2
+    'platform/base/core/value_type/money.yaml': `version: loom-schema/v2
 kind: value_type
 name: Money
 fields:
@@ -82,7 +86,7 @@ fields:
       args: { max_length: 3 }
     required: true
 `,
-    'systems/base/core/value_type/range.yaml': `version: loom-schema/v2
+    'platform/base/core/value_type/range.yaml': `version: loom-schema/v2
 kind: value_type
 name: Range
 type_parameters:
@@ -96,7 +100,7 @@ fields:
   - name: high
     type: T
 `,
-    'systems/base/core/value_type/status.yaml': `version: loom-schema/v2
+    'platform/base/core/value_type/status.yaml': `version: loom-schema/v2
 kind: value_type
 name: Status
 variants:
@@ -106,7 +110,7 @@ variants:
   - value: suspended
 `,
 
-    'systems/base/core/table/users.yaml': `version: loom-schema/v2
+    'platform/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
 name: Users
 table:
@@ -138,14 +142,14 @@ indexes:
     fields: [email]
     unique: true
 `,
-    'systems/base/core/entity/user.yaml': `version: loom-schema/v2
+    'platform/base/core/entity/user.yaml': `version: loom-schema/v2
 kind: entity
 name: User
 primary_table: table:base.core.Users
 business_keys: [email]
 audit: true
 `,
-    'systems/base/core/extension/user_fields.yaml': `version: loom-schema/v2
+    'platform/base/core/extension/user_fields.yaml': `version: loom-schema/v2
 kind: extension_fields
 entity: entity:base.core.User
 fields:

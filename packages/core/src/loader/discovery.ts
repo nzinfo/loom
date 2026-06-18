@@ -1,11 +1,13 @@
 import type { Diagnostics } from '../errors.js';
 import { type DiscoveredFile, pathToIdentity } from '../ir/paths.js';
 /**
- * Pass 0 — discovery. See spec §13.1.
+ * Pass 0 — discovery. See spec §13.1 (v2 owner dimension).
  *
- * Walks the injected FileSystem, derives identity for every .yaml file from
- * its path, and builds an identity→path map. Files that don't match the
- * layout emit an `identity` diagnostic but do not abort the walk.
+ * Walks the injected FileSystem, derives identity + owner for every .yaml
+ * file from its path (the owner prefix platform/ ext/ tenants/ is part of
+ * the rel path passed to pathToIdentity), and builds an identity→path map.
+ * Files that don't match the layout emit an `identity` diagnostic but do
+ * not abort the walk.
  */
 import type { FileSystem } from './fs.js';
 
@@ -35,14 +37,11 @@ export async function discover(opts: DiscoverOptions): Promise<DiscoveryResult> 
     if (seenPaths.has(abs)) continue;
     seenPaths.add(abs);
 
-    // Strip optional basePath prefix, then the leading `systems/` segment.
-    // pathToIdentity expects paths relative to the systems/ directory.
+    // Strip optional basePath prefix. pathToIdentity expects the full rel
+    // path including the owner prefix (platform/ ext/ tenants/).
     let rel = abs;
     if (prefix !== '' && abs.startsWith(`${prefix}/`)) {
       rel = abs.slice(prefix.length + 1);
-    }
-    if (rel.startsWith('systems/')) {
-      rel = rel.slice('systems/'.length);
     }
 
     const meta = pathToIdentity(abs, rel);
@@ -52,7 +51,7 @@ export async function discover(opts: DiscoverOptions): Promise<DiscoveryResult> 
         file: abs,
         line: 1,
         column: 1,
-        message: `path does not match loom-schema/v1 layout: ${rel}`,
+        message: `path does not match loom-schema/v2 layout: ${rel}`,
       });
       continue;
     }
