@@ -1,18 +1,12 @@
 import type { Diagnostics } from '../errors.js';
 import { parseRef } from '../ir/refs.js';
-import type { AnyFile, BaseTypes, TypeDescriptor } from '../ir/schemas.js';
+import type { AnyFile, BaseTypes, ExtensionFields, TypeDescriptor } from '../ir/schemas.js';
 import { type TypeRef, normalizeType, parseTypeRef, resolveShortName } from '../ir/typespace.js';
 import type { ExtensionFieldEntry, IR, IRNode, Identity, Owner } from '../ir/version.js';
 import type { FileKind } from '../ir/version.js';
 import { CURRENT_VERSION } from '../ir/version.js';
-
-/**
- * Default owner when discovery metadata is unavailable (stub until the link
- * pass receives the discovery `files` map in a follow-up commit). Real owner
- * is derived from the directory path; this placeholder keeps the type system
- * green in the interim.
- */
-const DEFAULT_OWNER: Owner = { kind: 'platform' };
+import type { DiscoveredEntry } from './discovery.js';
+import type { ParsedExtensionFields } from './parse.js';
 
 /**
  * Pass 2 — link. See spec §13.1, §12.
@@ -26,6 +20,18 @@ const DEFAULT_OWNER: Owner = { kind: 'platform' };
  */
 export interface LinkOptions {
   readonly parsed: ReadonlyMap<string, AnyFile>;
+  /**
+   * Parsed extension_fields files (each carries its identity). Multiple
+   * owners may share an identity; link aggregates them into the
+   * IR.extensionFields registry (spec §6.3, §7).
+   */
+  readonly extensionFieldsFiles?: ReadonlyArray<ParsedExtensionFields>;
+  /**
+   * Discovery result (path → DiscoveredEntry with meta.owner). Used to
+   * stamp the real owner onto each IRNode. Optional for tests that bypass
+   * discovery; absent owner defaults to platform.
+   */
+  readonly files?: ReadonlyMap<string, DiscoveredEntry>;
   readonly diagnostics: Diagnostics;
 }
 
@@ -42,10 +48,11 @@ export async function link(opts: LinkOptions): Promise<LinkResult> {
   const deps = new Map<Identity, Set<Identity>>();
 
   // Lift all parsed files into IRNodes keyed by identity.
-  // Owner is stubbed to DEFAULT_OWNER here; a follow-up commit wires real
-  // owner from the discovery `files` map (derived from directory path).
+  // (parse already split extension_fields out into opts.extensionFieldsFiles;
+  // parsed contains only node-defining kinds.)
   for (const [identity, file] of opts.parsed) {
-    nodes.set(identity, { ...file, identity, owner: DEFAULT_OWNER });
+    const owner = ownerOf(identity, opts.files);
+    nodes.set(identity, { ...file, identity, owner });
     deps.set(identity, new Set());
   }
 
@@ -78,13 +85,16 @@ export async function link(opts: LinkOptions): Promise<LinkResult> {
     nodes.set(identity, withFields(node, expanded));
   }
 
+  // Aggregate extension_fields across owners into the registry keyed by
+  // entity identity. Same-name field across owners on the same entity is
+  // a hard error (spec §7).
+  const extensionFields = collectExtensionFields(opts.extensionFieldsFiles ?? [], opts.diagnostics);
+
   const ir: IR = {
     nodes: nodes as ReadonlyMap<Identity, IRNode>,
     deps: deps as ReadonlyMap<Identity, ReadonlySet<Identity>>,
     version: CURRENT_VERSION,
-    // Stub: empty until the link pass aggregates extension_fields from the
-    // parsed set in a follow-up commit.
-    extensionFields: new Map<Identity, ReadonlyArray<ExtensionFieldEntry>>(),
+    extensionFields,
   };
   return { ir, diagnostics: opts.diagnostics };
 }
@@ -128,6 +138,83 @@ function collectValueTypeFqns(parsed: ReadonlyMap<string, AnyFile>): Set<string>
     fqns.add(identity.slice(colonIdx + 1));
   }
   return fqns;
+}
+
+/** Look up the owner for an identity from the discovery files map. */
+function ownerOf(identity: Identity, files?: ReadonlyMap<string, DiscoveredEntry>): Owner {
+  if (files !== undefined) {
+    for (const entry of files.values()) {
+      if (entry.identity === identity) return entry.meta.owner;
+    }
+  }
+  return { kind: 'platform' };
+}
+
+/**
+ * Aggregate extension_fields files into the registry keyed by entity
+ * identity. Same-name field on the same entity across owners (or within
+ * one file) is a hard error (spec §7).
+ *
+ * Each entry's `type:` is normalized via normalizeType. Single-segment refs
+ * become `scalar`; three-segment refs become `refValueTypeId`.
+ */
+function collectExtensionFields(
+  extensionFieldsFiles: ReadonlyArray<ParsedExtensionFields>,
+  diag: Diagnostics,
+): Map<Identity, ReadonlyArray<ExtensionFieldEntry>> {
+  const byEntity = new Map<Identity, ExtensionFieldEntry[]>();
+  // Track which file first contributed each (entity, fieldName) for error msgs.
+  const seen = new Map<string, string>();
+
+  for (const { identity, file } of extensionFieldsFiles) {
+    const ef = file.data as ExtensionFields;
+    const entityRef = ef.entity;
+
+    let bucket = byEntity.get(entityRef);
+    if (bucket === undefined) {
+      bucket = [];
+      byEntity.set(entityRef, bucket);
+    }
+
+    for (const f of ef.fields as ReadonlyArray<Record<string, unknown>>) {
+      if ('include' in f) continue;
+      const desc = normalizeType((f.type as string | TypeDescriptor | undefined) ?? '');
+      const fieldName = String(f.name ?? '');
+      const key = `${entityRef}::${fieldName}`;
+      const prev = seen.get(key);
+      if (prev !== undefined) {
+        diag.add({
+          category: 'schema',
+          file: identity,
+          line: 1,
+          column: 1,
+          message: `duplicate extension field "${fieldName}" on entity ${entityRef} (also declared in ${prev})`,
+        });
+        continue;
+      }
+      seen.set(key, identity);
+
+      const ref = desc.ref;
+      if (ref.includes('.')) {
+        bucket.push({
+          name: fieldName,
+          scalar: '',
+          refValueTypeId: `value_type:${ref}`,
+          props: desc.args ?? {},
+          ...(f.default_scope !== undefined ? { defaultScope: String(f.default_scope) } : {}),
+        });
+      } else {
+        bucket.push({
+          name: fieldName,
+          scalar: ref,
+          props: desc.args ?? {},
+          ...(f.default_scope !== undefined ? { defaultScope: String(f.default_scope) } : {}),
+        });
+      }
+    }
+  }
+
+  return byEntity;
 }
 
 /** Read the file's optional using list (empty if absent). */

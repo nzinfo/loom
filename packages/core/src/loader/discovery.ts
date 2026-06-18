@@ -5,9 +5,13 @@ import { type DiscoveredFile, pathToIdentity } from '../ir/paths.js';
  *
  * Walks the injected FileSystem, derives identity + owner for every .yaml
  * file from its path (the owner prefix platform/ ext/ tenants/ is part of
- * the rel path passed to pathToIdentity), and builds an identity→path map.
- * Files that don't match the layout emit an `identity` diagnostic but do
- * not abort the walk.
+ * the rel path passed to pathToIdentity), and builds a path→entry map.
+ *
+ * Identity uniqueness is enforced for all kinds EXCEPT extension_fields:
+ * multiple owners (platform/ext/tenant) may write extension_fields for
+ * the same entity (and even with the same file stem); those aggregate at
+ * link time (spec §6.3, §7). Files that don't match the layout emit an
+ * `identity` diagnostic but do not abort the walk.
  */
 import type { FileSystem } from './fs.js';
 
@@ -18,6 +22,11 @@ export interface DiscoveredEntry {
 }
 
 export interface DiscoveryResult {
+  /**
+   * All discovered files keyed by absolute path (unique).
+   * `meta.identity` carries the canonical identity; multiple extension_fields
+   * entries may share an identity across owners.
+   */
   readonly files: ReadonlyMap<string, DiscoveredEntry>;
 }
 
@@ -30,6 +39,9 @@ export interface DiscoverOptions {
 
 export async function discover(opts: DiscoverOptions): Promise<DiscoveryResult> {
   const files = new Map<string, DiscoveredEntry>();
+  // Tracks identity → first path that claimed it, for duplicate detection.
+  // extension_fields identities are exempt (multiple owners may share).
+  const identityOwner = new Map<string, string>();
   const seenPaths = new Set<string>();
   const prefix = opts.basePath.replace(/\\/g, '/').replace(/\/$/, '');
 
@@ -62,18 +74,26 @@ export async function discover(opts: DiscoverOptions): Promise<DiscoveryResult> 
     ) {
       continue;
     }
-    if (files.has(meta.identity)) {
-      const prev = files.get(meta.identity);
-      opts.diagnostics.add({
-        category: 'identity',
-        file: abs,
-        line: 1,
-        column: 1,
-        message: `duplicate identity ${meta.identity} (also at ${prev?.path ?? '?'})`,
-      });
-      continue;
+
+    // Duplicate-identity check. extension_fields is exempt: multiple owners
+    // may extend the same entity, and even reuse the same file stem — those
+    // aggregate in the link pass (spec §6.3, §7).
+    if (meta.kind !== 'extension_fields') {
+      const prev = identityOwner.get(meta.identity);
+      if (prev !== undefined) {
+        opts.diagnostics.add({
+          category: 'identity',
+          file: abs,
+          line: 1,
+          column: 1,
+          message: `duplicate identity ${meta.identity} (also at ${prev})`,
+        });
+        continue;
+      }
+      identityOwner.set(meta.identity, abs);
     }
-    files.set(meta.identity, { identity: meta.identity, path: abs, meta });
+
+    files.set(abs, { identity: meta.identity, path: abs, meta });
   }
 
   return { files };

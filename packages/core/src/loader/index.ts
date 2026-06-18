@@ -43,11 +43,20 @@ export async function load(opts: LoadOptions): Promise<LoadResult> {
   });
 
   // Pass 1 — parse.
-  const { parsed } = await parseAll({ fs: opts.fs, files, diagnostics });
+  const { parsed, extensionFieldsFiles } = await parseAll({
+    fs: opts.fs,
+    files,
+    diagnostics,
+  });
 
   // Pass 2 — link. Always run even with parse errors so we surface as many
   // diagnostics as possible; downstream passes operate on the partial map.
-  const { ir: linked } = await link({ parsed, diagnostics });
+  const { ir: linked } = await link({
+    parsed,
+    extensionFieldsFiles,
+    files,
+    diagnostics,
+  });
 
   // Pass 3 — validate.
   validate({ ir: linked, diagnostics });

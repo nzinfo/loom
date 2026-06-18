@@ -10,6 +10,12 @@ import type { FileSystem } from './fs.js';
  * Reads each discovered file's bytes, runs the YAML parser + Zod schema.
  * Failures become `parse` (or `version`) diagnostics; the file is dropped
  * from the parsed map but does not abort the pass.
+ *
+ * Returns two collections:
+ *   - `parsed`: identity → AnyFile for non-extension_fields nodes (unique).
+ *   - `extensionFieldsFiles`: list of { identity, owner, file } for every
+ *     successfully parsed extension_fields file. Multiple owners may share
+ *     an identity; link aggregates them (spec §6.3, §7).
  */
 export interface ParseOptions {
   readonly fs: FileSystem;
@@ -17,15 +23,22 @@ export interface ParseOptions {
   readonly diagnostics: Diagnostics;
 }
 
+export interface ParsedExtensionFields {
+  readonly identity: string;
+  readonly file: AnyFile;
+}
+
 export interface ParseResult {
   readonly parsed: ReadonlyMap<string, AnyFile>;
+  readonly extensionFieldsFiles: ReadonlyArray<ParsedExtensionFields>;
   readonly diagnostics: Diagnostics;
 }
 
 export async function parseAll(opts: ParseOptions): Promise<ParseResult> {
   const parsed = new Map<string, AnyFile>();
+  const extensionFieldsFiles: ParsedExtensionFields[] = [];
   const decoder = new TextDecoder('utf-8');
-  for (const [identity, entry] of opts.files) {
+  for (const entry of opts.files.values()) {
     let bytes: Uint8Array;
     try {
       bytes = await opts.fs.readFile(entry.path);
@@ -42,7 +55,11 @@ export async function parseAll(opts: ParseOptions): Promise<ParseResult> {
     const text = decoder.decode(bytes);
     try {
       const f = parseFile(text, entry.path);
-      parsed.set(identity, f);
+      if (f.kind === 'extension_fields') {
+        extensionFieldsFiles.push({ identity: entry.identity, file: f });
+      } else {
+        parsed.set(entry.identity, f);
+      }
     } catch (e) {
       // ParseError carries a typed category; everything else is a parse fault.
       const category = e instanceof ParseError && e.category === 'version' ? 'version' : 'parse';
@@ -55,5 +72,5 @@ export async function parseAll(opts: ParseOptions): Promise<ParseResult> {
       });
     }
   }
-  return { parsed, diagnostics: opts.diagnostics };
+  return { parsed, extensionFieldsFiles, diagnostics: opts.diagnostics };
 }

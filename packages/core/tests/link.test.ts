@@ -10,15 +10,19 @@ async function linkFromStringMap(files: Record<string, string>) {
   const fs = new MemoryFileSystem(files);
   const diag = new Diagnostics();
   const { files: discovered } = await discover({ fs, basePath: '', diagnostics: diag });
-  const { parsed } = await parseAll({ fs, files: discovered, diagnostics: diag });
-  return link({ parsed, diagnostics: diag });
+  const { parsed, extensionFieldsFiles } = await parseAll({
+    fs,
+    files: discovered,
+    diagnostics: diag,
+  });
+  return link({ parsed, extensionFieldsFiles, files: discovered, diagnostics: diag });
 }
 
 async function runLink(fs: ReturnType<typeof buildBaseSchemaFs>) {
   const diag = new Diagnostics();
   const { files } = await discover({ fs, basePath: '', diagnostics: diag });
-  const { parsed } = await parseAll({ fs, files, diagnostics: diag });
-  return await link({ parsed, diagnostics: diag });
+  const { parsed, extensionFieldsFiles } = await parseAll({ fs, files, diagnostics: diag });
+  return await link({ parsed, extensionFieldsFiles, files, diagnostics: diag });
 }
 
 describe('link (Pass 2)', () => {
@@ -255,6 +259,212 @@ primary_key: [id]
       diagnostics.errors.some(
         (d) => d.category === 'parse' && d.message.includes('invalid type reference'),
       ),
+    ).toBe(true);
+  });
+});
+
+describe('v2 link — owner stamping', () => {
+  it('stamps platform owner on platform nodes', async () => {
+    const { ir } = await linkFromStringMap({
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
+kind: base_types
+scalars:
+  - { name: string, description: s, properties: [] }
+`,
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: base
+module: core
+physical_schema: base_core
+`,
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
+kind: table
+name: Users
+table:
+  name: users
+  extension: { strategy: none }
+fields:
+  - { name: id, type: string, required: true }
+primary_key: [id]
+`,
+    });
+    expect(ir.nodes.get('table:base.core.Users')?.owner).toEqual({ kind: 'platform' });
+  });
+
+  it('stamps ext owner with provider', async () => {
+    const { ir } = await linkFromStringMap({
+      'ext/acme-corp/retail/pos/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: retail
+module: pos
+physical_schema: acme_retail_pos
+`,
+      'ext/acme-corp/retail/pos/table/orders.yaml': `version: loom-schema/v2
+kind: table
+name: Orders
+table:
+  name: orders
+  extension: { strategy: none }
+fields:
+  - { name: id, type: string, required: true }
+primary_key: [id]
+`,
+    });
+    expect(ir.nodes.get('table:retail.pos.Orders')?.owner).toEqual({
+      kind: 'ext',
+      provider: 'acme-corp',
+    });
+  });
+});
+
+describe('v2 link — extension_fields aggregation', () => {
+  it('excludes extension_fields from nodes map; aggregates into extensionFields', async () => {
+    const { ir, diagnostics } = await linkFromStringMap({
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
+kind: base_types
+scalars:
+  - { name: string, description: s, properties: [] }
+`,
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: base
+module: core
+physical_schema: base_core
+`,
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
+kind: table
+name: Users
+table:
+  name: users
+  extension:
+    strategy: sidecar_eav
+    ext_table: users_ext
+    view: users
+fields:
+  - { name: id, type: string, required: true }
+primary_key: [id]
+`,
+      'platform/base/core/entity/user.yaml': `version: loom-schema/v2
+kind: entity
+name: User
+primary_table: table:base.core.Users
+`,
+      'platform/base/core/extension/user_fields.yaml': `version: loom-schema/v2
+kind: extension_fields
+entity: entity:base.core.User
+fields:
+  - name: nickname
+    type: string
+`,
+    });
+    expect(diagnostics.hasErrors).toBe(false);
+    expect(ir.nodes.has('extension_fields:base.core.User_fields')).toBe(false);
+    const bucket = ir.extensionFields.get('entity:base.core.User');
+    expect(bucket?.length).toBe(1);
+    expect(bucket?.[0]?.name).toBe('nickname');
+    expect(bucket?.[0]?.scalar).toBe('string');
+  });
+
+  it('aggregates extension_fields across owners (platform + tenant)', async () => {
+    const { ir, diagnostics } = await linkFromStringMap({
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
+kind: base_types
+scalars:
+  - { name: string, description: s, properties: [] }
+`,
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: base
+module: core
+physical_schema: base_core
+`,
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
+kind: table
+name: Users
+table:
+  name: users
+  extension:
+    strategy: sidecar_eav
+    ext_table: users_ext
+    view: users
+fields:
+  - { name: id, type: string, required: true }
+primary_key: [id]
+`,
+      'platform/base/core/entity/user.yaml': `version: loom-schema/v2
+kind: entity
+name: User
+primary_table: table:base.core.Users
+`,
+      'platform/base/core/extension/user_fields.yaml': `version: loom-schema/v2
+kind: extension_fields
+entity: entity:base.core.User
+fields:
+  - name: nickname
+    type: string
+`,
+      'tenants/acme/base/core/user_fields.yaml': `version: loom-schema/v2
+kind: extension_fields
+entity: entity:base.core.User
+fields:
+  - name: avatar_url
+    type: string
+`,
+    });
+    expect(diagnostics.hasErrors).toBe(false);
+    const bucket = ir.extensionFields.get('entity:base.core.User');
+    expect(bucket?.map((e) => e.name).sort()).toEqual(['avatar_url', 'nickname']);
+  });
+
+  it('rejects same-name extension field across owners', async () => {
+    const { diagnostics } = await linkFromStringMap({
+      'platform/base/core/base_types.yaml': `version: loom-schema/v2
+kind: base_types
+scalars:
+  - { name: string, description: s, properties: [] }
+`,
+      'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: base
+module: core
+physical_schema: base_core
+`,
+      'platform/base/core/table/users.yaml': `version: loom-schema/v2
+kind: table
+name: Users
+table:
+  name: users
+  extension:
+    strategy: sidecar_eav
+    ext_table: users_ext
+    view: users
+fields:
+  - { name: id, type: string, required: true }
+primary_key: [id]
+`,
+      'platform/base/core/entity/user.yaml': `version: loom-schema/v2
+kind: entity
+name: User
+primary_table: table:base.core.Users
+`,
+      'platform/base/core/extension/user_fields.yaml': `version: loom-schema/v2
+kind: extension_fields
+entity: entity:base.core.User
+fields:
+  - name: nickname
+    type: string
+`,
+      'tenants/acme/base/core/user_fields.yaml': `version: loom-schema/v2
+kind: extension_fields
+entity: entity:base.core.User
+fields:
+  - name: nickname
+    type: string
+`,
+    });
+    expect(diagnostics.hasErrors).toBe(true);
+    expect(
+      diagnostics.errors.some((d) => d.message.includes('duplicate extension field "nickname"')),
     ).toBe(true);
   });
 });
