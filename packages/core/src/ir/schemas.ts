@@ -129,6 +129,29 @@ const variantSchema = z.union([
 
 const constraintSchema = z.object({ kind: z.literal('check'), expr: z.string().min(1) }).strict();
 
+/**
+ * A type parameter declaration on a value_type (spec v2 §X).
+ *
+ *   name        — the parameter identifier (referenced in fields as type: <name>)
+ *   constraint  — 'type' (any type, incl. another type parameter — for
+ *                 generic recursion like Map<K,V>) or 'value' (must be a
+ *                 concrete type: scalar short name or value_type fqn).
+ *                 Defaults to 'type'.
+ *   default     — default type used when the reference omits this param
+ *   description — human-readable note
+ *
+ * v2 allows declaring type_parameters AND referencing them in fields AND
+ * passing args at reference sites (full generic form).
+ */
+const typeParameterSchema = z
+  .object({
+    name: z.string().min(1),
+    constraint: z.enum(['type', 'value']).optional(),
+    default: z.string().min(1).optional(),
+    description: z.string().optional(),
+  })
+  .strict();
+
 const indexSchema = z
   .object({
     name: z.string().min(1),
@@ -206,6 +229,7 @@ export const ValueTypeSchema = z
     using: usingSchema,
     fields: z.array(fieldOrInclude).optional(),
     variants: z.array(variantSchema).min(1).optional(),
+    type_parameters: z.array(typeParameterSchema).optional(),
     constraints: z.array(constraintSchema).optional(),
   })
   .strict()

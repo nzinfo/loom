@@ -53,7 +53,11 @@ fields:
 `;
     const f = parseFile(yaml, 'test.yaml');
     const fields = (f.data as { fields: Array<Record<string, unknown>> }).fields;
-    const t = fields[0]?.type as { ref: string; args: { max_length: number }; meta: { since: string } };
+    const t = fields[0]?.type as {
+      ref: string;
+      args: { max_length: number };
+      meta: { since: string };
+    };
     expect(t.ref).toBe('string');
     expect(t.args.max_length).toBe(254);
     expect(t.meta.since).toBe('v0.2.0');
@@ -284,5 +288,76 @@ fields:
       expect(e).toBeInstanceOf(ParseError);
       expect((e as ParseError).category).toBe('parse');
     }
+  });
+});
+
+describe('value_type forms', () => {
+  it('parses a variants value_type (shorthand array)', () => {
+    const src = `version: loom-schema/v2
+kind: value_type
+name: Status
+variants: [active, inactive, suspended]
+`;
+    const f = parseFile(src, 'x');
+    const vt = ValueTypeSchema.parse((f as { raw: unknown }).raw);
+    expect(vt.variants).toEqual(['active', 'inactive', 'suspended']);
+    expect(vt.fields).toBeUndefined();
+  });
+
+  it('parses a variants value_type (detailed objects)', () => {
+    const src = `version: loom-schema/v2
+kind: value_type
+name: Status
+variants:
+  - value: active
+    display_name: 活跃
+  - value: inactive
+`;
+    const f = parseFile(src, 'x');
+    const vt = ValueTypeSchema.parse((f as { raw: unknown }).raw);
+    expect(vt.variants?.[0]).toEqual({ value: 'active', display_name: '活跃' });
+    expect(vt.variants?.[1]).toEqual({ value: 'inactive' });
+  });
+
+  it('rejects a value_type with both fields and variants', () => {
+    const src = `version: loom-schema/v2
+kind: value_type
+name: Bad
+fields:
+  - name: x
+    type: string
+variants: [a, b]
+`;
+    expect(() => ValueTypeSchema.parse((parseFile(src, 'x') as { raw: unknown }).raw)).toThrow();
+  });
+
+  it('rejects a value_type with neither fields nor variants', () => {
+    const src = `version: loom-schema/v2
+kind: value_type
+name: Empty
+`;
+    expect(() => ValueTypeSchema.parse((parseFile(src, 'x') as { raw: unknown }).raw)).toThrow();
+  });
+
+  it('parses type_parameters on a value_type', () => {
+    const src = `version: loom-schema/v2
+kind: value_type
+name: Range
+type_parameters:
+  - name: T
+    constraint: value
+    default: base.core.integer
+    description: element type
+fields:
+  - name: low
+    type: T
+  - name: high
+    type: T
+`;
+    const f = parseFile(src, 'x');
+    const vt = ValueTypeSchema.parse((f as { raw: unknown }).raw);
+    expect(vt.type_parameters?.[0]?.name).toBe('T');
+    expect(vt.type_parameters?.[0]?.constraint).toBe('value');
+    expect(vt.type_parameters?.[0]?.default).toBe('base.core.integer');
   });
 });

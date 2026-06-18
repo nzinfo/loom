@@ -34,10 +34,23 @@ export function validate(opts: ValidateOptions): ValidateResult {
       case 'value_type': {
         // value_type has two mutually exclusive forms: fields or variants.
         // variants form (sum type) has no typed fields to check.
-        const data = node.data as { fields?: FieldLike[]; variants?: unknown[] };
+        const data = node.data as {
+          fields?: FieldLike[];
+          variants?: unknown[];
+          type_parameters?: Array<{ name: string }>;
+        };
         if (data.variants && data.variants.length > 0) break;
+        const localTypeParams = new Set<string>((data.type_parameters ?? []).map((p) => p.name));
         for (const f of data.fields ?? []) {
-          checkTypedField(identity, node.kind, f, scalarNames, requiredProps, opts.diagnostics);
+          checkTypedField(
+            identity,
+            node.kind,
+            f,
+            scalarNames,
+            requiredProps,
+            opts.diagnostics,
+            localTypeParams,
+          );
         }
         break;
       }
@@ -91,6 +104,7 @@ function checkTypedField(
   scalarNames: Set<string>,
   requiredProps: Map<string, Set<string>>,
   diag: Diagnostics,
+  typeParams: ReadonlySet<string> = new Set(),
 ): void {
   if (scalarNames.size === 0) return;
   const typeVal = f.type as string | TypeDescriptor | undefined;
@@ -99,6 +113,11 @@ function checkTypedField(
   const ref = typeof typeVal === 'string' ? typeVal : typeVal.ref;
   // Three-segment (value_type ref): skip — validated at the value_type file.
   if (ref.includes('.')) return;
+
+  // Type parameter reference inside a generic host (e.g. type: T inside
+  // a value_type that declares type_parameters): skip — bound at
+  // instantiation time in the projector.
+  if (typeParams.has(ref)) return;
 
   // Single-segment: must be a known scalar.
   if (!scalarNames.has(ref)) {

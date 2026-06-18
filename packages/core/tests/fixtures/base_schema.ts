@@ -82,6 +82,30 @@ fields:
       args: { max_length: 3 }
     required: true
 `,
+    'systems/base/core/value_type/range.yaml': `version: loom-schema/v2
+kind: value_type
+name: Range
+type_parameters:
+  - name: T
+    constraint: value
+    default: base.core.bigint
+    description: element type
+fields:
+  - name: low
+    type: T
+  - name: high
+    type: T
+`,
+    'systems/base/core/value_type/status.yaml': `version: loom-schema/v2
+kind: value_type
+name: Status
+variants:
+  - value: active
+    display_name: Active
+  - value: inactive
+  - value: suspended
+`,
+
     'systems/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
 name: Users
@@ -102,6 +126,12 @@ fields:
     unique: true
   - name: balance
     type: base.core.Money
+  - name: price_range
+    type:
+      ref: base.core.Range
+      args: { T: decimal }
+  - name: status
+    type: base.core.Status
 primary_key: [id]
 indexes:
   - name: idx_users_email

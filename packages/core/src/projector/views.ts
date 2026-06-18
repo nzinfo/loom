@@ -90,13 +90,13 @@ export function buildPivotViews(model: PhysicalModel, ir: IR): PivotView[] {
           // Multi/single-field value_type ref → expand into physical columns.
           const vtNode = ir.nodes.get(ef.refValueTypeId);
           if (vtNode?.kind !== 'value_type') continue;
-          for (const f of vtNode.data.fields) {
+          for (const f of vtNode.data.fields ?? []) {
             const fRec = f as Record<string, unknown>;
             const rawType = fRec.type;
             const subScalar =
               typeof rawType === 'string'
                 ? rawType
-                : (rawType as { ref?: string })?.ref ?? 'string';
+                : ((rawType as { ref?: string })?.ref ?? 'string');
             pivotCols.push({
               fieldName: `${ef.name}_${(f as { name: string }).name}`,
               eavColumn: EAV_COLUMN_BY_SCALAR[subScalar] ?? 'string_value',

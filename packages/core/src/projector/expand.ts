@@ -29,6 +29,43 @@ function descriptorOf(field: Record<string, unknown>): TypeDescriptor {
 }
 
 /**
+ * Substitute type parameters in a generic value_type's fields with the
+ * caller-supplied bindings (or declared defaults). Returns a shallow-copied
+ * field list with each field's `type` rewritten where its ref names a type
+ * parameter.
+ *
+ *   typeParams: [{name:'T', default:'base.core.integer'}]
+ *   callerArgs: {T: 'decimal'}  (or {} → use default)
+ *
+ * For each field whose type ref is 'T', the ref is replaced with the bound
+ * type (string form; any args/meta on the binding are not propagated — v2
+ * only supports binding to a bare type name).
+ */
+function instantiateFields(
+  fields: ReadonlyArray<Record<string, unknown>>,
+  typeParams: ReadonlyArray<{ name: string; default?: string }>,
+  callerArgs: Record<string, unknown>,
+): ReadonlyArray<Record<string, unknown>> {
+  const bindings = new Map<string, string>();
+  for (const tp of typeParams) {
+    const v = callerArgs[tp.name];
+    if (typeof v === 'string') {
+      bindings.set(tp.name, v);
+    } else if (tp.default !== undefined) {
+      bindings.set(tp.name, tp.default);
+    }
+  }
+  if (bindings.size === 0) return fields;
+  return fields.map((f) => {
+    const desc = descriptorOf(f);
+    if (!bindings.has(desc.ref)) return f;
+    const bound = bindings.get(desc.ref);
+    if (bound === undefined) return f;
+    return { ...f, type: { ref: bound, ...(desc.args ? { args: desc.args } : {}) } };
+  });
+}
+
+/**
  * Main entry point: project a design IR to a physical model.
  *
  * - Expands mixins into inline fields.
@@ -236,7 +273,24 @@ function expandField(
   }
 
   const vt = vtNode.data as ValueType;
-  const vtNodeForField = vt as unknown as ValueTypeNode;
+
+  // Generic instantiation: if the value_type declares type_parameters and
+  // the caller passed args binding them, substitute each field's type ref
+  // that names a type parameter with the caller-supplied (or defaulted) type.
+  const typeParams = (
+    vt as unknown as { type_parameters?: Array<{ name: string; default?: string }> }
+  ).type_parameters;
+  const callerArgs = desc.args ?? {};
+  let fields = vt.fields as ReadonlyArray<Record<string, unknown>>;
+  if (typeParams && typeParams.length > 0) {
+    fields = instantiateFields(fields, typeParams, callerArgs);
+  }
+
+  const vtNodeForField = {
+    kind: 'value_type' as const,
+    name: vt.name,
+    fields: fields as ValueTypeNode['fields'],
+  };
 
   // Variants form (sum type): render as a single column backed by the
   // enum registry. The column's scalar is reported as 'string' for dialect
@@ -255,7 +309,7 @@ function expandField(
   }
 
   if (isSingleFieldValueType(vtNodeForField)) {
-    const inner = vt.fields[0] as Record<string, unknown>;
+    const inner = fields[0] as Record<string, unknown>;
     const innerDesc = descriptorOf(inner);
     const scalar = innerDesc.ref;
     const props = innerDesc.args ?? {};
@@ -277,7 +331,7 @@ function expandField(
   // Multi-field value_type: one column per subfield.
   const expanded = expandValueColumns(fName, vtNodeForField);
   return expanded.map((col, idx) => {
-    const subField = vt.fields[idx] as Record<string, unknown>;
+    const subField = fields[idx] as Record<string, unknown>;
     const subDesc = descriptorOf(subField);
     const subType = subDesc.ref;
     const subProps = subDesc.args ?? {};
