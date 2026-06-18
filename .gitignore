@@ -32,3 +32,6 @@ pnpm-debug.log*
 
 # loom runtime cache
 .loom-cache/
+
+# Local read-only upstream mirrors (not part of loom)
+.source-projects/
