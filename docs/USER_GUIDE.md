@@ -87,40 +87,70 @@ pnpm --filter @loom/core test
 
 ## 第 2 章 目录结构与身份约定
 
-loom 最核心的设计是**"路径即身份"**：你不需要在文件头声明 system/module/kind/name，
-它们直接由文件路径推导。
+loom 最核心的设计是**"路径即身份 + 路径即归属"**：你不需要在文件头声明
+system/module/kind/name，它们直接由文件路径推导；同样，节点归属于哪一层 owner
+（平台 / 第三方扩展 / 租户）也由路径的顶层前缀决定。
 
-### 2.1 标准布局
+### 2.1 标准布局（v2 owner 维度）
+
+loom v2 把目录树组织成三层 owner 前缀：
 
 ```
 my-schema/
-├── base_types.yaml                # 全局唯一，可用标量目录
-└── systems/
-    └── <system>/
-        └── <module>/
-            ├── MANIFEST.yaml      # kind: module_manifest
-            ├── value_type/
-            │   └── <name>.yaml
-            ├── mixin/
-            │   └── <name>.yaml
-            ├── table/
-            │   └── <name>.yaml
-            ├── entity/
-            │   └── <name>.yaml
-            └── extension/
-                └── <name>.yaml    # kind: extension_fields
+├── platform/                            # 平台内置（权威定义）
+│   └── base/
+│       └── core/
+│           ├── base_types.yaml          # 全局唯一，可用标量目录
+│           ├── MANIFEST.yaml            # kind: module_manifest
+│           ├── value_type/
+│           ├── mixin/
+│           ├── table/
+│           ├── entity/
+│           └── extension/
+│               └── <name>_fields.yaml   # kind: extension_fields
+├── ext/                                 # 第三方扩展包（独立作者）
+│   └── <provider>/                      # 如 acme-corp
+│       └── <system>/
+│           └── <module>/
+│               ├── MANIFEST.yaml
+│               ├── value_type/ mixin/ table/ entity/ extension/
+└── tenants/                             # 租户定制（仅扩展字段）
+    └── <tenant-id>/                     # 如 acme
+        └── <system>/
+            └── <module>/
+                └── <name>_fields.yaml   # 仅 extension_fields，无 kind 目录
 ```
 
-所有 kind 一律落到**模块目录**下，按 kind 分子目录。跨模块复用通过 `using` 导入
-和 `module_manifest.exports` 表达（详见 §5.5、§7.2），不另设共享目录。
+**三层 owner 固定枚举**（详见 `docs/specs/2026-06-18-loom-v2-owner-dimension.md`）：
 
-### 2.2 路径推导身份
+| owner | 目录前缀 | 能力 | 典型场景 |
+|---|---|---|---|
+| **platform** | `platform/<sys>/<mod>/` | 全部 kind + base_types + module_manifest | 平台权威定义 |
+| **ext** | `ext/<provider>/<sys>/<mod>/` | 除 base_types 外全部 kind | 第三方扩展包 |
+| **tenant** | `tenants/<id>/<sys>/<mod>/` | **仅** extension_fields（无 kind 子目录） | 租户级字段定制 |
+
+### 2.2 路径推导身份与 owner
 
 ```
-systems/base/core/entity/user.yaml
-└system─┘ └module┘ └kind┘ └name┘
+platform/base/core/entity/user.yaml
+└owner──┘ └system┘ └module┘ └kind┘ └name┘
 => identity = entity:base.core.User
+=> owner    = platform
+
+ext/acme-corp/retail/pos/table/orders.yaml
+└owner────────┘ └system─┘ └mod─┘ └kind┘ └name┘
+=> identity = table:retail.pos.Orders
+=> owner    = ext:acme-corp
+
+tenants/acme/base/core/user_fields.yaml
+└owner───────┘ └tenant─┘ └system┘ └module┘ └name──────┘
+=> identity = extension_fields:base.core.User_fields
+=> owner    = tenant:acme
 ```
+
+identity 仍是 `kind:sys.mod.Name` 三段不变；owner 是节点的独立字段，从路径顶层
+前缀推断，**不在文件内容里声明**。跨 owner 引用是隐式的——ref 不带 owner，
+全局查表（spec §4）。
 
 **关键规则：**
 
@@ -128,6 +158,17 @@ systems/base/core/entity/user.yaml
 - 推导出的逻辑名转 **PascalCase**（`user` → `User`，`user-profile` → `UserProfile`）
 - `extension/` 目录映射到 `extension_fields` kind（不对称，唯一例外）
 - 物理表名在 `table.name` 字段显式声明（不依赖推导）
+- `base_types.yaml` 唯一合法位置：`platform/base/core/base_types.yaml`（全局共享）
+- tenant 目录无 kind 子目录——tenant 层只有 extension_fields 一种 kind
+
+### 2.3 撞名规则与扩展叠加
+
+- **节点 identity 全局唯一**：两个不同路径推导出同一 identity（且非 extension_fields）
+  → discovery 阶段报 `duplicate identity` 错误
+- **extension_fields 例外**：多个 owner 可给同一 entity 写 extension_fields，**叠加**
+  （并集），不视为撞名。最终该 entity 的扩展字段 = 各 owner 声明的并集
+- **同名扩展字段冲突**：两个 owner 都声明了同名字段（如都写 `tax_id`）→ 报错，
+  不覆盖、不合并、不按优先级取舍
 
 ### 2.3 文件头格式
 
@@ -152,8 +193,8 @@ v2（`loom-schema/v2`）引入统一 `type:` 键与 `using` 导入机制，不�
 ### 3.1 创建项目骨架
 
 ```sh
-mkdir -p my-schema/systems/base/core/{value_type,table,entity,extension,mixin}
-touch my-schema/base_types.yaml
+mkdir -p my-schema/platform/base/core/{value_type,table,entity,extension,mixin}
+touch my-schema/platform/base/core/base_types.yaml
 ```
 
 ### 3.2 写 base_types.yaml
@@ -161,7 +202,7 @@ touch my-schema/base_types.yaml
 先声明两个最常用的标量：
 
 ```yaml
-# my-schema/base_types.yaml
+# my-schema/platform/base/core/base_types.yaml
 version: loom-schema/v2
 kind: base_types
 
@@ -183,7 +224,7 @@ scalars:
 ### 3.3 写 MANIFEST.yaml
 
 ```yaml
-# my-schema/systems/base/core/MANIFEST.yaml
+# my-schema/platform/base/core/MANIFEST.yaml
 version: loom-schema/v2
 kind: module_manifest
 system: base
@@ -197,7 +238,7 @@ description: core module
 ### 3.4 写第一张表
 
 ```yaml
-# my-schema/systems/base/core/table/users.yaml
+# my-schema/platform/base/core/table/users.yaml
 version: loom-schema/v2
 kind: table
 name: Users
@@ -326,7 +367,7 @@ value_type 是用户定义的"语义类型"，介于 base_type scalar 和 field 
 内部字段名**必须叫 `value`**，这样投影才不附加后缀：
 
 ```yaml
-# systems/base/core/value_type/email.yaml
+# platform/base/core/value_type/email.yaml
 version: loom-schema/v2
 kind: value_type
 name: Email
@@ -362,7 +403,7 @@ fields:
 ### 5.2 多字段 value_type
 
 ```yaml
-# systems/base/core/value_type/money.yaml
+# platform/base/core/value_type/money.yaml
 version: loom-schema/v2
 kind: value_type
 name: Money
@@ -476,7 +517,7 @@ package-level `import`）。模块内的不同文件可以有不同 using——�
 引入整个模块不需要的依赖。
 
 ```yaml
-# systems/retail/pos/table/orders.yaml
+# ext/acme-corp/retail/pos/table/orders.yaml
 version: loom-schema/v2
 kind: table
 name: Orders
@@ -586,7 +627,7 @@ fields:
 ### 5.6.1 声明
 
 ```yaml
-# systems/base/core/value_type/range.yaml
+# platform/base/core/value_type/range.yaml
 version: loom-schema/v2
 kind: value_type
 name: Range
@@ -641,7 +682,7 @@ fields:
 ### 6.1 定义 mixin
 
 ```yaml
-# systems/base/core/mixin/audit.yaml
+# platform/base/core/mixin/audit.yaml
 version: loom-schema/v2
 kind: mixin
 name: Audit
@@ -657,7 +698,7 @@ mixin 与其他 kind 一样落在**模块目录**下（`<system>/<module>/mixin/
 ### 6.2 在 table 里 include
 
 ```yaml
-# systems/base/core/table/users.yaml
+# platform/base/core/table/users.yaml
 fields:
   - name: id
     type: bigint
@@ -688,7 +729,7 @@ mixin **物理上落到主表**（展开为列），与运行时 sidecar EAV 完
 `table` 承载物理结构 + 扩展策略；`entity` 在 table 之上加**业务身份**：
 
 ```yaml
-# systems/base/core/entity/user.yaml
+# platform/base/core/entity/user.yaml
 version: loom-schema/v2
 kind: entity
 name: User
@@ -711,7 +752,7 @@ audit: true
 物理 schema 空间（PG schema / MySQL database）是**模块级别决策**，不该 per-table 配置：
 
 ```yaml
-# systems/base/core/MANIFEST.yaml
+# platform/base/core/MANIFEST.yaml
 version: loom-schema/v2
 kind: module_manifest
 system: base
@@ -832,7 +873,7 @@ EAV 表完全动态会带来隐患（任意字段都能加）。`extension_field
 ### 9.1 定义模板
 
 ```yaml
-# systems/base/core/extension/user_fields.yaml
+# platform/base/core/extension/user_fields.yaml
 version: loom-schema/v2
 kind: extension_fields
 entity: entity:base.core.User           # 作用于哪个 entity（身份引用，kind 前缀保留）
@@ -871,7 +912,7 @@ v2 用类型论术语 **variants**（sum type）替代 v1 的工业惯用词 `en
 value_type 的**两种互斥形态之一**（另一种是 `fields`）：
 
 ```yaml
-# systems/base/core/value_type/user_status.yaml
+# platform/base/core/value_type/user_status.yaml
 version: loom-schema/v2
 kind: value_type
 name: UserStatus
@@ -926,7 +967,7 @@ indexes:
 ### 10.3 外键
 
 ```yaml
-# systems/base/core/table/user_roles.yaml
+# platform/base/core/table/user_roles.yaml
 fields:
   - { name: user_id, type: bigint, required: true }
   - { name: role_id, type: bigint, required: true }
@@ -1115,14 +1156,19 @@ loom 的加载是确定性的 4 阶段管线，**永不抛异常**——所有�
 ### 13.1 四阶段
 
 ```
-Pass 0  Discovery     扫描目录，按路径推导 identity
-                      错误：路径不符合 <system>/<module>/<kind>/<name>.yaml 规范
+Pass 0  Discovery     扫描目录，按路径推导 identity + owner
+                      extension_fields 允许多 owner 共享 identity（叠加），其他 kind
+                      全局唯一
+                      错误：路径不符合 platform/ext/tenants 布局、duplicate identity
 
 Pass 1  Parse         YAML → typed struct，校验 version 和 kind
+                      extension_fields 文件分流到独立列表（不进 parsed 主表）
                       错误：YAML 语法错、version 不匹配、kind 不在枚举内
 
-Pass 2  Link          解析所有 $ref，建立 identity→object 映射
-                      错误：dangling_ref、kind_mismatch、cycle（mixin 环）
+Pass 2  Link          解析 $ref，建立 identity→IRNode 映射；从路径推断 owner；
+                      聚合 extension_fields 到 IR.extensionFields（按 entity 叠加）
+                      错误：dangling_ref、kind_mismatch、cycle（mixin 环）、
+                            duplicate extension field（同名冲突）
 
 Pass 3  Validate      语义校验
                       错误：type 缺失或解析失败、属性 schema 不匹配、
@@ -1230,9 +1276,9 @@ jobs:
         with: { node-version: '20', cache: 'pnpm' }
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r run build
-      - run: node packages/cli/bin/loom check systems/
+      - run: node packages/cli/bin/loom check platform/
       - run: |
-          node packages/cli/bin/loom project sql --dialect pg systems/ > /tmp/schema.sql
+          node packages/cli/bin/loom project sql --dialect pg platform/ > /tmp/schema.sql
           git diff --exit-code /tmp/schema.sql || \
             (echo "projected SQL drift detected; commit the regenerated artifact" && exit 1)
 ```
@@ -1310,7 +1356,7 @@ scalars:
   - { name: boolean,  description: boolean,   properties: [] }
 ```
 
-### A.2 systems/base/core/MANIFEST.yaml
+### A.2 platform/base/core/MANIFEST.yaml
 
 ```yaml
 version: loom-schema/v2
@@ -1321,7 +1367,7 @@ physical_schema: base_core
 description: core module
 ```
 
-### A.3 systems/base/core/mixin/audit.yaml
+### A.3 platform/base/core/mixin/audit.yaml
 
 ```yaml
 version: loom-schema/v2
@@ -1332,7 +1378,7 @@ fields:
   - { name: updated_at, type: datetime, required: true }
 ```
 
-### A.4 systems/base/core/value_type/email.yaml + money.yaml
+### A.4 platform/base/core/value_type/email.yaml + money.yaml
 
 ```yaml
 # email.yaml
@@ -1358,7 +1404,7 @@ fields:
     required: true
 ```
 
-### A.5 systems/base/core/table/users.yaml
+### A.5 platform/base/core/table/users.yaml
 
 ```yaml
 version: loom-schema/v2
@@ -1384,7 +1430,7 @@ indexes:
   - { name: idx_users_email, fields: [email], unique: true }
 ```
 
-### A.6 systems/base/core/entity/user.yaml
+### A.6 platform/base/core/entity/user.yaml
 
 ```yaml
 version: loom-schema/v2
@@ -1395,7 +1441,7 @@ business_keys: [email]
 audit: true
 ```
 
-### A.7 systems/base/core/extension/user_fields.yaml
+### A.7 platform/base/core/extension/user_fields.yaml
 
 ```yaml
 version: loom-schema/v2

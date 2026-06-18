@@ -159,5 +159,48 @@ fields:
       args: { max_length: 50 }
     default_scope: tenant
 `,
+
+    // ── ext:acme-corp — independent module with its own physical schema ──
+    'ext/acme-corp/retail/pos/MANIFEST.yaml': `version: loom-schema/v2
+kind: module_manifest
+system: retail
+module: pos
+physical_schema: acme_retail_pos
+description: acme-corp retail POS extension
+`,
+    'ext/acme-corp/retail/pos/table/orders.yaml': `version: loom-schema/v2
+kind: table
+name: Orders
+table:
+  name: orders
+  extension: { strategy: none }
+fields:
+  - name: id
+    type: bigint
+    required: true
+  - name: user_id
+    type: bigint
+    required: true
+  - name: total
+    type: base.core.Money
+foreign_keys:
+  - name: fk_orders_user
+    fields: [user_id]
+    ref_table: users_base
+    ref_fields: [id]
+primary_key: [id]
+`,
+
+    // ── tenant:acme — per-tenant extension field on platform's User entity ──
+    'tenants/acme/base/core/user_fields.yaml': `version: loom-schema/v2
+kind: extension_fields
+entity: entity:base.core.User
+fields:
+  - name: customer_no
+    type:
+      ref: string
+      args: { max_length: 32 }
+    default_scope: tenant
+`,
   });
 }

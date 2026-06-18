@@ -28,6 +28,15 @@ CREATE TABLE base_core.users_ext (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE acme_retail_pos.orders (
+  id BIGINT NOT NULL,
+  user_id BIGINT NOT NULL,
+  total_amount NUMERIC(18,4),
+  total_currency_code VARCHAR(3),
+  PRIMARY KEY (id),
+  CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES users_base (id)
+);
+
 CREATE VIEW users AS
 SELECT
   id,
@@ -39,5 +48,6 @@ SELECT
   price_range_low,
   price_range_high,
   status,
-  (SELECT string_value FROM users_ext e WHERE e.base_id = u.id AND e.field_name = 'nickname' LIMIT 1) AS nickname
+  (SELECT string_value FROM users_ext e WHERE e.base_id = u.id AND e.field_name = 'nickname' LIMIT 1) AS nickname,
+  (SELECT string_value FROM users_ext e WHERE e.base_id = u.id AND e.field_name = 'customer_no' LIMIT 1) AS customer_no
 FROM base_core.users_base u;
