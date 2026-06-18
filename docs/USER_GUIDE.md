@@ -96,22 +96,22 @@ my-schema/
 ├── base_types.yaml                # 全局唯一，可用标量目录
 └── systems/
     └── <system>/
-        ├── <module>/
-        │   ├── MANIFEST.yaml      # kind: module_manifest
-        │   ├── value_type/
-        │   │   └── <name>.yaml
-        │   ├── mixin/
-        │   │   └── <name>.yaml
-        │   ├── table/
-        │   │   └── <name>.yaml
-        │   ├── entity/
-        │   │   └── <name>.yaml
-        │   └── extension/
-        │       └── <name>.yaml    # kind: extension_fields
-        └── _shared/
-            └── mixin/
-                └── <name>.yaml
+        └── <module>/
+            ├── MANIFEST.yaml      # kind: module_manifest
+            ├── value_type/
+            │   └── <name>.yaml
+            ├── mixin/
+            │   └── <name>.yaml
+            ├── table/
+            │   └── <name>.yaml
+            ├── entity/
+            │   └── <name>.yaml
+            └── extension/
+                └── <name>.yaml    # kind: extension_fields
 ```
+
+所有 kind 一律落到**模块目录**下，按 kind 分子目录。跨模块复用通过 `using` 导入
+和 `module_manifest.exports` 表达（详见 §5.5、§7.2），不另设共享目录。
 
 ### 2.2 路径推导身份
 
@@ -552,7 +552,7 @@ fields:
 ### 6.1 定义 mixin
 
 ```yaml
-# systems/base/_shared/mixin/audit.yaml
+# systems/base/core/mixin/audit.yaml
 version: loom-schema/v2
 kind: mixin
 name: Audit
@@ -562,7 +562,8 @@ fields:
   - { name: updated_at, type: datetime, required: true }
 ```
 
-约定：共享 mixin 放在 `_shared/mixin/` 目录下，跨模块复用。
+mixin 与其他 kind 一样落在**模块目录**下（`<system>/<module>/mixin/`），身份形如
+`mixin:base.core.Audit`。跨模块复用时由目标模块 `using` 导入。
 
 ### 6.2 在 table 里 include
 
@@ -572,7 +573,7 @@ fields:
   - name: id
     type: bigint
     required: true
-  - include: mixin:base._shared.Audit     # 整组插入到当前位置
+  - include: mixin:base.core.Audit        # 整组插入到当前位置
   - name: email
     type: base.core.Email
     required: true
@@ -909,7 +910,7 @@ fields:
 ```
 entity:base.core.User             ← base/core/entity/user.yaml
 table:base.core.Users             ← base/core/table/users.yaml
-mixin:base._shared.Audit          ← base/_shared/mixin/audit.yaml
+mixin:base.core.Audit             ← base/core/mixin/audit.yaml
 value_type:base.core.Email        ← base/core/value_type/email.yaml
 ```
 
@@ -919,7 +920,7 @@ value_type:base.core.Email        ← base/core/value_type/email.yaml
 |---|---|---|
 | `primary_table:` | `primary_table: table:base.core.Users` | entity 强引用一张 table |
 | `ref_table:`（foreign_keys） | `ref_table: entity:base.core.User` | FK 引用目标表 |
-| `- include:`（mixin） | `- include: mixin:base._shared.Audit` | fields 数组里展开 mixin |
+| `- include:`（mixin） | `- include: mixin:base.core.Audit` | fields 数组里展开 mixin |
 | `entity:`（extension_fields） | `entity: entity:base.core.User` | extension_fields 作用于哪个 entity |
 | `exports:`（module_manifest） | `- value_type:base.core.Email` | 声明对外导出的节点 |
 
@@ -927,7 +928,7 @@ value_type:base.core.Email        ← base/core/value_type/email.yaml
 fields:
   - name: id                           # field（类型引用走 type:）
     type: bigint
-  - include: mixin:base._shared.Audit  # 身份引用（mixin 展开到 fields）
+  - include: mixin:base.core.Audit     # 身份引用（mixin 展开到 fields）
 ```
 
 ### 11.3 为什么分两个名字空间
@@ -1172,6 +1173,11 @@ diff-stable 且引用完整。
 - FK 跨 kind 解析（`entity:` → `primary_table`）
 - using 形态 C（重命名）——解决短名冲突，无需回退全限定名
 - mixin using 化——把 `- include: mixin:...` 纳入 using 体系（v2.1 候选）
+- 共享目录候选——v0.2.0 取消了 `_shared/`，所有 kind 落模块目录；若实践中跨模块
+  复用频繁、需要"位置即意图"的强提示，可重新引入 `_shared/` 作为可选风格
+  （思路见 `docs/design/2026-06-18-shared-and-value-type-notes.md` §a）
+- 方言插件机制——支持注册第三方 `dialects/<name>.ts`（达梦、OceanBase 等），
+  而非在 schema 里描述方言映射（同上设计文档 §c 已否决 schema 自描述方案）
 - `loom fmt` — 字段排序、key 顺序固定、缩进统一
 - `loom lift` — 从 atlas-yaml/v2 物理格式反向提炼 design schema 骨架
 - `loom project atlas-yaml` — 桥接到 atlas 生态
@@ -1216,7 +1222,7 @@ physical_schema: base_core
 description: core module
 ```
 
-### A.3 systems/base/_shared/mixin/audit.yaml
+### A.3 systems/base/core/mixin/audit.yaml
 
 ```yaml
 version: loom-schema/v2
@@ -1262,7 +1268,7 @@ table:
     view: users
 fields:
   - { name: id, type: bigint, required: true }
-  - include: mixin:base._shared.Audit
+  - include: mixin:base.core.Audit
   - name: email
     type: base.core.Email
     required: true
