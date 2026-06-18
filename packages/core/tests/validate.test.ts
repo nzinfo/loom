@@ -10,8 +10,8 @@ import { MemoryFileSystem } from './fixtures/memory_fs.js';
 async function runValidate(fs: ReturnType<typeof buildBaseSchemaFs>) {
   const diag = new Diagnostics();
   const { files } = await discover({ fs, basePath: '', diagnostics: diag });
-  const { parsed } = await parseAll({ fs, files, diagnostics: diag });
-  const { ir } = await link({ parsed, diagnostics: diag });
+  const { parsed, extensionFieldsFiles } = await parseAll({ fs, files, diagnostics: diag });
+  const { ir } = await link({ parsed, extensionFieldsFiles, files, diagnostics: diag });
   return validate({ ir, diagnostics: diag });
 }
 
@@ -161,8 +161,17 @@ async function validateFromStringMap(files: Record<string, string>) {
   const fs = new MemoryFileSystem(files);
   const diag = new Diagnostics();
   const { files: discovered } = await discover({ fs, basePath: '', diagnostics: diag });
-  const { parsed } = await parseAll({ fs, files: discovered, diagnostics: diag });
-  const { ir } = await link({ parsed, diagnostics: diag });
+  const { parsed, extensionFieldsFiles } = await parseAll({
+    fs,
+    files: discovered,
+    diagnostics: diag,
+  });
+  const { ir } = await link({
+    parsed,
+    extensionFieldsFiles,
+    files: discovered,
+    diagnostics: diag,
+  });
   validate({ ir, diagnostics: diag });
   return diag;
 }

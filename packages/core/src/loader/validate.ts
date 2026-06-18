@@ -1,6 +1,6 @@
 import type { Diagnostics } from '../errors.js';
-import type { BaseTypes, Entity, ExtensionFields, Table, TypeDescriptor } from '../ir/schemas.js';
-import type { FileKind, IR } from '../ir/version.js';
+import type { BaseTypes, Entity, Table, TypeDescriptor } from '../ir/schemas.js';
+import type { ExtensionFieldEntry, FileKind, IR } from '../ir/version.js';
 
 /**
  * Pass 3 — semantic validation. See spec §13.1, §6.9, §7.5 (v2).
@@ -54,14 +54,10 @@ export function validate(opts: ValidateOptions): ValidateResult {
         }
         break;
       }
-      case 'mixin':
-      case 'extension_fields': {
+      case 'mixin': {
         const data = node.data as { fields?: FieldLike[] };
         for (const f of data.fields ?? []) {
           checkTypedField(identity, node.kind, f, scalarNames, requiredProps, opts.diagnostics);
-        }
-        if (node.kind === 'extension_fields') {
-          checkExtensionTarget(identity, node.data as ExtensionFields, opts.ir, opts.diagnostics);
         }
         break;
       }
@@ -72,6 +68,17 @@ export function validate(opts: ValidateOptions): ValidateResult {
       default:
         break;
     }
+  }
+
+  // extension_fields live in ir.extensionFields (aggregated by link), not in
+  // ir.nodes. Validate each entity's extension bucket: scalar types must be
+  // declared in base_types, and the target entity must exist with a
+  // sidecar_eav primary_table (spec §7, §6.9).
+  for (const [entityId, entries] of opts.ir.extensionFields) {
+    for (const entry of entries) {
+      checkExtensionEntry(entityId, entry, scalarNames, requiredProps, opts.diagnostics);
+    }
+    checkExtensionTarget(entityId, opts.ir, opts.diagnostics);
   }
 
   return { diagnostics: opts.diagnostics };
@@ -173,20 +180,56 @@ function checkTable(
   }
 }
 
-function checkExtensionTarget(
-  identity: string,
-  ef: ExtensionFields,
-  ir: IR,
+/**
+ * Validate a single extension field entry's scalar type.
+ *
+ * Single-segment (scalar) refs must be declared in base_types and supply
+ * any required properties. Value_type refs (refValueTypeId set) are
+ * validated at the value_type file itself.
+ */
+function checkExtensionEntry(
+  entityId: string,
+  entry: ExtensionFieldEntry,
+  scalarNames: Set<string>,
+  requiredProps: Map<string, Set<string>>,
   diag: Diagnostics,
 ): void {
-  const entityNode = ir.nodes.get(ef.entity);
+  if (entry.refValueTypeId !== undefined) return; // value_type ref — checked elsewhere
+  if (entry.scalar === '') return;
+  if (scalarNames.size === 0) return;
+  if (!scalarNames.has(entry.scalar)) {
+    diag.add({
+      category: 'schema',
+      file: entityId,
+      line: 1,
+      column: 1,
+      message: `unknown scalar type "${entry.scalar}" for extension field "${entry.name}" (not in base_types)`,
+    });
+    return;
+  }
+  const req = requiredProps.get(entry.scalar) ?? new Set<string>();
+  for (const rp of req) {
+    if (!(rp in entry.props)) {
+      diag.add({
+        category: 'schema',
+        file: entityId,
+        line: 1,
+        column: 1,
+        message: `scalar "${entry.scalar}" requires property "${rp}" on extension field "${entry.name}" (base_types)`,
+      });
+    }
+  }
+}
+
+function checkExtensionTarget(entityId: string, ir: IR, diag: Diagnostics): void {
+  const entityNode = ir.nodes.get(entityId);
   if (!entityNode || entityNode.kind !== 'entity') {
     diag.add({
       category: 'semantic',
-      file: identity,
+      file: entityId,
       line: 1,
       column: 1,
-      message: `extension_fields entity "${ef.entity}" does not exist`,
+      message: `extension_fields entity "${entityId}" does not exist`,
     });
     return;
   }
@@ -195,10 +238,10 @@ function checkExtensionTarget(
   if (!tableNode || tableNode.kind !== 'table') {
     diag.add({
       category: 'semantic',
-      file: identity,
+      file: entityId,
       line: 1,
       column: 1,
-      message: `extension_fields entity "${ef.entity}" primary_table "${ent.primary_table}" is not a table`,
+      message: `extension_fields entity "${entityId}" primary_table "${ent.primary_table}" is not a table`,
     });
     return;
   }
@@ -206,10 +249,10 @@ function checkExtensionTarget(
   if (table.table.extension.strategy !== 'sidecar_eav') {
     diag.add({
       category: 'semantic',
-      file: identity,
+      file: entityId,
       line: 1,
       column: 1,
-      message: `extension_fields requires sidecar_eav strategy on entity "${ef.entity}"`,
+      message: `extension_fields requires sidecar_eav strategy on entity "${entityId}"`,
     });
   }
 }
