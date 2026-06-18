@@ -93,11 +93,8 @@ primary_key: [id]
       'base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
-  - name: enum
-    properties:
-      - name: values
-        type: array<string>
-        required: true
+  - name: bigint
+    properties: []
 `,
       'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
 kind: module_manifest
@@ -108,10 +105,7 @@ physical_schema: base_core
       'systems/base/core/value_type/status.yaml': `version: loom-schema/v2
 kind: value_type
 name: Status
-fields:
-  - name: value
-    type: enum
-    values: [active, inactive]
+variants: [active, inactive]
 `,
     });
     const { ir } = await load({ fs, basePath: '' });
@@ -155,8 +149,9 @@ table:
 fields:
   - { name: id, type: bigint, required: true }
   - name: email
-    type: string
-    max_length: 254
+    type:
+      ref: string
+      args: { max_length: 254 }
 primary_key: [id]
 `,
     });
@@ -189,8 +184,9 @@ kind: value_type
 name: Email
 fields:
   - name: value
-    type: string
-    max_length: 254
+    type:
+      ref: string
+      args: { max_length: 254 }
 `,
       'systems/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
@@ -239,12 +235,13 @@ kind: value_type
 name: Money
 fields:
   - name: amount
-    type: decimal
-    precision: 18
-    scale: 4
+    type:
+      ref: decimal
+      args: { precision: 18, scale: 4 }
   - name: currency_code
-    type: string
-    max_length: 3
+    type:
+      ref: string
+      args: { max_length: 3 }
 `,
       'systems/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
@@ -271,10 +268,6 @@ primary_key: [id]
       'base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
-  - name: enum
-    description: e
-    properties:
-      - { name: values, type: string, required: true }
   - { name: bigint, description: i, properties: [] }
 `,
       'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
@@ -286,10 +279,7 @@ physical_schema: base_core
       'systems/base/core/value_type/status.yaml': `version: loom-schema/v2
 kind: value_type
 name: Status
-fields:
-  - name: value
-    type: enum
-    values: [active, inactive]
+variants: [active, inactive]
 `,
       'systems/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table

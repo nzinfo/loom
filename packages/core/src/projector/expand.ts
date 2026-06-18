@@ -8,7 +8,8 @@
  */
 
 import { type ValueTypeNode, expandValueColumns, isSingleFieldValueType } from '../ir/field.js';
-import type { ExtensionFields, Table, ValueType } from '../ir/schemas.js';
+import type { ExtensionFields, Table, TypeDescriptor, ValueType } from '../ir/schemas.js';
+import { normalizeType } from '../ir/typespace.js';
 import type { IR, IRNode } from '../ir/version.js';
 import type {
   ExtensionFieldEntry,
@@ -18,6 +19,14 @@ import type {
   PhysicalModel,
   PhysicalTable,
 } from './types.js';
+
+/**
+ * Extract the type descriptor from a field, normalizing shorthand strings.
+ * Returns `{ref, args, meta}` always; args/meta default to empty objects.
+ */
+function descriptorOf(field: Record<string, unknown>): TypeDescriptor {
+  return normalizeType(field.type as string | TypeDescriptor);
+}
 
 /**
  * Main entry point: project a design IR to a physical model.
@@ -200,23 +209,24 @@ function expandField(
   enums: Map<string, ReadonlyArray<string>>,
 ): PhysicalColumn[] {
   const fName = String(f.name);
-  const typeVal = String(f.type);
+  const desc = descriptorOf(f);
+  const ref = desc.ref;
 
   // Single-segment: direct base_types scalar.
-  if (!typeVal.includes('.')) {
+  if (!ref.includes('.')) {
     const result: PhysicalColumn = {
       name: fName,
-      scalar: typeVal,
+      scalar: ref,
       required: f.required === true,
       unique: f.unique === true,
-      props: extractProperties(f),
+      props: desc.args ?? {},
     };
     return [result];
   }
 
   // Three-segment: value_type reference. Link pass verified existence + kind
-  // and rewrote short-name matches to their fqn, so typeVal is `sys.mod.Name`.
-  const targetId = `value_type:${typeVal}`;
+  // and rewrote short-name matches to their fqn, so ref is `sys.mod.Name`.
+  const targetId = `value_type:${ref}`;
   const vtNode = ir.nodes.get(targetId);
   if (!vtNode) {
     throw new Error(`Value type not found: ${targetId}`);
@@ -228,12 +238,29 @@ function expandField(
   const vt = vtNode.data as ValueType;
   const vtNodeForField = vt as unknown as ValueTypeNode;
 
+  // Variants form (sum type): render as a single column backed by the
+  // enum registry. The column's scalar is reported as 'string' for dialect
+  // purposes; the enumRef drives PG ENUM / MySQL ENUM / SQLite CHECK.
+  const variants = (vt as unknown as { variants?: ReadonlyArray<unknown> }).variants;
+  if (variants && variants.length > 0) {
+    const result: PhysicalColumn = {
+      name: fName,
+      scalar: 'string',
+      required: f.required === true,
+      unique: f.unique === true,
+      props: {},
+      enumRef: targetId,
+    };
+    return [result];
+  }
+
   if (isSingleFieldValueType(vtNodeForField)) {
     const inner = vt.fields[0] as Record<string, unknown>;
-    const scalar = String(inner.type);
-    const props = extractProperties(inner);
+    const innerDesc = descriptorOf(inner);
+    const scalar = innerDesc.ref;
+    const props = innerDesc.args ?? {};
     let enumRef: string | undefined;
-    if (scalar === 'enum' && Array.isArray(inner.values)) {
+    if (scalar === 'enum' && Array.isArray(props.values)) {
       enumRef = targetId;
     }
     const result: PhysicalColumn = {
@@ -251,62 +278,39 @@ function expandField(
   const expanded = expandValueColumns(fName, vtNodeForField);
   return expanded.map((col, idx) => {
     const subField = vt.fields[idx] as Record<string, unknown>;
-    const subType = String(subField.type);
+    const subDesc = descriptorOf(subField);
+    const subType = subDesc.ref;
+    const subProps = subDesc.args ?? {};
     const result: PhysicalColumn = {
       name: col.name,
       scalar: subType,
       required: f.required === true,
       unique: f.unique === true,
-      props: extractProperties(subField),
-      ...(subType === 'enum' && Array.isArray(subField.values) ? { enumRef: targetId } : {}),
+      props: subProps,
+      ...(subType === 'enum' && Array.isArray(subProps.values) ? { enumRef: targetId } : {}),
     };
     return result;
   });
 }
 
 /**
- * Extract scalar properties from a field object (e.g., max_length, precision, scale).
+ * Collect variant values from value_types with a top-level `variants:` list.
  *
- * Skips known structural keys like 'name', 'type', 'required', 'unique', 'default', 'include'.
- */
-function extractProperties(field: Record<string, unknown>): Record<string, unknown> {
-  const props: Record<string, unknown> = {};
-  const skipKeys = new Set([
-    'name',
-    'type',
-    'required',
-    'unique',
-    'default',
-    'include',
-    'default_scope',
-  ]);
-
-  for (const [k, v] of Object.entries(field)) {
-    if (!skipKeys.has(k)) {
-      props[k] = v;
-    }
-  }
-
-  return props;
-}
-
-/**
- * Collect enum values from value_types with type="enum".
- *
- * Populates the `enums` registry: identity → values array.
+ * Populates the `enums` registry: identity → values array. Each variant's
+ * `value` (the shorthand string, or the detailed object's `value` field)
+ * becomes one entry. This registry feeds the dialect projectors (PG enum
+ * types, MySQL ENUM, SQLite CHECK).
  */
 function collectEnums(ir: IR, enums: Map<string, ReadonlyArray<string>>): void {
   for (const [identity, node] of ir.nodes) {
     if (node.kind !== 'value_type') continue;
-
     const vt = node.data as ValueType;
-    // Check if the first field has type="enum".
-    if (vt.fields.length === 1) {
-      const first = vt.fields[0] as Record<string, unknown>;
-      if (first.type === 'enum' && Array.isArray(first.values)) {
-        enums.set(identity, first.values as ReadonlyArray<string>);
-      }
-    }
+    const variants = (vt as unknown as { variants?: ReadonlyArray<unknown> }).variants;
+    if (!variants || variants.length === 0) continue;
+    const values = variants.map((v) =>
+      typeof v === 'string' ? v : (v as { value: string }).value,
+    );
+    enums.set(identity, values);
   }
 }
 
@@ -332,21 +336,22 @@ function collectExtensionFields(
       // Skip include entries (they're handled at parse time)
       if ('include' in fRec) continue;
 
-      const typeVal = String(fRec.type);
-      if (typeVal.includes('.')) {
+      const desc = descriptorOf(fRec);
+      const ref = desc.ref;
+      if (ref.includes('.')) {
         const entry: ExtensionFieldEntry = {
           name: String(fRec.name),
           scalar: '',
-          refValueTypeId: `value_type:${typeVal}`,
-          props: extractProperties(fRec),
+          refValueTypeId: `value_type:${ref}`,
+          props: desc.args ?? {},
           ...(fRec.default_scope !== undefined ? { defaultScope: String(fRec.default_scope) } : {}),
         };
         entries.push(entry);
       } else {
         const entry: ExtensionFieldEntry = {
           name: String(fRec.name),
-          scalar: typeVal,
-          props: extractProperties(fRec),
+          scalar: ref,
+          props: desc.args ?? {},
           ...(fRec.default_scope !== undefined ? { defaultScope: String(fRec.default_scope) } : {}),
         };
         entries.push(entry);

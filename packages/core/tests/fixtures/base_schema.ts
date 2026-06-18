@@ -63,21 +63,23 @@ kind: value_type
 name: Email
 fields:
   - name: value
-    type: string
-    max_length: 254
+    type:
+      ref: string
+      args: { max_length: 254 }
 `,
     'systems/base/core/value_type/money.yaml': `version: loom-schema/v2
 kind: value_type
 name: Money
 fields:
   - name: amount
-    type: decimal
-    precision: 18
-    scale: 4
+    type:
+      ref: decimal
+      args: { precision: 18, scale: 4 }
     required: true
   - name: currency_code
-    type: string
-    max_length: 3
+    type:
+      ref: string
+      args: { max_length: 3 }
     required: true
 `,
     'systems/base/core/table/users.yaml': `version: loom-schema/v2
@@ -118,8 +120,9 @@ kind: extension_fields
 entity: entity:base.core.User
 fields:
   - name: nickname
-    type: string
-    max_length: 50
+    type:
+      ref: string
+      args: { max_length: 50 }
     default_scope: tenant
 `,
   });

@@ -57,30 +57,75 @@ const versionSchema = z.literal(CURRENT_VERSION);
 const usingSchema = z.array(z.string().min(1)).optional();
 
 /**
+ * Type descriptor — the structured form of a field's `type:` (spec v2 §3).
+ *
+ *   ref   — type reference: single-segment (base_types short name) or
+ *           three-segment (value_type fqn)
+ *   args  — type arguments (max_length, precision, scale, pattern, ...).
+ *           Unified home for both value params (literals) and type params
+ *           (type refs); discrimination happens at resolution.
+ *   meta  — opaque metadata bag (since, deprecated, tags, ...). Not
+ *           schema-validated in v2; reserved for future tightening.
+ *
+ * The string shorthand `type: integer` is normalized to
+ * `{ ref: 'integer', args: {}, meta: {} }` by {@link normalizeType} in
+ * typespace.ts before any downstream pass consumes it.
+ */
+export const TypeDescriptorSchema = z
+  .object({
+    ref: z.string().min(1),
+    args: z.record(z.string(), z.unknown()).optional(),
+    meta: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+
+export type TypeDescriptor = z.infer<typeof TypeDescriptorSchema>;
+
+/**
  * A field with a type reference (spec v2 §3).
  *
- * `type:` is the single key. Value is a type name — single-segment
- * (base_types short name, e.g. "integer") or three-segment (value_type
- * node, e.g. "base.core.Email"). Form discrimination happens in the
- * typespace resolver, not here.
+ * `type:` accepts two forms:
+ *   - shorthand: a bare string (`integer`, `base.core.Email`)
+ *   - detailed:  a {@link TypeDescriptor} object (`{ref, args, meta}`)
  *
- * `catchall` allows scalar-specific properties (max_length, precision,
- * scale, values, ...) to pass through; validation against base_types
- * property schemas happens in Pass 3.
+ * The loader's link pass normalizes the shorthand to the descriptor form,
+ * so downstream passes always see an object. Scalar arguments live in
+ * `type.args`, not at field top level.
  */
 const typeField = z
   .object({
     name: z.string().min(1),
-    type: z.string().min(1),
+    type: z.union([z.string().min(1), TypeDescriptorSchema]),
     required: z.boolean().optional(),
     unique: z.boolean().optional(),
     default: z.unknown().optional(),
+    default_scope: z.string().min(1).optional(),
   })
-  .catchall(z.unknown());
+  .strict();
 
 const includeEntry = z.object({ include: z.string().min(1) }).strict();
 
 const fieldOrInclude = z.union([typeField, includeEntry]);
+
+/**
+ * A variant entry — element of a value_type's `variants:` list (spec v2 §6).
+ *
+ * Two equivalent forms:
+ *   - shorthand: a bare string (`active`)
+ *   - detailed:  `{ value: active, display_name: 活跃, description: ... }`
+ *
+ * Reader normalizes the shorthand to `{ value: <str> }`.
+ */
+const variantSchema = z.union([
+  z.string().min(1),
+  z
+    .object({
+      value: z.string().min(1),
+      display_name: z.string().optional(),
+      description: z.string().optional(),
+    })
+    .strict(),
+]);
 
 const constraintSchema = z.object({ kind: z.literal('check'), expr: z.string().min(1) }).strict();
 
@@ -159,10 +204,30 @@ export const ValueTypeSchema = z
     display_name: z.string().optional(),
     description: z.string().optional(),
     using: usingSchema,
-    fields: z.array(fieldOrInclude).min(1),
+    fields: z.array(fieldOrInclude).optional(),
+    variants: z.array(variantSchema).min(1).optional(),
     constraints: z.array(constraintSchema).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((data, ctx) => {
+    // fields and variants are mutually exclusive; exactly one required.
+    const hasFields = data.fields !== undefined && data.fields.length > 0;
+    const hasVariants = data.variants !== undefined && data.variants.length > 0;
+    if (hasFields && hasVariants) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'value_type cannot have both fields and variants (they are mutually exclusive)',
+        path: ['variants'],
+      });
+    }
+    if (!hasFields && !hasVariants) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'value_type must have either fields or variants',
+        path: ['fields'],
+      });
+    }
+  });
 
 export const MixinSchema = z
   .object({

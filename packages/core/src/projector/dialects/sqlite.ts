@@ -34,7 +34,7 @@ function tableBlock(t: PhysicalTable, ctx: SqliteEmitContext): string {
     body.push(
       `  ${c.name} ${sqliteType(c)}${c.required ? ' NOT NULL' : ''}${c.unique ? ' UNIQUE' : ''}`,
     );
-    if (c.scalar === 'enum' && c.enumRef) {
+    if (c.enumRef) {
       const values = ctx.model.enums.get(c.enumRef);
       if (values) {
         body.push(`  CHECK (${c.name} IN (${values.map((v) => `'${v}'`).join(', ')}))`);

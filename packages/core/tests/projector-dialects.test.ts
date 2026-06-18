@@ -33,11 +33,11 @@ describe('projector dialects', () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
       'base_types.yaml':
-        'version: loom-schema/v2\nkind: base_types\nscalars:\n  - name: enum\n    properties:\n      - name: values\n        type: array<string>\n        required: true\n  - name: bigint\n    properties: []\n',
+        'version: loom-schema/v2\nkind: base_types\nscalars:\n  - name: bigint\n    properties: []\n  - name: string\n    properties: []\n',
       'systems/base/core/MANIFEST.yaml':
         'version: loom-schema/v2\nkind: module_manifest\nsystem: base\nmodule: core\nphysical_schema: base_core\n',
       'systems/base/core/value_type/status.yaml':
-        'version: loom-schema/v2\nkind: value_type\nname: Status\nfields:\n  - name: value\n    type: enum\n    values: [active, inactive]\n',
+        'version: loom-schema/v2\nkind: value_type\nname: Status\nvariants: [active, inactive]\n',
       'systems/base/core/table/t.yaml':
         'version: loom-schema/v2\nkind: table\nname: T\ntable:\n  name: t\n  extension:\n    strategy: none\nfields:\n  - name: id\n    type: bigint\n    required: true\n  - name: status\n    type: base.core.Status\nprimary_key: [id]\n',
     });
@@ -51,15 +51,15 @@ describe('projector dialects', () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
       'base_types.yaml':
-        'version: loom-schema/v2\nkind: base_types\nscalars:\n  - name: enum\n    properties:\n      - name: values\n        type: array<string>\n        required: true\n  - name: bigint\n    properties: []\n  - name: decimal\n    properties:\n      - name: precision\n        type: integer\n        required: true\n      - name: scale\n        type: integer\n        required: true\n  - name: string\n    properties:\n      - name: max_length\n        type: integer\n        required: true\n',
+        'version: loom-schema/v2\nkind: base_types\nscalars:\n  - name: bigint\n    properties: []\n  - name: decimal\n    properties:\n      - name: precision\n        type: integer\n        required: true\n      - name: scale\n        type: integer\n        required: true\n  - name: string\n    properties:\n      - name: max_length\n        type: integer\n        required: true\n',
       'systems/base/core/MANIFEST.yaml':
         'version: loom-schema/v2\nkind: module_manifest\nsystem: base\nmodule: core\nphysical_schema: base_core\n',
       'systems/base/core/value_type/status.yaml':
-        'version: loom-schema/v2\nkind: value_type\nname: Status\nfields:\n  - name: value\n    type: enum\n    values: [active, inactive]\n',
+        'version: loom-schema/v2\nkind: value_type\nname: Status\nvariants: [active, inactive]\n',
       'systems/base/core/value_type/money.yaml':
-        'version: loom-schema/v2\nkind: value_type\nname: Money\nfields:\n  - name: amount\n    type: decimal\n    precision: 18\n    scale: 4\n  - name: currency_code\n    type: string\n    max_length: 3\n',
+        'version: loom-schema/v2\nkind: value_type\nname: Money\nfields:\n  - name: amount\n    type:\n      ref: decimal\n      args: { precision: 18, scale: 4 }\n  - name: currency_code\n    type:\n      ref: string\n      args: { max_length: 3 }\n',
       'systems/base/core/value_type/email.yaml':
-        'version: loom-schema/v2\nkind: value_type\nname: Email\nfields:\n  - name: value\n    type: string\n    max_length: 254\n',
+        'version: loom-schema/v2\nkind: value_type\nname: Email\nfields:\n  - name: value\n    type:\n      ref: string\n      args: { max_length: 254 }\n',
       'systems/base/core/table/t.yaml':
         'version: loom-schema/v2\nkind: table\nname: T\ntable:\n  name: t\n  extension:\n    strategy: none\nfields:\n  - name: id\n    type: bigint\n    required: true\n  - name: s\n    type: base.core.Status\n  - name: m\n    type: base.core.Money\n  - name: email\n    type: base.core.Email\nprimary_key: [id]\n',
     });
@@ -74,13 +74,13 @@ describe('projector dialects', () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
       'base_types.yaml':
-        'version: loom-schema/v2\nkind: base_types\nscalars:\n  - name: enum\n    properties:\n      - name: values\n        type: array<string>\n        required: true\n  - name: bigint\n    properties: []\n  - name: decimal\n    properties:\n      - name: precision\n        type: integer\n        required: true\n      - name: scale\n        type: integer\n        required: true\n',
+        'version: loom-schema/v2\nkind: base_types\nscalars:\n  - name: bigint\n    properties: []\n  - name: decimal\n    properties:\n      - name: precision\n        type: integer\n        required: true\n      - name: scale\n        type: integer\n        required: true\n',
       'systems/base/core/MANIFEST.yaml':
         'version: loom-schema/v2\nkind: module_manifest\nsystem: base\nmodule: core\nphysical_schema: base_core\n',
       'systems/base/core/value_type/status.yaml':
-        'version: loom-schema/v2\nkind: value_type\nname: Status\nfields:\n  - name: value\n    type: enum\n    values: [active, inactive]\n',
+        'version: loom-schema/v2\nkind: value_type\nname: Status\nvariants: [active, inactive]\n',
       'systems/base/core/value_type/money.yaml':
-        'version: loom-schema/v2\nkind: value_type\nname: Money\nfields:\n  - name: amount\n    type: decimal\n    precision: 18\n    scale: 4\n',
+        'version: loom-schema/v2\nkind: value_type\nname: Money\nfields:\n  - name: amount\n    type:\n      ref: decimal\n      args: { precision: 18, scale: 4 }\n',
       'systems/base/core/table/t.yaml':
         'version: loom-schema/v2\nkind: table\nname: T\ntable:\n  name: t\n  extension:\n    strategy: none\nfields:\n  - name: id\n    type: bigint\n    required: true\n  - name: s\n    type: base.core.Status\n  - name: m\n    type: base.core.Money\nprimary_key: [id]\n',
     });

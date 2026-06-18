@@ -84,7 +84,7 @@ function viewBlock(v: PivotView): string {
 }
 
 function mysqlType(c: PhysicalColumn, ctx: MysqlEmitContext): string {
-  if (c.scalar === 'enum' && c.enumRef) {
+  if (c.enumRef) {
     const values = ctx.model.enums.get(c.enumRef);
     if (values) {
       return `ENUM(${values.map((v) => `'${v}'`).join(', ')})`;

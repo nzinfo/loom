@@ -1,7 +1,7 @@
 import type { Diagnostics } from '../errors.js';
 import { parseRef } from '../ir/refs.js';
-import type { AnyFile, BaseTypes } from '../ir/schemas.js';
-import { type TypeRef, parseTypeRef, resolveShortName } from '../ir/typespace.js';
+import type { AnyFile, BaseTypes, TypeDescriptor } from '../ir/schemas.js';
+import { type TypeRef, normalizeType, parseTypeRef, resolveShortName } from '../ir/typespace.js';
 import type { IR, IRNode, Identity } from '../ir/version.js';
 import type { FileKind } from '../ir/version.js';
 import { CURRENT_VERSION } from '../ir/version.js';
@@ -223,16 +223,19 @@ function resolveFieldTypes(
   for (const e of host.fields) {
     if (typeof e !== 'object' || e === null) continue;
     if (!('type' in e)) continue;
-    const typeVal = (e as { type: unknown }).type;
-    if (typeof typeVal !== 'string') continue;
+    const rawType = (e as { type: unknown }).type;
+    // Normalize shorthand string → {ref, args?, meta?}; downstream sees object only.
+    const descriptor = normalizeType(rawType as string | TypeDescriptor);
+    // Write back the normalized form so consumers (validate, expand) see object.
+    (e as Record<string, unknown>).type = descriptor;
 
-    const threeSeg = parseTypeRef(typeVal);
+    const threeSeg = parseTypeRef(descriptor.ref);
     if (threeSeg !== null) {
       resolveThreeSegment(e as Record<string, unknown>, threeSeg, identity, parsed, diag, deps);
     } else {
       resolveSingleSegment(
         e as Record<string, unknown>,
-        typeVal,
+        descriptor.ref,
         identity,
         using,
         scalars,
@@ -322,8 +325,9 @@ function resolveSingleSegment(
       // Stays as-is; base_types short name flows to the projector.
       return;
     case 'value_type': {
-      // Rewrite the field's type to its fqn.
-      field.type = result.fqn;
+      // Rewrite the descriptor's ref to its fqn; args/meta stay attached.
+      const desc = field.type as TypeDescriptor;
+      desc.ref = result.fqn;
       const targetId = `value_type:${result.fqn}`;
       deps.get(identity)?.add(targetId);
       return;

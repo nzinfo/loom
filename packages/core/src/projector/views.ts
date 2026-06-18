@@ -92,7 +92,11 @@ export function buildPivotViews(model: PhysicalModel, ir: IR): PivotView[] {
           if (vtNode?.kind !== 'value_type') continue;
           for (const f of vtNode.data.fields) {
             const fRec = f as Record<string, unknown>;
-            const subScalar = typeof fRec.base === 'string' ? fRec.base : 'string';
+            const rawType = fRec.type;
+            const subScalar =
+              typeof rawType === 'string'
+                ? rawType
+                : (rawType as { ref?: string })?.ref ?? 'string';
             pivotCols.push({
               fieldName: `${ef.name}_${(f as { name: string }).name}`,
               eavColumn: EAV_COLUMN_BY_SCALAR[subScalar] ?? 'string_value',

@@ -1,5 +1,5 @@
 import type { Diagnostics } from '../errors.js';
-import type { BaseTypes, Entity, ExtensionFields, Table } from '../ir/schemas.js';
+import type { BaseTypes, Entity, ExtensionFields, Table, TypeDescriptor } from '../ir/schemas.js';
 import type { FileKind, IR } from '../ir/version.js';
 
 /**
@@ -7,7 +7,7 @@ import type { FileKind, IR } from '../ir/version.js';
  *
  * Cross-file rules that Zod cannot express:
  *   - every field `type:` single-segment name is a scalar declared in base_types
- *   - every scalar property flagged required in base_types is present on the field
+ *   - every scalar property flagged required in base_types is present in type.args
  *   - table.primary_key entries are all required:true fields
  *   - extension_fields targets an entity whose primary_table is sidecar_eav
  *
@@ -31,7 +31,16 @@ export function validate(opts: ValidateOptions): ValidateResult {
 
   for (const [identity, node] of opts.ir.nodes) {
     switch (node.kind) {
-      case 'value_type':
+      case 'value_type': {
+        // value_type has two mutually exclusive forms: fields or variants.
+        // variants form (sum type) has no typed fields to check.
+        const data = node.data as { fields?: FieldLike[]; variants?: unknown[] };
+        if (data.variants && data.variants.length > 0) break;
+        for (const f of data.fields ?? []) {
+          checkTypedField(identity, node.kind, f, scalarNames, requiredProps, opts.diagnostics);
+        }
+        break;
+      }
       case 'mixin':
       case 'extension_fields': {
         const data = node.data as { fields?: FieldLike[] };
@@ -84,42 +93,34 @@ function checkTypedField(
   diag: Diagnostics,
 ): void {
   if (scalarNames.size === 0) return;
-  const typeVal = f.type;
-  if (typeof typeVal !== 'string') return;
-  // Inline enum is only legal inside a value_type file (spec v2 §6).
-  if (typeVal === 'enum' && hostKind !== 'value_type') {
-    diag.add({
-      category: 'schema',
-      file: identity,
-      line: 1,
-      column: 1,
-      message: `inline enum is not allowed in ${hostKind} (define a value_type and reference it)`,
-    });
-    return;
-  }
+  const typeVal = f.type as string | TypeDescriptor | undefined;
+  if (typeVal === undefined) return;
+  // link pass normalizes string → object; accept either for safety.
+  const ref = typeof typeVal === 'string' ? typeVal : typeVal.ref;
   // Three-segment (value_type ref): skip — validated at the value_type file.
-  if (typeVal.includes('.')) return;
+  if (ref.includes('.')) return;
 
   // Single-segment: must be a known scalar.
-  if (!scalarNames.has(typeVal)) {
+  if (!scalarNames.has(ref)) {
     diag.add({
       category: 'schema',
       file: identity,
       line: 1,
       column: 1,
-      message: `unknown scalar type "${typeVal}" (not in base_types)`,
+      message: `unknown scalar type "${ref}" (not in base_types)`,
     });
     return;
   }
-  const req = requiredProps.get(typeVal) ?? new Set<string>();
+  const req = requiredProps.get(ref) ?? new Set<string>();
+  const args = typeof typeVal === 'object' && typeVal.args ? typeVal.args : {};
   for (const rp of req) {
-    if (!(rp in f)) {
+    if (!(rp in args)) {
       diag.add({
         category: 'schema',
         file: identity,
         line: 1,
         column: 1,
-        message: `scalar "${typeVal}" requires property "${rp}" (base_types)`,
+        message: `scalar "${ref}" requires property "${rp}" in type.args (base_types)`,
       });
     }
   }

@@ -108,7 +108,7 @@ primary_key: [id]
     const fields = (usersNode?.data as { fields: Array<Record<string, unknown>> }).fields;
     // Short name "Email" should be rewritten to its fqn after link.
     const emailField = fields.find((f) => f.name === 'email');
-    expect(emailField?.type).toBe('base.core.Email');
+    expect((emailField?.type as { ref: string }).ref).toBe('base.core.Email');
   });
 
   it('reports ambiguous when using imports two modules with the same type name', async () => {

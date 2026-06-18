@@ -117,8 +117,9 @@ kind: extension_fields
 entity: entity:base.core.T
 fields:
   - name: note
-    type: string
-    max_length: 10
+    type:
+      ref: string
+      args: { max_length: 10 }
 `,
     });
     const { diagnostics } = await runValidate(fs);
@@ -224,8 +225,9 @@ kind: value_type
 name: Money
 fields:
   - name: amount
-    type: decimal
-    precision: 18
+    type:
+      ref: decimal
+      args: { precision: 18 }
 `,
       'systems/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
@@ -314,15 +316,11 @@ primary_key: [id]
     ).toBe(true);
   });
 
-  it('rejects inline enum in a table field (enum must go through value_type)', async () => {
+  it('rejects a bare "enum" type ref in a table (enum scalar was removed; use variants in a value_type)', async () => {
     const diag = await validateFromStringMap({
       'base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
-  - name: enum
-    description: e
-    properties:
-      - { name: values, type: string, required: true }
   - { name: string, description: s, properties: [] }
 `,
       'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
@@ -341,24 +339,19 @@ fields:
   - { name: id, type: string, required: true }
   - name: status
     type: enum
-    values: [active, inactive]
 primary_key: [id]
 `,
     });
 
     expect(diag.hasErrors).toBe(true);
-    expect(diag.errors.some((d) => d.message.includes('inline enum'))).toBe(true);
+    expect(diag.errors.some((d) => d.message.includes('unknown scalar type "enum"'))).toBe(true);
   });
 
-  it('allows type: enum inside a value_type file (enum definition)', async () => {
+  it('allows variants in a value_type file (sum type form)', async () => {
     const diag = await validateFromStringMap({
       'base_types.yaml': `version: loom-schema/v2
 kind: base_types
 scalars:
-  - name: enum
-    description: e
-    properties:
-      - { name: values, type: string, required: true }
   - { name: string, description: s, properties: [] }
 `,
       'systems/base/core/MANIFEST.yaml': `version: loom-schema/v2
@@ -370,10 +363,7 @@ physical_schema: base_core
       'systems/base/core/value_type/status.yaml': `version: loom-schema/v2
 kind: value_type
 name: Status
-fields:
-  - name: value
-    type: enum
-    values: [active, inactive]
+variants: [active, inactive]
 `,
       'systems/base/core/table/users.yaml': `version: loom-schema/v2
 kind: table
@@ -390,7 +380,6 @@ primary_key: [id]
 `,
     });
 
-    const inlineEnumErrors = diag.errors.filter((d) => d.message.includes('inline enum'));
-    expect(inlineEnumErrors).toEqual([]);
+    expect(diag.hasErrors).toBe(false);
   });
 });

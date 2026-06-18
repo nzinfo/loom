@@ -12,6 +12,7 @@
  * disambiguating short names via `using`) lives in the loader's link pass
  * and operates on IR context — see Task 5.
  */
+import type { TypeDescriptor } from './schemas.js';
 
 /** A parsed three-segment type reference. Single-segment names are NOT type
  *  refs (they are base_types short names); {@link parseTypeRef} returns null
@@ -20,6 +21,26 @@ export interface TypeRef {
   readonly system: string;
   readonly module: string;
   readonly name: string;
+}
+
+/**
+ * Normalize a field's `type:` value (which may be a shorthand string or a
+ * detailed {@link TypeDescriptor}) into the canonical descriptor form.
+ *
+ *   'integer'                       → { ref: 'integer', args: {}, meta: {} }
+ *   { ref: 'string', args: {...} }  → as-is (with args/meta defaulted)
+ *
+ * Downstream passes (link, validate, expand) consume only the object form.
+ */
+export function normalizeType(t: string | TypeDescriptor): TypeDescriptor {
+  if (typeof t === 'string') {
+    return { ref: t };
+  }
+  return {
+    ref: t.ref,
+    ...(t.args && Object.keys(t.args).length > 0 ? { args: { ...t.args } } : {}),
+    ...(t.meta && Object.keys(t.meta).length > 0 ? { meta: { ...t.meta } } : {}),
+  };
 }
 
 /**

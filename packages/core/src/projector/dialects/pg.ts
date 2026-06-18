@@ -93,7 +93,7 @@ function viewBlock(v: PivotView): string {
 }
 
 function pgType(c: PhysicalColumn, ctx: PgEmitContext): string {
-  if (c.scalar === 'enum' && c.enumRef) {
+  if (c.enumRef) {
     return pgEnumName(c.enumRef);
   }
   switch (c.scalar) {

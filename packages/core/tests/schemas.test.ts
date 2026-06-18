@@ -40,6 +40,25 @@ fields:
     expect(fields[0]?.type).toBe('base.core.Email');
   });
 
+  it('accepts a field with type as a descriptor object', () => {
+    const yaml = `version: loom-schema/v2
+kind: mixin
+name: M
+fields:
+  - name: email
+    type:
+      ref: string
+      args: { max_length: 254 }
+      meta: { since: v0.2.0 }
+`;
+    const f = parseFile(yaml, 'test.yaml');
+    const fields = (f.data as { fields: Array<Record<string, unknown>> }).fields;
+    const t = fields[0]?.type as { ref: string; args: { max_length: number }; meta: { since: string } };
+    expect(t.ref).toBe('string');
+    expect(t.args.max_length).toBe(254);
+    expect(t.meta.since).toBe('v0.2.0');
+  });
+
   it('rejects a field with the v1 base: key', () => {
     const yaml = `version: loom-schema/v2
 kind: mixin
@@ -71,8 +90,9 @@ using:
   - retail.pos.types.*
 fields:
   - name: value
-    type: string
-    max_length: 100
+    type:
+      ref: string
+      args: { max_length: 100 }
 `;
     const f = parseFile(yaml, 'test.yaml');
     const data = f.data as { using?: string[] };
@@ -85,8 +105,9 @@ kind: value_type
 name: Email
 fields:
   - name: value
-    type: string
-    max_length: 254
+    type:
+      ref: string
+      args: { max_length: 254 }
 `;
     const f = parseFile(yaml, 'test.yaml');
     const data = f.data as { using?: string[] };
@@ -125,13 +146,14 @@ kind: value_type
 name: Email
 fields:
   - name: value
-    type: string
-    max_length: 254
+    type:
+      ref: string
+      args: { max_length: 254 }
 `;
     const f = parseFile(src, 'systems/base/core/value_type/email.yaml');
     expect(f.kind).toBe('value_type');
     const vt = ValueTypeSchema.parse((f as { raw: unknown }).raw);
-    expect(vt.fields[0]?.type).toBe('string');
+    expect((vt.fields[0]?.type as { ref: string }).ref).toBe('string');
   });
 
   it('parses a multi-field value_type with constraints', () => {
@@ -140,13 +162,14 @@ kind: value_type
 name: Money
 fields:
   - name: amount
-    type: decimal
-    precision: 18
-    scale: 4
+    type:
+      ref: decimal
+      args: { precision: 18, scale: 4 }
     required: true
   - name: currency_code
-    type: string
-    max_length: 3
+    type:
+      ref: string
+      args: { max_length: 3 }
 constraints:
   - kind: check
     expr: amount >= 0
@@ -206,8 +229,9 @@ kind: extension_fields
 entity: entity:base.core.User
 fields:
   - name: nickname
-    type: string
-    max_length: 50
+    type:
+      ref: string
+      args: { max_length: 50 }
     default_scope: tenant
 `;
     const f = parseFile(src, 'systems/base/core/extension/user_fields.yaml');
