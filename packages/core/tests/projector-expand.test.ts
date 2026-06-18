@@ -12,8 +12,17 @@ async function expandFromStringMap(files: Record<string, string>) {
   const fs = new MemoryFileSystem(files);
   const diag = new Diagnostics();
   const { files: discovered } = await discover({ fs, basePath: '', diagnostics: diag });
-  const { parsed } = await parseAll({ fs, files: discovered, diagnostics: diag });
-  const { ir } = await link({ parsed, diagnostics: diag });
+  const { parsed, extensionFieldsFiles } = await parseAll({
+    fs,
+    files: discovered,
+    diagnostics: diag,
+  });
+  const { ir } = await link({
+    parsed,
+    extensionFieldsFiles,
+    files: discovered,
+    diagnostics: diag,
+  });
   return expandTables(ir);
 }
 

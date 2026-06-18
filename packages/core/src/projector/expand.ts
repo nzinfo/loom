@@ -8,7 +8,7 @@
  */
 
 import { type ValueTypeNode, expandValueColumns, isSingleFieldValueType } from '../ir/field.js';
-import type { ExtensionFields, Table, TypeDescriptor, ValueType } from '../ir/schemas.js';
+import type { Table, TypeDescriptor, ValueType } from '../ir/schemas.js';
 import { normalizeType } from '../ir/typespace.js';
 import type { IR, IRNode } from '../ir/version.js';
 import type {
@@ -79,11 +79,12 @@ function instantiateFields(
 export function expandTables(ir: IR): PhysicalModel {
   const tables: PhysicalTable[] = [];
   const enums = new Map<string, ReadonlyArray<string>>();
-  const extensionFields = new Map<string, ReadonlyArray<ExtensionFieldEntry>>();
+  // extension_fields were aggregated by the link pass into ir.extensionFields.
+  // Copy them verbatim into the physical model (spec §7).
+  const extensionFields = new Map<string, ReadonlyArray<ExtensionFieldEntry>>(ir.extensionFields);
 
-  // Collect enums and extension_fields first (they're referenced elsewhere).
+  // Collect enums first (referenced during table expansion).
   collectEnums(ir, enums);
-  collectExtensionFields(ir, extensionFields);
 
   // Expand each table node.
   for (const [identity, node] of ir.nodes) {
@@ -365,53 +366,5 @@ function collectEnums(ir: IR, enums: Map<string, ReadonlyArray<string>>): void {
       typeof v === 'string' ? v : (v as { value: string }).value,
     );
     enums.set(identity, values);
-  }
-}
-
-/**
- * Collect extension_fields into the registry.
- *
- * Populates the `extensionFields` registry: entity identity → ExtensionFieldEntry array.
- */
-function collectExtensionFields(
-  ir: IR,
-  extensionFields: Map<string, ReadonlyArray<ExtensionFieldEntry>>,
-): void {
-  for (const [identity, node] of ir.nodes) {
-    if (node.kind !== 'extension_fields') continue;
-
-    const ef = node.data as ExtensionFields;
-    const entityRef = ef.entity;
-    const entries: ExtensionFieldEntry[] = [];
-
-    for (const f of ef.fields as ReadonlyArray<Record<string, unknown>>) {
-      const fRec = f as Record<string, unknown>;
-
-      // Skip include entries (they're handled at parse time)
-      if ('include' in fRec) continue;
-
-      const desc = descriptorOf(fRec);
-      const ref = desc.ref;
-      if (ref.includes('.')) {
-        const entry: ExtensionFieldEntry = {
-          name: String(fRec.name),
-          scalar: '',
-          refValueTypeId: `value_type:${ref}`,
-          props: desc.args ?? {},
-          ...(fRec.default_scope !== undefined ? { defaultScope: String(fRec.default_scope) } : {}),
-        };
-        entries.push(entry);
-      } else {
-        const entry: ExtensionFieldEntry = {
-          name: String(fRec.name),
-          scalar: ref,
-          props: desc.args ?? {},
-          ...(fRec.default_scope !== undefined ? { defaultScope: String(fRec.default_scope) } : {}),
-        };
-        entries.push(entry);
-      }
-    }
-
-    extensionFields.set(entityRef, entries);
   }
 }
