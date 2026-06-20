@@ -14,8 +14,7 @@ import { MemoryFileSystem } from './memory_fs.js';
  */
 export function buildBaseSchemaFs(): FileSystem {
   return new MemoryFileSystem({
-    'platform/base/core/base_types.yaml': `version: loom-schema/v2
-kind: base_types
+    'platform/base/core/base.types.yaml': `version: loom-schema/v2
 scalars:
   - name: bigint
     description: 64-bit integer
@@ -44,15 +43,13 @@ scalars:
     description: boolean
     properties: []
 `,
-    'platform/base/core/MANIFEST.yaml': `version: loom-schema/v2
-kind: module_manifest
+    'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
 system: base
 module: core
 physical_schema: base_core
 description: core module
 `,
-    'platform/base/core/mixin/audit.yaml': `version: loom-schema/v2
-kind: mixin
+    'platform/base/core/audit.mixin.yaml': `version: loom-schema/v2
 name: Audit
 fields:
   - name: created_at
@@ -62,8 +59,7 @@ fields:
     type: datetime
     required: true
 `,
-    'platform/base/core/value_type/email.yaml': `version: loom-schema/v2
-kind: value_type
+    'platform/base/core/email.value_type.yaml': `version: loom-schema/v2
 name: Email
 fields:
   - name: value
@@ -71,8 +67,7 @@ fields:
       ref: string
       args: { max_length: 254 }
 `,
-    'platform/base/core/value_type/money.yaml': `version: loom-schema/v2
-kind: value_type
+    'platform/base/core/money.value_type.yaml': `version: loom-schema/v2
 name: Money
 fields:
   - name: amount
@@ -86,8 +81,7 @@ fields:
       args: { max_length: 3 }
     required: true
 `,
-    'platform/base/core/value_type/range.yaml': `version: loom-schema/v2
-kind: value_type
+    'platform/base/core/range.value_type.yaml': `version: loom-schema/v2
 name: Range
 type_parameters:
   - name: T
@@ -100,8 +94,7 @@ fields:
   - name: high
     type: T
 `,
-    'platform/base/core/value_type/status.yaml': `version: loom-schema/v2
-kind: value_type
+    'platform/base/core/status.value_type.yaml': `version: loom-schema/v2
 name: Status
 variants:
   - value: active
@@ -110,8 +103,7 @@ variants:
   - value: suspended
 `,
 
-    'platform/base/core/table/users.yaml': `version: loom-schema/v2
-kind: table
+    'platform/base/core/users.table.yaml': `version: loom-schema/v2
 name: Users
 table:
   name: users_base
@@ -142,15 +134,13 @@ indexes:
     fields: [email]
     unique: true
 `,
-    'platform/base/core/entity/user.yaml': `version: loom-schema/v2
-kind: entity
+    'platform/base/core/user.entity.yaml': `version: loom-schema/v2
 name: User
 primary_table: table:base.core.Users
 business_keys: [email]
 audit: true
 `,
-    'platform/base/core/extension/user_fields.yaml': `version: loom-schema/v2
-kind: extension_fields
+    'platform/base/core/user_fields.ext.yaml': `version: loom-schema/v2
 entity: entity:base.core.User
 fields:
   - name: nickname
@@ -161,15 +151,13 @@ fields:
 `,
 
     // ── ext:acme-corp — independent module with its own physical schema ──
-    'ext/acme-corp/retail/pos/MANIFEST.yaml': `version: loom-schema/v2
-kind: module_manifest
+    'ext/acme-corp/retail/pos/manifest.module.yaml': `version: loom-schema/v2
 system: retail
 module: pos
 physical_schema: acme_retail_pos
 description: acme-corp retail POS extension
 `,
-    'ext/acme-corp/retail/pos/table/orders.yaml': `version: loom-schema/v2
-kind: table
+    'ext/acme-corp/retail/pos/orders.table.yaml': `version: loom-schema/v2
 name: Orders
 table:
   name: orders
@@ -192,8 +180,7 @@ primary_key: [id]
 `,
 
     // ── tenant:acme — per-tenant extension field on platform's User entity ──
-    'tenants/acme/base/core/user_fields.yaml': `version: loom-schema/v2
-kind: extension_fields
+    'tenants/acme/base/core/user_fields.ext.yaml': `version: loom-schema/v2
 entity: entity:base.core.User
 fields:
   - name: customer_no

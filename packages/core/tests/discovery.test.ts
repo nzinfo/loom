@@ -47,8 +47,8 @@ describe('discovery (Pass 0) — platform', () => {
 
   it('reports duplicate identities (case collision on case‑sensitive fs)', async () => {
     const fs = new MemoryFileSystem({
-      'platform/base/core/mixin/a.yaml': '',
-      'platform/base/core/mixin/A.yaml': '',
+      'platform/base/core/a.mixin.yaml': '',
+      'platform/base/core/A.mixin.yaml': '',
     });
     const diag = new Diagnostics();
     await discover({ fs, basePath: '', diagnostics: diag });
@@ -63,17 +63,19 @@ describe('discovery (Pass 0) — platform', () => {
       // legacy bare base_types.yaml at root — no longer valid in v2
       'base_types.yaml': '',
       // systems/ prefix no longer valid in v2
-      'systems/foo/bar/baz/MANIFEST.yaml': '',
+      'systems/foo/bar/baz/manifest.module.yaml': '',
       'systems/foo/bar/file.yaml': '',
-      // unknown kind dir
+      // unknown kind extension (plain .yaml with no kind token)
       'platform/base/core/unknown/foo.yaml': '',
+      // old kind-directory layout, now flat — no kind token in filename
+      'platform/base/core/entity/user.yaml': '',
     });
     const diag = new Diagnostics();
     await discover({ fs, basePath: '', diagnostics: diag });
     expect(diag.hasErrors).toBe(true);
-    expect(diag.errors.some((e) => e.message.includes('systems/foo/bar/baz/MANIFEST.yaml'))).toBe(
-      true,
-    );
+    expect(
+      diag.errors.some((e) => e.message.includes('systems/foo/bar/baz/manifest.module.yaml')),
+    ).toBe(true);
     expect(diag.errors.some((e) => e.message.includes('systems/foo/bar/file.yaml'))).toBe(true);
     expect(diag.errors.some((e) => e.message.includes('platform/base/core/unknown/foo.yaml'))).toBe(
       true,
@@ -100,10 +102,9 @@ describe('discovery (Pass 0) — platform', () => {
 describe('discovery (Pass 0) — ext / tenant owners', () => {
   it('stamps ext owner with provider', async () => {
     const fs = new MemoryFileSystem({
-      'ext/acme-corp/retail/pos/MANIFEST.yaml':
-        'version: loom-schema/v2\nkind: module_manifest\nsystem: retail\nmodule: pos\n',
-      'ext/acme-corp/retail/pos/table/orders.yaml':
-        'version: loom-schema/v2\nkind: table\nname: Orders\n',
+      'ext/acme-corp/retail/pos/manifest.module.yaml':
+        'version: loom-schema/v2\nsystem: retail\nmodule: pos\n',
+      'ext/acme-corp/retail/pos/orders.table.yaml': 'version: loom-schema/v2\nname: Orders\n',
     });
     const diag = new Diagnostics();
     const result = await discover({ fs, basePath: '', diagnostics: diag });
@@ -118,10 +119,10 @@ describe('discovery (Pass 0) — ext / tenant owners', () => {
     });
   });
 
-  it('stamps tenant owner with id (no kind dir)', async () => {
+  it('stamps tenant owner with id', async () => {
     const fs = new MemoryFileSystem({
-      'tenants/acme/base/core/user_fields.yaml':
-        'version: loom-schema/v2\nkind: extension_fields\nentity: entity:base.core.User\n',
+      'tenants/acme/base/core/user_fields.ext.yaml':
+        'version: loom-schema/v2\nentity: entity:base.core.User\n',
     });
     const diag = new Diagnostics();
     const result = await discover({ fs, basePath: '', diagnostics: diag });
@@ -135,10 +136,10 @@ describe('discovery (Pass 0) — ext / tenant owners', () => {
     // Both files parse to identity `extension_fields:base.core.User_fields`.
     // Discovery must NOT treat this as a duplicate — they aggregate at link.
     const fs = new MemoryFileSystem({
-      'platform/base/core/extension/user_fields.yaml':
-        'version: loom-schema/v2\nkind: extension_fields\nentity: entity:base.core.User\n',
-      'tenants/acme/base/core/user_fields.yaml':
-        'version: loom-schema/v2\nkind: extension_fields\nentity: entity:base.core.User\n',
+      'platform/base/core/user_fields.ext.yaml':
+        'version: loom-schema/v2\nentity: entity:base.core.User\n',
+      'tenants/acme/base/core/user_fields.ext.yaml':
+        'version: loom-schema/v2\nentity: entity:base.core.User\n',
     });
     const diag = new Diagnostics();
     const result = await discover({ fs, basePath: '', diagnostics: diag });
