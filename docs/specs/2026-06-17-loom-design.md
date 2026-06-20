@@ -1,5 +1,15 @@
 # loom：正向 Schema 描述语言设计
 
+> ⚠️ **历史文档（v1 设计快照，2026-06-17）。** 本文描述的是 `loom-schema/v1`
+> 设计——使用 `systems/` 前缀布局、文件头声明 `kind:` 字段、v1 的 `base:`/`ref:`
+> 字段类型语法。这些均已被 **v2** 取代。当前权威参考：
+> - 目录与身份（v2 owner 维度 + kind 由扩展名编码）：`docs/guide/01-layout-and-identity.md`
+> - v2 owner 维度 spec：`docs/specs/2026-06-18-loom-v2-owner-dimension.md`
+> - v2 类型系统 spec：`docs/specs/2026-06-18-loom-v2-type-system.md`
+>
+> 本文保留作历史记录，**不反映当前实现**。下文路径示例（`systems/base/core/...`）
+> 与 `kind:` 文件头均为 v1 形态。
+
 - **状态**：设计完成（spec self-review 通过）；骨架已初始化，待 writing-plans
 - **日期**：2026-06-17
 - **作者**：nzinfo + Claude

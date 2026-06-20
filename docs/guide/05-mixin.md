@@ -6,9 +6,8 @@
 ## 定义 mixin
 
 ```yaml
-# platform/base/core/mixin/audit.yaml
+# platform/base/core/audit.mixin.yaml
 version: loom-schema/v2
-kind: mixin
 name: Audit
 display_name: 审计字段组
 fields:
@@ -22,7 +21,7 @@ mixin 与其他 kind 一样落在**模块目录**下（`<system>/<module>/mixin/
 ## 在 table 里 include
 
 ```yaml
-# platform/base/core/table/users.yaml
+# platform/base/core/users.table.yaml
 fields:
   - name: id
     type: bigint

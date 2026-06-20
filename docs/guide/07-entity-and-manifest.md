@@ -5,9 +5,8 @@
 `table` 承载物理结构 + 扩展策略；`entity` 在 table 之上加**业务身份**：
 
 ```yaml
-# platform/base/core/entity/user.yaml
+# platform/base/core/user.entity.yaml
 version: loom-schema/v2
-kind: entity
 name: User
 display_name: 用户
 description: 系统用户主体
@@ -29,9 +28,8 @@ entity 不只是"业务元数据容器"。它是 extension_fields 的**锚点**�
 （platform / ext / tenant 都可以写）都挂在 entity 身上：
 
 ```yaml
-# platform 写：platform/base/core/extension/user_fields.yaml
-# tenant 写：tenants/acme/base/core/user_fields.yaml
-kind: extension_fields
+# platform 写：platform/base/core/user_fields.ext.yaml
+# tenant 写：tenants/acme/base/core/user_fields.ext.yaml
 entity: entity:base.core.User           # ← 锚点
 fields:
   - { name: nickname, ... }
@@ -54,9 +52,8 @@ fields:
 物理 schema 空间（PG schema / MySQL database）是**模块级别决策**，不该 per-table 配置：
 
 ```yaml
-# platform/base/core/MANIFEST.yaml
+# platform/base/core/manifest.module.yaml
 version: loom-schema/v2
-kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
@@ -81,9 +78,8 @@ ext 包（`ext/<provider>/<sys>/<mod>/`）也有自己的 MANIFEST，声明独�
 `physical_schema`。这让 ext 的物理表落在独立 schema 里，与 platform 隔离：
 
 ```yaml
-# ext/acme-corp/retail/pos/MANIFEST.yaml
+# ext/acme-corp/retail/pos/manifest.module.yaml
 version: loom-schema/v2
-kind: module_manifest
 system: retail
 module: pos
 physical_schema: acme_retail_pos          # ext 自己的 schema

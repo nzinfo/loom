@@ -6,9 +6,8 @@ EAV 表完全动态会带来隐患（任意字段都能加）。`extension_field
 ## 定义模板
 
 ```yaml
-# platform/base/core/extension/user_fields.yaml
+# platform/base/core/user_fields.ext.yaml
 version: loom-schema/v2
-kind: extension_fields
 entity: entity:base.core.User           # 作用于哪个 entity（身份引用，kind 前缀保留）
 fields:
   - name: nickname
@@ -38,16 +37,14 @@ entity 写 extension_fields，加载器**收集所有**并叠加。最终该 ent
 
 ```yaml
 # ext:acme-corp 给 platform 的 User entity 挂扩展字段
-# ext/acme-corp/base/core/extension/user_fields.yaml
-kind: extension_fields
+# ext/acme-corp/base/core/user_fields.ext.yaml
 entity: entity:base.core.User
 fields:
   - name: tax_id
     type: { ref: string, args: { max_length: 20 } }
 
 # tenant:acme 给同一个 entity 挂另一组扩展字段
-# tenants/acme/base/core/user_fields.yaml
-kind: extension_fields
+# tenants/acme/base/core/user_fields.ext.yaml
 entity: entity:base.core.User
 fields:
   - name: nickname

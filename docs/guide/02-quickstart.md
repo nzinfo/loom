@@ -6,18 +6,20 @@
 ## 创建项目骨架
 
 ```sh
-mkdir -p my-schema/platform/base/core/{value_type,table,entity,extension,mixin}
-touch my-schema/platform/base/core/base_types.yaml
+mkdir -p my-schema/platform/base/core
+touch my-schema/platform/base/core/base.types.yaml
 ```
 
-## 写 base_types.yaml
+kind 由文件扩展名决定（详见 [01 目录与身份](./01-layout-and-identity.md)），
+所以不需要 kind 子目录——文件扁平地放在模块下。
+
+## 写 base.types.yaml
 
 先声明两个最常用的标量：
 
 ```yaml
-# my-schema/platform/base/core/base_types.yaml
+# my-schema/platform/base/core/base.types.yaml
 version: loom-schema/v2
-kind: base_types
 
 scalars:
   - name: bigint
@@ -36,12 +38,11 @@ scalars:
 
 标量目录的完整说明见 [03 base_types](./03-base-types.md)。
 
-## 写 MANIFEST.yaml
+## 写 manifest.module.yaml
 
 ```yaml
-# my-schema/platform/base/core/MANIFEST.yaml
+# my-schema/platform/base/core/manifest.module.yaml
 version: loom-schema/v2
-kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
@@ -54,9 +55,8 @@ description: core module
 ## 写第一张表
 
 ```yaml
-# my-schema/platform/base/core/table/users.yaml
+# my-schema/platform/base/core/users.table.yaml
 version: loom-schema/v2
-kind: table
 name: Users
 table:
   name: users

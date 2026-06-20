@@ -1,6 +1,6 @@
 # base_types：可用标量目录
 
-`base_types.yaml` 是整个系统的"原子词汇表"——所有 value_type、table field、
+`base.types.yaml` 是整个系统的"原子词汇表"——所有 value_type、table field、
 entity field 最终都要落到这些标量之一。
 
 ## 设计取向
@@ -9,7 +9,7 @@ entity field 最终都要落到这些标量之一。
   `string` 有 `max_length`），**不绑定方言**
 - 方言映射在投影器里集中管理（`decimal` → PG `NUMERIC(18,4)` / MySQL `DECIMAL(18,4)`
   / SQLite `NUMERIC`）
-- v2 内**不可扩展**：想加新标量，需改 base_types.yaml + 投影器并 bump 版本号
+- v2 内**不可扩展**：想加新标量，需改 base.types.yaml + 投影器并 bump 版本号
 
 ## 推荐内置标量
 
@@ -49,6 +49,6 @@ scalars:
 
 ## 位置约束
 
-base_types.yaml 唯一合法位置是 `platform/base/core/base_types.yaml`——它是全局
+base_types.yaml 唯一合法位置是 `platform/base/core/base.types.yaml`——它是全局
 共享的，ext 和 tenant 都不能定义自己的 base_types（详见
 [01 目录与身份](./01-layout-and-identity.md)）。

@@ -11,9 +11,9 @@ loom 的跨文件引用是字符串（不是 map）。v2 把引用明确分成�
 用于 field 的 `type:` 键，目标必须是 value_type 节点。
 
 ```
-base.core.Email              ← base/core/value_type/email.yaml
-base.core.Money              ← base/core/value_type/money.yaml
-retail.pos.types.OrderId     ← retail/pos/types/value_type/order_id.yaml
+base.core.Email              ← base/core/email.value_type.yaml
+base.core.Money              ← base/core/money.value_type.yaml
+retail.pos.types.OrderId     ← retail/pos/types/order_id.value_type.yaml
 ```
 
 逻辑名是 PascalCase（与推导规则一致）。
@@ -49,10 +49,10 @@ fields:
 `kind` 字段匹配，加载器按身份表查找。
 
 ```
-entity:base.core.User             ← base/core/entity/user.yaml
-table:base.core.Users             ← base/core/table/users.yaml
-mixin:base.core.Audit             ← base/core/mixin/audit.yaml
-value_type:base.core.Email        ← base/core/value_type/email.yaml
+entity:base.core.User             ← base/core/user.entity.yaml
+table:base.core.Users             ← base/core/users.table.yaml
+mixin:base.core.Audit             ← base/core/audit.mixin.yaml
+value_type:base.core.Email        ← base/core/email.value_type.yaml
 ```
 
 **身份引用出现在哪些位置**：
@@ -95,7 +95,7 @@ value_type node）。
 这意味着 ext 包可以引用 platform 的 value_type：
 
 ```yaml
-# ext/acme-corp/retail/pos/table/orders.yaml
+# ext/acme-corp/retail/pos/orders.table.yaml
 fields:
   - name: total
     type: base.core.Money            # 引用 platform 的 value_type，不带 owner

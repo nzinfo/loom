@@ -101,9 +101,8 @@ tenant 的 schema 各自有目录、有身份、有撞名检测。
   无歧义）
 
 ```yaml
-# ext/acme-corp/retail/pos/table/orders.yaml
+# ext/acme-corp/retail/pos/orders.table.yaml
 version: loom-schema/v2
-kind: table
 name: Orders
 table:
   name: orders
@@ -134,9 +133,8 @@ primary_key: [id]
   的 entity 报错
 
 ```yaml
-# tenants/acme/base/core/user_fields.yaml
+# tenants/acme/base/core/user_fields.ext.yaml
 version: loom-schema/v2
-kind: extension_fields
 entity: entity:base.core.User        # 必须指向已存在的 entity
 fields:
   - name: nickname
@@ -196,7 +194,7 @@ my-schema/
 - **ext 下是 provider → sys/mod**——provider 一级，sys/mod 两级，共三级
 - **tenants 下是 tenant-id → extension/ → sys/mod**——tenant 层只有 extension_fields
   一种 kind，路径镜像目标 entity 的 sys/mod
-- **base_types.yaml 唯一位置**：`platform/base/core/base_types.yaml`，全局共享
+- **base_types.yaml 唯一位置**：`platform/base/core/base.types.yaml`，全局共享
 - **文件名 `_fields` 后缀**：extension_fields 文件沿用现有约定
   （`user_fields.yaml`），与 fixture 一致
 - **tenant 无 kind 目录**：tenant 层只有 extension_fields，文件直接放
@@ -207,7 +205,7 @@ my-schema/
 | 维度 | v2 当前 | v2 + owner |
 |---|---|---|
 | 根目录 | `systems/<sys>/<mod>/` | `platform/<sys>/<mod>/` |
-| base_types | 根目录 `base_types.yaml` | `platform/base/core/base_types.yaml` |
+| base_types | 根目录 `base_types.yaml` | `platform/base/core/base.types.yaml` |
 | 扩展包 | 无（混在 systems/ 里） | `ext/<provider>/<sys>/<mod>/` |
 | 租户 | 无（extension_fields 混在 systems/ 里） | `tenants/<id>/<sys>/<mod>/`（无 kind 目录） |
 | systems/ 中间层 | 有 | **移除** |
@@ -270,8 +268,8 @@ foreign_keys:
 identity 全局唯一——**跨 owner 撞名即冲突**：
 
 ```
-platform/base/core/table/users.yaml   → table:base.core.Users (owner: platform)
-ext/acme-corp/base/core/table/users.yaml → table:base.core.Users (owner: ext:acme-corp)
+platform/base/core/users.table.yaml   → table:base.core.Users (owner: platform)
+ext/acme-corp/base/core/users.table.yaml → table:base.core.Users (owner: ext:acme-corp)
 ```
 
 这两个文件都试图定义 `table:base.core.Users`，加载器在 discovery 阶段检测到
@@ -321,16 +319,14 @@ identity 时立即报错，不等 link/validate。
 
 ```yaml
 # ext:acme-corp 给 platform 的 User entity 挂扩展字段
-# ext/acme-corp/base/core/extension/user_fields.yaml
-kind: extension_fields
+# ext/acme-corp/base/core/user_fields.ext.yaml
 entity: entity:base.core.User
 fields:
   - name: tax_id
     type: { ref: string, args: { max_length: 20 } }
 
 # tenant:acme 给同一个 entity 挂另一组扩展字段
-# tenants/acme/base/core/user_fields.yaml
-kind: extension_fields
+# tenants/acme/base/core/user_fields.ext.yaml
 entity: entity:base.core.User
 fields:
   - name: nickname
@@ -403,8 +399,8 @@ tenant:acme 的 user_fields:    [tax_id]
 跨 owner 可以同名：
 
 ```
-ext/acme-corp/base/core/extension/user_fields.yaml    # ext:acme-corp 的
-tenants/acme/base/core/user_fields.yaml               # tenant:acme 的
+ext/acme-corp/base/core/user_fields.ext.yaml    # ext:acme-corp 的
+tenants/acme/base/core/user_fields.ext.yaml               # tenant:acme 的
 tenants/globex/base/core/user_fields.yaml             # tenant:globex 的
 ```
 
@@ -415,7 +411,7 @@ tenants/globex/base/core/user_fields.yaml             # tenant:globex 的
 
 ### 8.1 唯一位置
 
-base_types.yaml 移到 `platform/base/core/base_types.yaml`。
+base_types.yaml 移到 `platform/base/core/base.types.yaml`。
 
 - 身份仍为 `base_types:base.core`（不变）
 - owner 为 `platform`

@@ -31,9 +31,11 @@ Pass 2 即使有 parse 错误也会运行（为了暴露尽可能多的诊断）
 
 ### Pass 0 — Discovery
 
-扫描 `basePath` 下所有 `.yaml` / `.yml`，对每个文件调 `pathToIdentity` 推导
-identity + owner。结果是一个 `Map<path, DiscoveredEntry>`——key 是路径（永远唯一），
-value 携带 `meta.identity`、`meta.owner`。
+扫描 `basePath` 下所有 `.yaml`，对每个文件调 `pathToIdentity` 推导
+identity + owner + kind。结果是一个 `Map<path, DiscoveredEntry>`——key 是路径（永远唯一），
+value 携带 `meta.identity`、`meta.owner`、`meta.kind`。**kind 由文件扩展名推导**
+（`.entity.yaml`、`.table.yaml` 等，详见
+[01 目录与身份](./01-layout-and-identity.md)），不读文件正文。
 
 - **duplicate identity 检测**：两个不同路径推导出同一 identity 且都不是
   extension_fields → 报 `duplicate identity` 错误

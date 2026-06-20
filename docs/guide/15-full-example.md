@@ -3,11 +3,10 @@
 下面是仓库 `packages/core/tests/fixtures/base_schema.ts` 中的完整 schema，
 对应黄金固件 `base_schema.pg.sql` 的输出。
 
-## base_types.yaml
+## base.types.yaml
 
 ```yaml
 version: loom-schema/v2
-kind: base_types
 scalars:
   - { name: bigint,   description: 64-bit integer, properties: [] }
   - name: decimal
@@ -24,34 +23,31 @@ scalars:
   - { name: boolean,  description: boolean,   properties: [] }
 ```
 
-## platform/base/core/MANIFEST.yaml
+## platform/base/core/manifest.module.yaml
 
 ```yaml
 version: loom-schema/v2
-kind: module_manifest
 system: base
 module: core
 physical_schema: base_core
 description: core module
 ```
 
-## platform/base/core/mixin/audit.yaml
+## platform/base/core/audit.mixin.yaml
 
 ```yaml
 version: loom-schema/v2
-kind: mixin
 name: Audit
 fields:
   - { name: created_at, type: datetime, required: true }
   - { name: updated_at, type: datetime, required: true }
 ```
 
-## platform/base/core/value_type/email.yaml + money.yaml
+## platform/base/core/email.value_type.yaml + money.value_type.yaml
 
 ```yaml
-# email.yaml
+# email.value_type.yaml
 version: loom-schema/v2
-kind: value_type
 name: Email
 fields:
   - name: value
@@ -59,9 +55,8 @@ fields:
 ```
 
 ```yaml
-# money.yaml
+# money.value_type.yaml
 version: loom-schema/v2
-kind: value_type
 name: Money
 fields:
   - name: amount
@@ -72,11 +67,10 @@ fields:
     required: true
 ```
 
-## platform/base/core/table/users.yaml
+## platform/base/core/users.table.yaml
 
 ```yaml
 version: loom-schema/v2
-kind: table
 name: Users
 table:
   name: users_base
@@ -98,22 +92,20 @@ indexes:
   - { name: idx_users_email, fields: [email], unique: true }
 ```
 
-## platform/base/core/entity/user.yaml
+## platform/base/core/user.entity.yaml
 
 ```yaml
 version: loom-schema/v2
-kind: entity
 name: User
 primary_table: table:base.core.Users
 business_keys: [email]
 audit: true
 ```
 
-## platform/base/core/extension/user_fields.yaml
+## platform/base/core/user_fields.ext.yaml
 
 ```yaml
 version: loom-schema/v2
-kind: extension_fields
 entity: entity:base.core.User
 fields:
   - name: nickname

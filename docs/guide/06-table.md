@@ -6,9 +6,8 @@
 ## 基本结构
 
 ```yaml
-# platform/base/core/table/users.yaml
+# platform/base/core/users.table.yaml
 version: loom-schema/v2
-kind: table
 name: Users
 table:
   name: users_base                      # 物理表名（不依赖推导）
@@ -137,9 +136,8 @@ v2 用类型论术语 **variants**（sum type）替代 v1 的工业惯用词 `en
 value_type 的**两种互斥形态之一**（另一种是 `fields`）：
 
 ```yaml
-# platform/base/core/value_type/user_status.yaml
+# platform/base/core/user_status.value_type.yaml
 version: loom-schema/v2
-kind: value_type
 name: UserStatus
 variants: [active, inactive, suspended]
 # 或详写（带显示名/描述）：
@@ -198,7 +196,7 @@ indexes:
 ## 外键
 
 ```yaml
-# platform/base/core/table/user_roles.yaml
+# platform/base/core/user_roles.table.yaml
 fields:
   - { name: user_id, type: bigint, required: true }
   - { name: role_id, type: bigint, required: true }

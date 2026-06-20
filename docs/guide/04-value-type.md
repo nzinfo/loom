@@ -11,9 +11,8 @@ value_type 是用户定义的"语义类型"，介于 base_type scalar 和 field 
 内部字段名**必须叫 `value`**，这样投影才不附加后缀：
 
 ```yaml
-# platform/base/core/value_type/email.yaml
+# platform/base/core/email.value_type.yaml
 version: loom-schema/v2
-kind: value_type
 name: Email
 display_name: 邮箱
 fields:
@@ -47,9 +46,8 @@ fields:
 ## 多字段 value_type
 
 ```yaml
-# platform/base/core/value_type/money.yaml
+# platform/base/core/money.value_type.yaml
 version: loom-schema/v2
-kind: value_type
 name: Money
 fields:
   - name: amount
@@ -161,9 +159,8 @@ package-level `import`）。模块内的不同文件可以有不同 using——�
 引入整个模块不需要的依赖。
 
 ```yaml
-# ext/acme-corp/retail/pos/table/orders.yaml
+# ext/acme-corp/retail/pos/orders.table.yaml
 version: loom-schema/v2
-kind: table
 name: Orders
 using:
   - base.core.*                       # 导入 base.core 命名空间下所有类型
@@ -271,9 +268,8 @@ fields:
 ### 声明
 
 ```yaml
-# platform/base/core/value_type/range.yaml
+# platform/base/core/range.value_type.yaml
 version: loom-schema/v2
-kind: value_type
 name: Range
 type_parameters:
   - name: T

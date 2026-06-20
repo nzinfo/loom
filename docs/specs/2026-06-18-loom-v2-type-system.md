@@ -308,7 +308,6 @@ v2 把 value_type 明确区分为**两种互斥形态**：
 
 ```yaml
 # 形态 A：组合类型（值对象 / product type）
-kind: value_type
 name: Money
 fields:
   - name: amount
@@ -316,7 +315,6 @@ fields:
     required: true
 
 # 形态 B：variants（求和类型 / sum type，取代 enum）
-kind: value_type
 name: UserStatus
 variants: [active, inactive, suspended]
 # 或详写：
@@ -471,7 +469,6 @@ v2 通过 `type_parameters` 把这一能力引入 value_type，让一个 value_t
 ### 12.2 声明
 
 ```yaml
-kind: value_type
 name: Range
 type_parameters:
   - name: T
