@@ -1,17 +1,18 @@
 import type { Diagnostics } from '../errors.js';
-import type { BaseTypes, Entity, Table, TypeDescriptor } from '../ir/schemas.js';
+import type { Entity, Table, TypeDescriptor, TypeNode } from '../ir/schemas.js';
 import type { ExtensionFieldEntry, FileKind, IR } from '../ir/version.js';
 
 /**
  * Pass 3 — semantic validation. See spec §13.1, §6.9, §7.5 (v2).
  *
  * Cross-file rules that Zod cannot express:
- *   - every field `type:` single-segment name is a scalar declared in base_types
- *   - every scalar property flagged required in base_types is present in type.args
+ *   - every field `type:` single-segment name is a known scalar (form: scalar
+ *     under base.core)
+ *   - every scalar property flagged required is present in type.args
  *   - table.primary_key entries are all required:true fields
  *   - extension_fields targets an entity whose primary_table is sidecar_eav
  *
- * (v2: three-segment value_type refs are validated at the value_type file.)
+ * (v2: three-segment type refs are validated at the referenced type file.)
  */
 export interface ValidateOptions {
   readonly ir: IR;
@@ -24,24 +25,24 @@ export interface ValidateResult {
 
 type FieldLike = Record<string, unknown>;
 
+interface ScalarInfo {
+  readonly name: string;
+  readonly requiredProps: Set<string>;
+}
+
 export function validate(opts: ValidateOptions): ValidateResult {
-  const baseTypes = findBaseTypes(opts.ir);
-  const scalarNames = new Set<string>(baseTypes?.scalars.map((s) => s.name) ?? []);
-  const requiredProps = indexRequiredProps(baseTypes);
+  const scalars = collectScalars(opts.ir);
+  const scalarNames = new Set<string>(scalars.map((s) => s.name));
+  const requiredProps = new Map<string, Set<string>>(scalars.map((s) => [s.name, s.requiredProps]));
 
   for (const [identity, node] of opts.ir.nodes) {
     switch (node.kind) {
-      case 'value_type': {
-        // value_type has two mutually exclusive forms: fields or variants.
-        // variants form (sum type) has no typed fields to check.
-        const data = node.data as {
-          fields?: FieldLike[];
-          variants?: unknown[];
-          type_parameters?: Array<{ name: string }>;
-        };
-        if (data.variants && data.variants.length > 0) break;
+      case 'type': {
+        const data = node.data as TypeNode;
+        // enum form (variants) has no typed fields to check.
+        if (data.form === 'enum') break;
         const localTypeParams = new Set<string>((data.type_parameters ?? []).map((p) => p.name));
-        for (const f of data.fields ?? []) {
+        for (const f of (data.fields as FieldLike[] | undefined) ?? []) {
           checkTypedField(
             identity,
             node.kind,
@@ -72,8 +73,8 @@ export function validate(opts: ValidateOptions): ValidateResult {
 
   // extension_fields live in ir.extensionFields (aggregated by link), not in
   // ir.nodes. Validate each entity's extension bucket: scalar types must be
-  // declared in base_types, and the target entity must exist with a
-  // sidecar_eav primary_table (spec §7, §6.9).
+  // known scalars, and the target entity must exist with a sidecar_eav
+  // primary_table (spec §7, §6.9).
   for (const [entityId, entries] of opts.ir.extensionFields) {
     for (const entry of entries) {
       checkExtensionEntry(entityId, entry, scalarNames, requiredProps, opts.diagnostics);
@@ -84,24 +85,21 @@ export function validate(opts: ValidateOptions): ValidateResult {
   return { diagnostics: opts.diagnostics };
 }
 
-function findBaseTypes(ir: IR): BaseTypes | null {
-  for (const node of ir.nodes.values()) {
-    if (node.kind === 'base_types') return node.data as BaseTypes;
-  }
-  return null;
-}
-
-function indexRequiredProps(base: BaseTypes | null): Map<string, Set<string>> {
-  const m = new Map<string, Set<string>>();
-  if (!base) return m;
-  for (const s of base.scalars) {
-    const req = new Set<string>();
-    for (const p of s.properties) {
-      if (p.required) req.add(p.name);
+/** Collect scalar (form: scalar) info from base.core type nodes. */
+function collectScalars(ir: IR): ScalarInfo[] {
+  const out: ScalarInfo[] = [];
+  for (const [identity, node] of ir.nodes) {
+    if (node.kind !== 'type') continue;
+    const data = node.data as TypeNode;
+    if (data.form !== 'scalar') continue;
+    if (!identity.startsWith('type:base.core.')) continue;
+    const requiredProps = new Set<string>();
+    for (const p of data.properties ?? []) {
+      if (p.required) requiredProps.add(p.name);
     }
-    m.set(s.name, req);
+    out.push({ name: data.name, requiredProps });
   }
-  return m;
+  return out;
 }
 
 function checkTypedField(
@@ -118,11 +116,11 @@ function checkTypedField(
   if (typeVal === undefined) return;
   // link pass normalizes string → object; accept either for safety.
   const ref = typeof typeVal === 'string' ? typeVal : typeVal.ref;
-  // Three-segment (value_type ref): skip — validated at the value_type file.
+  // Three-segment (type ref): skip — validated at the referenced type file.
   if (ref.includes('.')) return;
 
-  // Type parameter reference inside a generic host (e.g. type: T inside
-  // a value_type that declares type_parameters): skip — bound at
+  // Type parameter reference inside a generic host (e.g. type: T inside a
+  // struct type that declares type_parameters): skip — bound at
   // instantiation time in the projector.
   if (typeParams.has(ref)) return;
 
@@ -133,7 +131,7 @@ function checkTypedField(
       file: identity,
       line: 1,
       column: 1,
-      message: `unknown scalar type "${ref}" (not in base_types)`,
+      message: `unknown scalar type "${ref}" (not a declared scalar)`,
     });
     return;
   }
@@ -146,7 +144,7 @@ function checkTypedField(
         file: identity,
         line: 1,
         column: 1,
-        message: `scalar "${ref}" requires property "${rp}" in type.args (base_types)`,
+        message: `scalar "${ref}" requires property "${rp}" in type.args`,
       });
     }
   }
@@ -183,9 +181,9 @@ function checkTable(
 /**
  * Validate a single extension field entry's scalar type.
  *
- * Single-segment (scalar) refs must be declared in base_types and supply
- * any required properties. Value_type refs (refValueTypeId set) are
- * validated at the value_type file itself.
+ * Single-segment (scalar) refs must be a known scalar and supply any required
+ * properties. Type refs (refValueTypeId set) are validated at the referenced
+ * type file itself.
  */
 function checkExtensionEntry(
   entityId: string,
@@ -194,7 +192,7 @@ function checkExtensionEntry(
   requiredProps: Map<string, Set<string>>,
   diag: Diagnostics,
 ): void {
-  if (entry.refValueTypeId !== undefined) return; // value_type ref — checked elsewhere
+  if (entry.refValueTypeId !== undefined) return; // type ref — checked elsewhere
   if (entry.scalar === '') return;
   if (scalarNames.size === 0) return;
   if (!scalarNames.has(entry.scalar)) {
@@ -203,7 +201,7 @@ function checkExtensionEntry(
       file: entityId,
       line: 1,
       column: 1,
-      message: `unknown scalar type "${entry.scalar}" for extension field "${entry.name}" (not in base_types)`,
+      message: `unknown scalar type "${entry.scalar}" for extension field "${entry.name}"`,
     });
     return;
   }
@@ -215,7 +213,7 @@ function checkExtensionEntry(
         file: entityId,
         line: 1,
         column: 1,
-        message: `scalar "${entry.scalar}" requires property "${rp}" on extension field "${entry.name}" (base_types)`,
+        message: `scalar "${entry.scalar}" requires property "${rp}" on extension field "${entry.name}"`,
       });
     }
   }

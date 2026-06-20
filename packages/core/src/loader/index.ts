@@ -13,7 +13,7 @@ import { validate } from './validate.js';
 export interface LoadOptions {
   /** Injected FS adapter. Required — core never imports node:fs. */
   readonly fs: FileSystem;
-  /** Loom schema root directory (contains base_types.yaml + systems/). */
+  /** Loom schema root directory (contains platform/ ext/ tenants/ owners). */
   readonly basePath: string;
   /** Restrict to these systems (faster for partial loads). */
   readonly systemFilter?: readonly string[];

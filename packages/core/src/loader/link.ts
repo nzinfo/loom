@@ -1,6 +1,6 @@
 import type { Diagnostics } from '../errors.js';
 import { parseRef } from '../ir/refs.js';
-import type { AnyFile, BaseTypes, ExtensionFields, TypeDescriptor } from '../ir/schemas.js';
+import type { AnyFile, ExtensionFields, TypeDescriptor, TypeNode } from '../ir/schemas.js';
 import { type TypeRef, normalizeType, parseTypeRef, resolveShortName } from '../ir/typespace.js';
 import type { ExtensionFieldEntry, IR, IRNode, Identity, Owner } from '../ir/version.js';
 import type { FileKind } from '../ir/version.js';
@@ -116,23 +116,31 @@ function withFields(node: IRNode, fields: FieldsHost): IRNode {
   return updated as IRNode;
 }
 
-/** Collect base_types scalar short names from the parsed set. */
+/** Collect scalar (form: scalar) short names from base.core type nodes.
+ *
+ * Scalars are the system base — only defined under base.core (platform/ext
+ * elsewhere may define struct/enum types, but not scalars). See design note
+ * decision 4. */
 function collectScalars(parsed: ReadonlyMap<string, AnyFile>): Set<string> {
   const scalars = new Set<string>();
-  for (const f of parsed.values()) {
-    if (f.kind !== 'base_types') continue;
-    const data = f.data as BaseTypes;
-    for (const s of data.scalars) scalars.add(s.name);
+  for (const [identity, f] of parsed) {
+    if (f.kind !== 'type') continue;
+    const data = f.data as TypeNode;
+    if (data.form !== 'scalar') continue;
+    if (!identity.startsWith('type:base.core.')) continue;
+    scalars.add(data.name);
   }
   return scalars;
 }
 
-/** Collect value_type fully-qualified names (sys.mod.Name) from the parsed set. */
+/** Collect struct/enum (non-scalar) type fully-qualified names (sys.mod.Name). */
 function collectValueTypeFqns(parsed: ReadonlyMap<string, AnyFile>): Set<string> {
   const fqns = new Set<string>();
   for (const [identity, f] of parsed) {
-    if (f.kind !== 'value_type') continue;
-    // Identity format: value_type:sys.mod.Name
+    if (f.kind !== 'type') continue;
+    const data = f.data as TypeNode;
+    if (data.form === 'scalar') continue;
+    // Identity format: type:sys.mod.Name
     const colonIdx = identity.indexOf(':');
     if (colonIdx < 0) continue;
     fqns.add(identity.slice(colonIdx + 1));
@@ -199,7 +207,7 @@ function collectExtensionFields(
         bucket.push({
           name: fieldName,
           scalar: '',
-          refValueTypeId: `value_type:${ref}`,
+          refValueTypeId: `type:${ref}`,
           props: desc.args ?? {},
           ...(f.default_scope !== undefined ? { defaultScope: String(f.default_scope) } : {}),
         });
@@ -313,7 +321,7 @@ function expandIncludes(
  * Resolve every field's `type:` value (spec v2 §3, §4.6).
  *
  *   - single-segment name  → resolveShortName against scalars + using
- *   - three-segment name   → direct fqn; verify target is a value_type node
+ *   - three-segment name   → direct fqn; verify target is a type node
  *
  * Single-segment names that resolve to scalars stay as-is. Names resolved
  * via using are rewritten to their fqn so downstream passes don't need
@@ -370,7 +378,7 @@ function resolveThreeSegment(
   deps: Map<Identity, Set<Identity>>,
 ): void {
   const fqn = `${ref.system}.${ref.module}.${ref.name}`;
-  const targetId = `value_type:${fqn}`;
+  const targetId = `type:${fqn}`;
   const target = parsed.get(targetId);
 
   if (!target) {
@@ -382,7 +390,7 @@ function resolveThreeSegment(
         file: identity,
         line: 1,
         column: 1,
-        message: `type reference "${fqn}" resolves to kind=${anyNode[1].kind}, expected value_type`,
+        message: `type reference "${fqn}" resolves to kind=${anyNode[1].kind}, expected type`,
       });
       return;
     }
@@ -396,13 +404,13 @@ function resolveThreeSegment(
     return;
   }
 
-  if (target.kind !== 'value_type') {
+  if (target.kind !== 'type') {
     diag.add({
       category: 'kind_mismatch',
       file: identity,
       line: 1,
       column: 1,
-      message: `type reference "${fqn}" resolves to kind=${target.kind}, expected value_type`,
+      message: `type reference "${fqn}" resolves to kind=${target.kind}, expected type`,
     });
     return;
   }
@@ -442,7 +450,7 @@ function resolveSingleSegment(
       // Rewrite the descriptor's ref to its fqn; args/meta stay attached.
       const desc = field.type as TypeDescriptor;
       desc.ref = result.fqn;
-      const targetId = `value_type:${result.fqn}`;
+      const targetId = `type:${result.fqn}`;
       deps.get(identity)?.add(targetId);
       return;
     }

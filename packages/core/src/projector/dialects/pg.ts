@@ -128,7 +128,7 @@ function pgType(c: PhysicalColumn, ctx: PgEmitContext): string {
 }
 
 function pgEnumName(valueTypeId: string): string {
-  // value_type:base.core.Status → base_core_status
+  // type:base.core.Status → base_core_status
   const colon = valueTypeId.indexOf(':');
   const body = valueTypeId.slice(colon + 1);
   const [sys, mod, name] = body.split('.');

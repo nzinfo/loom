@@ -7,21 +7,23 @@
  * including the owner prefix (platform/ ext/ tenants/).
  *
  * The file's kind is encoded in its extension — the SOLE source of kind. The
- * YAML body carries no `kind:` field, and there are no `entity/` `table/`
- * kind subdirectories (flat layout). See spec §9.
+ * YAML body carries no `kind:` field, and there are no kind subdirectories
+ * (flat layout). See spec §9.
  *
  * Layout (relPath includes the owner prefix):
- *   platform/base/core/base.types.yaml            → base_types:           (owner: platform)
  *   platform/<sys>/<mod>/manifest.module.yaml     → module_manifest:<sys>.<mod>
  *   platform/<sys>/<mod>/<stem>.<kind>.yaml       → <kind>:<sys>.<mod>.<Stem>
  *   ext/<provider>/<sys>/<mod>/manifest.module.yaml → module_manifest:<sys>.<mod>  (owner: ext:<provider>)
  *   ext/<provider>/<sys>/<mod>/<stem>.<kind>.yaml → <kind>:<sys>.<mod>.<Stem>
  *   tenants/<id>/<sys>/<mod>/<stem>.<kind>.yaml   → <kind>:<sys>.<mod>.<Stem>  (owner: tenant:<id>)
  *
- * kind token ∈ { entity, table, value_type, mixin, ext, types, module }
- * where `ext`→extension_fields, `types`→base_types, `module`→module_manifest.
+ * kind token ∈ { type, mixin, table, entity, ext, module }
+ * where `ext`→extension_fields, `module`→module_manifest.
  *
- * base_types is valid ONLY at platform/base/core/base.types.yaml.
+ * There is no longer a singleton base_types file: scalars are ordinary
+ * `.type.yaml` files (form: scalar) under platform/base/core/, each with its
+ * own identity `type:base.core.<name>`. The `base_types:` collection identity
+ * is gone. See `docs/design/2026-06-21-unified-type-kind-notes.md`.
  */
 import { EXT_TO_KIND, type FileKind } from './version.js';
 import type { Owner } from './version.js';
@@ -127,31 +129,13 @@ export function pathToIdentity(fullPath: string, relPath: string): DiscoveredFil
 
 /**
  * Parse the post-owner-prefix portion for platform/ext. These two share the
- * same inner layout: [<sys>/<mod>/base.types.yaml (platform only)
- * | <sys>/<mod>/manifest.module.yaml
+ * same inner layout: [<sys>/<mod>/manifest.module.yaml
  * | <sys>/<mod>/<stem>.<kind>.yaml].
  *
  * Flat: no kind subdirectories. The kind comes from the filename suffix.
+ * There is no singleton base_types file — scalars are ordinary .type.yaml.
  */
 function parseOwned(inner: string[], owner: Owner): DiscoveredFile | null {
-  // platform/base/core/base.types.yaml  (3 parts)
-  if (
-    owner.kind === 'platform' &&
-    inner.length === 3 &&
-    inner[0] === 'base' &&
-    inner[1] === 'core' &&
-    inner[2] === 'base.types.yaml'
-  ) {
-    return {
-      kind: 'base_types',
-      system: 'base',
-      module: 'core',
-      name: '',
-      identity: 'base_types:',
-      owner,
-    };
-  }
-
   // <sys>/<mod>/<file>  (3 parts) — kind from filename suffix.
   if (inner.length === 3) {
     const system = inner[0];
@@ -163,14 +147,9 @@ function parseOwned(inner: string[], owner: Owner): DiscoveredFile | null {
     const stem = stemFromFilename(file);
     if (stem === null) return null;
 
-    // base_types/module_manifest have no logical name.
-    if (kind === 'base_types' || kind === 'module_manifest') {
-      // module_manifest must use its canonical filename `manifest.module.yaml`.
-      if (kind === 'module_manifest' && file !== 'manifest.module.yaml') return null;
-      // base_types is a global singleton valid ONLY at
-      // platform/base/core/base.types.yaml (handled above). Reject it
-      // anywhere else (including ext and under a different platform module).
-      if (kind === 'base_types') return null;
+    // module_manifest has no logical name and must use its canonical filename.
+    if (kind === 'module_manifest') {
+      if (file !== 'manifest.module.yaml') return null;
       return {
         kind,
         system,

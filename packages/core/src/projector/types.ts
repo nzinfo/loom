@@ -31,8 +31,8 @@ export interface PhysicalColumn {
   /** True if column has a UNIQUE constraint. */
   readonly unique: boolean;
   /**
-   * If scalar === 'enum', this is the value_type identity (e.g.
-   * value_type:base.core.Status) used to look up the value list in the
+   * If scalar === 'enum', this is the type identity (e.g.
+   * type:base.core.Status) used to look up the value list in the
    * model's enum registry.
    */
   readonly enumRef?: string;

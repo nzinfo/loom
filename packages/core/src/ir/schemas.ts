@@ -6,8 +6,9 @@
  * (dangling $ref, mixin cycle, primary_key required) live in the validator.
  *
  * Fields use a single `type:` key (spec v2 §3); form discrimination between
- * single-segment base_types names and three-segment value_type refs happens
- * in the typespace resolver, not here.
+ * single-segment scalar short names and three-segment type refs happens in
+ * the typespace resolver, not here. The unified `type` kind carries a `form`
+ * field (scalar/struct/enum) — see `docs/design/2026-06-21-unified-type-kind-notes.md`.
  */
 //
 // ── Adding a new file kind ──────────────────────────────────────────
@@ -21,7 +22,7 @@
 // ────────────────────────────────────────────────────────────────────
 import { parse as yamlParse } from 'yaml';
 import { z } from 'zod';
-import { CURRENT_VERSION, FILE_KIND, type FileKind } from './version.js';
+import { CURRENT_VERSION, FILE_KIND, type FileKind, TYPE_FORMS, type TypeForm } from './version.js';
 
 /** Category of failure surfaced by {@link parseFile}. */
 export type ParseErrorCategory = 'parse' | 'version';
@@ -59,8 +60,8 @@ const usingSchema = z.array(z.string().min(1)).optional();
 /**
  * Type descriptor — the structured form of a field's `type:` (spec v2 §3).
  *
- *   ref   — type reference: single-segment (base_types short name) or
- *           three-segment (value_type fqn)
+ *   ref   — type reference: single-segment (scalar short name) or
+ *           three-segment (type fqn sys.mod.Name)
  *   args  — type arguments (max_length, precision, scale, pattern, ...).
  *           Unified home for both value params (literals) and type params
  *           (type refs); discrimination happens at resolution.
@@ -108,7 +109,7 @@ const includeEntry = z.object({ include: z.string().min(1) }).strict();
 const fieldOrInclude = z.union([typeField, includeEntry]);
 
 /**
- * A variant entry — element of a value_type's `variants:` list (spec v2 §6).
+ * A variant entry — element of an `enum` form type's `variants:` list (spec v2 §6).
  *
  * Two equivalent forms:
  *   - shorthand: a bare string (`active`)
@@ -130,16 +131,17 @@ const variantSchema = z.union([
 const constraintSchema = z.object({ kind: z.literal('check'), expr: z.string().min(1) }).strict();
 
 /**
- * A type parameter declaration on a value_type (spec v2 §X).
+ * A type parameter declaration on a struct/enum type (spec v2 §X).
  *
  *   name        — the parameter identifier (referenced in fields as type: <name>)
  *   constraint  — 'type' (any type, incl. another type parameter — for
  *                 generic recursion like Map<K,V>) or 'value' (must be a
- *                 concrete type: scalar short name or value_type fqn).
+ *                 concrete type: scalar short name or type fqn).
  *                 Defaults to 'type'.
  *   default     — default type used when the reference omits this param
  *   description — human-readable note
  *
+ * type_parameters are accepted by struct and enum forms (scalar forbids them).
  * v2 allows declaring type_parameters AND referencing them in fields AND
  * passing args at reference sites (full generic form).
  */
@@ -187,23 +189,87 @@ const scalarPropertySchema = z
   })
   .strict();
 
-export const BaseTypesSchema = z
+export const TypeSchema = z
   .object({
     version: versionSchema,
+    name: z.string().min(1),
+    form: z.enum(TYPE_FORMS),
+    display_name: z.string().optional(),
+    description: z.string().optional(),
     using: usingSchema,
-    scalars: z
-      .array(
-        z
-          .object({
-            name: z.string().min(1),
-            description: z.string().optional(),
-            properties: z.array(scalarPropertySchema).default([]),
-          })
-          .strict(),
-      )
-      .min(1),
+    // Form-specific fields (all optional; superRefine enforces the mutex).
+    properties: z.array(scalarPropertySchema).optional(), // scalar
+    fields: z.array(fieldOrInclude).optional(), // struct
+    variants: z.array(variantSchema).min(1).optional(), // enum (current shape)
+    type_parameters: z.array(typeParameterSchema).optional(), // struct/enum
+    constraints: z.array(constraintSchema).optional(), // struct only
   })
-  .strict();
+  .strict()
+  .superRefine((data, ctx) => {
+    // Name-case convention (compile-time enforced): scalar lowercase,
+    // struct/enum PascalCase.
+    if (data.form === 'scalar' && !/^[a-z][a-z0-9_]*$/.test(data.name)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `scalar type name must be lowercase (got "${data.name}")`,
+        path: ['name'],
+      });
+    }
+    if (
+      (data.form === 'struct' || data.form === 'enum') &&
+      !/^[A-Z][A-Za-z0-9_]*$/.test(data.name)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `${data.form} type name must be PascalCase (got "${data.name}")`,
+        path: ['name'],
+      });
+    }
+
+    const has = (k: 'properties' | 'fields' | 'variants' | 'type_parameters' | 'constraints') =>
+      data[k] !== undefined;
+
+    if (data.form === 'scalar') {
+      if (has('fields') || has('variants') || has('type_parameters') || has('constraints')) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'scalar type must not have fields/variants/type_parameters/constraints',
+          path: ['form'],
+        });
+      }
+    } else if (data.form === 'struct') {
+      if (has('properties') || has('variants')) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'struct type must not have properties/variants',
+          path: ['form'],
+        });
+      }
+      if (!has('fields')) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'struct type must have fields',
+          path: ['fields'],
+        });
+      }
+    } else {
+      // enum
+      if (has('properties') || has('fields') || has('constraints')) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'enum type must not have properties/fields/constraints',
+          path: ['form'],
+        });
+      }
+      if (!has('variants')) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'enum type must have variants',
+          path: ['variants'],
+        });
+      }
+    }
+  });
 
 export const ModuleManifestSchema = z
   .object({
@@ -216,39 +282,6 @@ export const ModuleManifestSchema = z
     exports: z.array(z.string().min(1)).optional(),
   })
   .strict();
-
-export const ValueTypeSchema = z
-  .object({
-    version: versionSchema,
-    name: z.string().min(1),
-    display_name: z.string().optional(),
-    description: z.string().optional(),
-    using: usingSchema,
-    fields: z.array(fieldOrInclude).optional(),
-    variants: z.array(variantSchema).min(1).optional(),
-    type_parameters: z.array(typeParameterSchema).optional(),
-    constraints: z.array(constraintSchema).optional(),
-  })
-  .strict()
-  .superRefine((data, ctx) => {
-    // fields and variants are mutually exclusive; exactly one required.
-    const hasFields = data.fields !== undefined && data.fields.length > 0;
-    const hasVariants = data.variants !== undefined && data.variants.length > 0;
-    if (hasFields && hasVariants) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'value_type cannot have both fields and variants (they are mutually exclusive)',
-        path: ['variants'],
-      });
-    }
-    if (!hasFields && !hasVariants) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'value_type must have either fields or variants',
-        path: ['fields'],
-      });
-    }
-  });
 
 export const MixinSchema = z
   .object({
@@ -306,9 +339,8 @@ export const ExtensionFieldsSchema = z
 
 // ---- inferred types ----
 
-export type BaseTypes = z.infer<typeof BaseTypesSchema>;
+export type TypeNode = z.infer<typeof TypeSchema>;
 export type ModuleManifest = z.infer<typeof ModuleManifestSchema>;
-export type ValueType = z.infer<typeof ValueTypeSchema>;
 export type Mixin = z.infer<typeof MixinSchema>;
 export type Table = z.infer<typeof TableSchema>;
 export type Entity = z.infer<typeof EntitySchema>;
@@ -325,18 +357,16 @@ export interface ParsedFileBase {
 }
 
 export type AnyFile =
-  | (ParsedFileBase & { kind: 'base_types'; data: BaseTypes })
+  | (ParsedFileBase & { kind: 'type'; data: TypeNode })
   | (ParsedFileBase & { kind: 'module_manifest'; data: ModuleManifest })
-  | (ParsedFileBase & { kind: 'value_type'; data: ValueType })
   | (ParsedFileBase & { kind: 'mixin'; data: Mixin })
   | (ParsedFileBase & { kind: 'table'; data: Table })
   | (ParsedFileBase & { kind: 'entity'; data: Entity })
   | (ParsedFileBase & { kind: 'extension_fields'; data: ExtensionFields });
 
 const SCHEMA_BY_KIND = {
-  base_types: BaseTypesSchema,
+  type: TypeSchema,
   module_manifest: ModuleManifestSchema,
-  value_type: ValueTypeSchema,
   mixin: MixinSchema,
   table: TableSchema,
   entity: EntitySchema,

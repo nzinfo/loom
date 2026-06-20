@@ -8,7 +8,7 @@
  */
 
 import { type ValueTypeNode, expandValueColumns, isSingleFieldValueType } from '../ir/field.js';
-import type { Table, TypeDescriptor, ValueType } from '../ir/schemas.js';
+import type { Table, TypeDescriptor, TypeNode } from '../ir/schemas.js';
 import { normalizeType } from '../ir/typespace.js';
 import type { IR, IRNode } from '../ir/version.js';
 import type {
@@ -262,18 +262,18 @@ function expandField(
     return [result];
   }
 
-  // Three-segment: value_type reference. Link pass verified existence + kind
+  // Three-segment: type reference. Link pass verified existence + kind
   // and rewrote short-name matches to their fqn, so ref is `sys.mod.Name`.
-  const targetId = `value_type:${ref}`;
+  const targetId = `type:${ref}`;
   const vtNode = ir.nodes.get(targetId);
   if (!vtNode) {
-    throw new Error(`Value type not found: ${targetId}`);
+    throw new Error(`Type node not found: ${targetId}`);
   }
-  if (vtNode.kind !== 'value_type') {
-    throw new Error(`Expected value_type, got ${vtNode.kind} for ${targetId}`);
+  if (vtNode.kind !== 'type') {
+    throw new Error(`Expected type, got ${vtNode.kind} for ${targetId}`);
   }
 
-  const vt = vtNode.data as ValueType;
+  const vt = vtNode.data as TypeNode;
 
   // Generic instantiation: if the value_type declares type_parameters and
   // the caller passed args binding them, substitute each field's type ref
@@ -288,7 +288,7 @@ function expandField(
   }
 
   const vtNodeForField = {
-    kind: 'value_type' as const,
+    kind: 'type' as const,
     name: vt.name,
     fields: fields as ValueTypeNode['fields'],
   };
@@ -358,8 +358,8 @@ function expandField(
  */
 function collectEnums(ir: IR, enums: Map<string, ReadonlyArray<string>>): void {
   for (const [identity, node] of ir.nodes) {
-    if (node.kind !== 'value_type') continue;
-    const vt = node.data as ValueType;
+    if (node.kind !== 'type') continue;
+    const vt = node.data as TypeNode;
     const variants = (vt as unknown as { variants?: ReadonlyArray<unknown> }).variants;
     if (!variants || variants.length === 0) continue;
     const values = variants.map((v) =>

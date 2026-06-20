@@ -87,9 +87,9 @@ export function buildPivotViews(model: PhysicalModel, ir: IR): PivotView[] {
     if (extFields) {
       for (const ef of extFields) {
         if (ef.refValueTypeId) {
-          // Multi/single-field value_type ref → expand into physical columns.
+          // Multi/single-field type ref → expand into physical columns.
           const vtNode = ir.nodes.get(ef.refValueTypeId);
-          if (vtNode?.kind !== 'value_type') continue;
+          if (vtNode?.kind !== 'type') continue;
           for (const f of vtNode.data.fields ?? []) {
             const fRec = f as Record<string, unknown>;
             const rawType = fRec.type;

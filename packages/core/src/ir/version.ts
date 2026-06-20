@@ -17,41 +17,42 @@ export const FORMAT_VERSION = 'v2' as const;
 /** Full version string written to schema files. */
 export const CURRENT_VERSION = `${FORMAT_FAMILY}/${FORMAT_VERSION}` as const;
 
-/** All file kinds recognized by loom-schema/v2. See spec §9. */
+/** All file kinds recognized by loom-schema/v2. See spec §9.
+ *
+ * `type` is the unified type-definition kind (scalar / struct / enum via the
+ * `form` field). It replaces the former `base_types` (collection kind) and
+ * `value_type`. See `docs/design/2026-06-21-unified-type-kind-notes.md`. */
 export const FILE_KIND = [
-  'base_types',
-  'module_manifest',
-  'value_type',
+  'type',
   'mixin',
   'table',
   'entity',
   'extension_fields',
+  'module_manifest',
 ] as const;
 export type FileKind = (typeof FILE_KIND)[number];
 
 /**
  * Kind ↔ file-extension mapping. The file extension is the SOLE source of a
- * file's kind (the YAML body no longer carries `kind:`; the layout is flat —
- * no `entity/` `table/` kind subdirectories). See spec §9.
+ * file's kind (the YAML body carries no `kind:`; the layout is flat — no kind
+ * subdirectories). See spec §9.
  *
  * The kind token sits between the stem and `.yaml`:
- *   `user.entity.yaml`, `orders.table.yaml`, `audit.mixin.yaml`,
- *   `email.value_type.yaml`, `user_fields.ext.yaml`, `base.types.yaml`,
- *   `manifest.module.yaml`
+ *   `money.type.yaml`, `audit.mixin.yaml`, `users.table.yaml`,
+ *   `user.entity.yaml`, `user_fields.ext.yaml`, `manifest.module.yaml`
  *
- * `extension_fields`/`base_types`/`module_manifest` use short aliases
- * (`.ext.yaml`/`.types.yaml`/`.module.yaml`) for brevity.
+ * `type` covers scalar/struct/enum (discriminated by the `form:` field in the
+ * body); `.types.yaml` (base_types) and `.value_type.yaml` are gone.
  *
  * Only `.yaml` is supported (not `.yml`) — kind-encoded files standardize on
  * the canonical long extension.
  */
 export const KIND_EXTENSIONS: Readonly<Record<FileKind, string>> = {
-  entity: '.entity.yaml',
-  table: '.table.yaml',
-  value_type: '.value_type.yaml',
+  type: '.type.yaml',
   mixin: '.mixin.yaml',
+  table: '.table.yaml',
+  entity: '.entity.yaml',
   extension_fields: '.ext.yaml',
-  base_types: '.types.yaml',
   module_manifest: '.module.yaml',
 };
 
@@ -59,6 +60,22 @@ export const KIND_EXTENSIONS: Readonly<Record<FileKind, string>> = {
 export const EXT_TO_KIND: Readonly<Record<string, FileKind>> = Object.fromEntries(
   Object.entries(KIND_EXTENSIONS).map(([kind, ext]) => [ext, kind as FileKind]),
 );
+
+/**
+ * The form of a `type` node (spec §9). Discriminates how the type is defined:
+ *   - `scalar` — a base scalar (bigint, decimal, string, ...) with optional
+ *                `properties` declaring the args it accepts. Scalars are the
+ *                system base; only defined under base.core. Referenced by
+ *                lowercase short name (no `using`).
+ *   - `struct` — a composite type with `fields` (one column per field) and
+ *                optional `type_parameters` / `constraints`. Referenced by
+ *                PascalCase name via `using`.
+ *   - `enum`   — a sum type with `variants`. Referenced by PascalCase name.
+ *                Open to future Rust-style evolution (associated data,
+ *                type_parameters); see design note §3.1.
+ */
+export const TYPE_FORMS = ['scalar', 'struct', 'enum'] as const;
+export type TypeForm = (typeof TYPE_FORMS)[number];
 
 /**
  * Stable identity string for any schema node.

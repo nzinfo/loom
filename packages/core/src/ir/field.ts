@@ -12,9 +12,9 @@
  * full type info). Both are re-exported through `index.ts`.
  */
 
-/** Loose view of a value_type node — only what expansion needs. */
+/** Loose view of a type node (struct form) — only what expansion needs. */
 export interface ValueTypeNode {
-  readonly kind: 'value_type';
+  readonly kind: 'type';
   readonly name: string;
   readonly fields: ReadonlyArray<{ readonly name: string }>;
 }
