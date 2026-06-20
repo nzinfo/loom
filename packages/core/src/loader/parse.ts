@@ -54,7 +54,7 @@ export async function parseAll(opts: ParseOptions): Promise<ParseResult> {
     }
     const text = decoder.decode(bytes);
     try {
-      const f = parseFile(text, entry.path);
+      const f = parseFile(text, entry.path, entry.meta.kind);
       if (f.kind === 'extension_fields') {
         extensionFieldsFiles.push({ identity: entry.identity, file: f });
       } else {

@@ -13,18 +13,18 @@
 // ── Adding a new file kind ──────────────────────────────────────────
 // To add a new kind, touch ALL of these (missing any one causes silent bugs):
 //   1. version.ts → FILE_KIND array
-//   2. schemas.ts → new `XxxSchema` export
-//   3. schemas.ts → inferred `type Xxx = z.infer<...>`
-//   4. schemas.ts → new arm in `AnyFile` union
-//   5. schemas.ts → entry in `SCHEMA_BY_KIND`
-//   6. paths.ts  → entry in `KIND_DIRS` (if it has its own directory)
+//   2. version.ts → KIND_EXTENSIONS map (extension token for this kind)
+//   3. schemas.ts → new `XxxSchema` export
+//   4. schemas.ts → inferred `type Xxx = z.infer<...>`
+//   5. schemas.ts → new arm in `AnyFile` union
+//   6. schemas.ts → entry in `SCHEMA_BY_KIND`
 // ────────────────────────────────────────────────────────────────────
 import { parse as yamlParse } from 'yaml';
 import { z } from 'zod';
 import { CURRENT_VERSION, FILE_KIND, type FileKind } from './version.js';
 
 /** Category of failure surfaced by {@link parseFile}. */
-export type ParseErrorCategory = 'parse' | 'version' | 'kind';
+export type ParseErrorCategory = 'parse' | 'version';
 
 /**
  * Typed error thrown by {@link parseFile}. The Pass 1 loader catches this
@@ -190,7 +190,6 @@ const scalarPropertySchema = z
 export const BaseTypesSchema = z
   .object({
     version: versionSchema,
-    kind: z.literal('base_types'),
     using: usingSchema,
     scalars: z
       .array(
@@ -209,7 +208,6 @@ export const BaseTypesSchema = z
 export const ModuleManifestSchema = z
   .object({
     version: versionSchema,
-    kind: z.literal('module_manifest'),
     system: z.string().min(1),
     module: z.string().min(1),
     physical_schema: z.string().min(1),
@@ -222,7 +220,6 @@ export const ModuleManifestSchema = z
 export const ValueTypeSchema = z
   .object({
     version: versionSchema,
-    kind: z.literal('value_type'),
     name: z.string().min(1),
     display_name: z.string().optional(),
     description: z.string().optional(),
@@ -256,7 +253,6 @@ export const ValueTypeSchema = z
 export const MixinSchema = z
   .object({
     version: versionSchema,
-    kind: z.literal('mixin'),
     name: z.string().min(1),
     display_name: z.string().optional(),
     description: z.string().optional(),
@@ -268,7 +264,6 @@ export const MixinSchema = z
 export const TableSchema = z
   .object({
     version: versionSchema,
-    kind: z.literal('table'),
     name: z.string().min(1),
     display_name: z.string().optional(),
     description: z.string().optional(),
@@ -290,7 +285,6 @@ export const TableSchema = z
 export const EntitySchema = z
   .object({
     version: versionSchema,
-    kind: z.literal('entity'),
     name: z.string().min(1),
     display_name: z.string().optional(),
     description: z.string().optional(),
@@ -304,7 +298,6 @@ export const EntitySchema = z
 export const ExtensionFieldsSchema = z
   .object({
     version: versionSchema,
-    kind: z.literal('extension_fields'),
     entity: z.string().min(1),
     using: usingSchema,
     fields: z.array(fieldOrInclude).min(1),
@@ -352,13 +345,15 @@ const SCHEMA_BY_KIND = {
 
 /**
  * Parse a single file's text into an AnyFile. Throws {@link ParseError} on
- * version/kind mismatch, schema violation, or YAML syntax error. The Pass 1
+ * version mismatch, schema violation, or YAML syntax error. The Pass 1
  * loader catches ParseError and routes `category` into a Diagnostic.
  *
- * `file` is the basePath-relative path for error messages; line/column default
- * to 1:1 — the YAML parser supplies real positions in Pass 1.
+ * `kind` is provided by the caller — it is derived from the file extension
+ * during discovery (the sole source of kind; the YAML body carries no `kind:`
+ * field). `file` is the basePath-relative path for error messages; line/column
+ * default to 1:1 — the YAML parser supplies real positions in Pass 1.
  */
-export function parseFile(text: string, file: string): AnyFile {
+export function parseFile(text: string, file: string, kind: FileKind): AnyFile {
   let raw: unknown;
   try {
     raw = yamlParse(text);
@@ -372,11 +367,7 @@ export function parseFile(text: string, file: string): AnyFile {
   if (version !== CURRENT_VERSION) {
     throw new ParseError('version', file, `expected ${CURRENT_VERSION}, got ${String(version)}`);
   }
-  const kind = (raw as { kind?: unknown }).kind;
-  if (typeof kind !== 'string' || !(kind in SCHEMA_BY_KIND)) {
-    throw new ParseError('kind', file, `unknown kind ${String(kind)}`);
-  }
-  const schema = SCHEMA_BY_KIND[kind as FileKind];
+  const schema = SCHEMA_BY_KIND[kind];
   let data: unknown;
   try {
     data = schema.parse(raw);
@@ -386,7 +377,7 @@ export function parseFile(text: string, file: string): AnyFile {
     const first = zodErr.errors?.[0]?.message ?? (e as Error).message;
     throw new ParseError('parse', file, `schema: ${first}`);
   }
-  return { kind: kind as FileKind, raw, file, line: 1, column: 1, data } as AnyFile;
+  return { kind, raw, file, line: 1, column: 1, data } as AnyFile;
 }
 
 // FILE_KIND is re-exported through version.ts; keep the import used so tree-shaking

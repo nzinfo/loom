@@ -30,6 +30,37 @@ export const FILE_KIND = [
 export type FileKind = (typeof FILE_KIND)[number];
 
 /**
+ * Kind ↔ file-extension mapping. The file extension is the SOLE source of a
+ * file's kind (the YAML body no longer carries `kind:`; the layout is flat —
+ * no `entity/` `table/` kind subdirectories). See spec §9.
+ *
+ * The kind token sits between the stem and `.yaml`:
+ *   `user.entity.yaml`, `orders.table.yaml`, `audit.mixin.yaml`,
+ *   `email.value_type.yaml`, `user_fields.ext.yaml`, `base.types.yaml`,
+ *   `manifest.module.yaml`
+ *
+ * `extension_fields`/`base_types`/`module_manifest` use short aliases
+ * (`.ext.yaml`/`.types.yaml`/`.module.yaml`) for brevity.
+ *
+ * Only `.yaml` is supported (not `.yml`) — kind-encoded files standardize on
+ * the canonical long extension.
+ */
+export const KIND_EXTENSIONS: Readonly<Record<FileKind, string>> = {
+  entity: '.entity.yaml',
+  table: '.table.yaml',
+  value_type: '.value_type.yaml',
+  mixin: '.mixin.yaml',
+  extension_fields: '.ext.yaml',
+  base_types: '.types.yaml',
+  module_manifest: '.module.yaml',
+};
+
+/** Reverse map: file suffix → kind. Suffixes are non-overlapping. */
+export const EXT_TO_KIND: Readonly<Record<string, FileKind>> = Object.fromEntries(
+  Object.entries(KIND_EXTENSIONS).map(([kind, ext]) => [ext, kind as FileKind]),
+);
+
+/**
  * Stable identity string for any schema node.
  * Format: `<kind>:<system>.<module>.<PascalName>`
  * See spec §3.5.

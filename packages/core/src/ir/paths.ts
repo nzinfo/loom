@@ -6,21 +6,24 @@
  * The discovery layer passes the path relative to the schema root (basePath),
  * including the owner prefix (platform/ ext/ tenants/).
  *
+ * The file's kind is encoded in its extension — the SOLE source of kind. The
+ * YAML body carries no `kind:` field, and there are no `entity/` `table/`
+ * kind subdirectories (flat layout). See spec §9.
+ *
  * Layout (relPath includes the owner prefix):
- *   platform/base/core/base_types.yaml            → base_types:           (owner: platform)
- *   platform/<sys>/<mod>/MANIFEST.yaml            → module_manifest:<sys>.<mod>
- *   platform/<sys>/<mod>/<kind>/<name>.yaml       → <kind>:<sys>.<mod>.<Name>
- *   ext/<provider>/<sys>/<mod>/MANIFEST.yaml      → module_manifest:<sys>.<mod>  (owner: ext:<provider>)
- *   ext/<provider>/<sys>/<mod>/<kind>/<name>.yaml → <kind>:<sys>.<mod>.<Name>
- *   tenants/<id>/<sys>/<mod>/<name>_fields.yaml   → extension_fields:<sys>.<mod>.<Name>  (owner: tenant:<id>)
+ *   platform/base/core/base.types.yaml            → base_types:           (owner: platform)
+ *   platform/<sys>/<mod>/manifest.module.yaml     → module_manifest:<sys>.<mod>
+ *   platform/<sys>/<mod>/<stem>.<kind>.yaml       → <kind>:<sys>.<mod>.<Stem>
+ *   ext/<provider>/<sys>/<mod>/manifest.module.yaml → module_manifest:<sys>.<mod>  (owner: ext:<provider>)
+ *   ext/<provider>/<sys>/<mod>/<stem>.<kind>.yaml → <kind>:<sys>.<mod>.<Stem>
+ *   tenants/<id>/<sys>/<mod>/<stem>.<kind>.yaml   → <kind>:<sys>.<mod>.<Stem>  (owner: tenant:<id>)
  *
- * kind ∈ { value_type, mixin, table, entity, extension_fields }
- * extension_fields files live under <sys>/<mod>/extension/<name>.yaml for
- * platform/ext, and directly under <sys>/<mod>/ for tenants (no kind dir).
+ * kind token ∈ { entity, table, value_type, mixin, ext, types, module }
+ * where `ext`→extension_fields, `types`→base_types, `module`→module_manifest.
  *
- * base_types.yaml is valid ONLY at platform/base/core/base_types.yaml.
+ * base_types is valid ONLY at platform/base/core/base.types.yaml.
  */
-import type { FileKind } from './version.js';
+import { EXT_TO_KIND, type FileKind } from './version.js';
 import type { Owner } from './version.js';
 
 export interface DiscoveredFile {
@@ -35,13 +38,29 @@ export interface DiscoveredFile {
   readonly owner: Owner;
 }
 
-const KIND_DIRS = new Map<string, FileKind>([
-  ['value_type', 'value_type'],
-  ['mixin', 'mixin'],
-  ['table', 'table'],
-  ['entity', 'entity'],
-  ['extension', 'extension_fields'],
-]);
+/**
+ * Derive kind from a filename by matching its known kind-encoded suffix.
+ * Suffixes are non-overlapping (`.ext.yaml` is checked before a generic
+ * `.yaml`). Returns null if the file has no recognized kind token.
+ */
+export function kindFromFilename(file: string): FileKind | null {
+  for (const [ext, kind] of Object.entries(EXT_TO_KIND)) {
+    if (file.endsWith(ext)) return kind;
+  }
+  return null;
+}
+
+/**
+ * Strip the kind-encoded suffix from a filename, returning the kebab-case
+ * stem. E.g. `user.entity.yaml` → `user`, `manifest.module.yaml` → `manifest`,
+ * `base.types.yaml` → `base`. Returns null if no known kind suffix matches.
+ */
+export function stemFromFilename(file: string): string | null {
+  for (const ext of Object.keys(EXT_TO_KIND)) {
+    if (file.endsWith(ext)) return file.slice(0, -ext.length);
+  }
+  return null;
+}
 
 export function kebabToPascal(kebab: string): string {
   return kebab
@@ -92,7 +111,7 @@ export function pathToIdentity(fullPath: string, relPath: string): DiscoveredFil
     return parseOwned(rest.slice(1), { kind: 'ext', provider });
   }
 
-  // ── tenants/<id>/<sys>/<mod>/<name>_fields.yaml (no kind dir) ─────────
+  // ── tenants/<id>/<sys>/<mod>/<stem>.<kind>.yaml ───────────────────────
   if (ownerPrefix === 'tenants') {
     const rest = parts.slice(1);
     if (rest.length === 0) return null;
@@ -108,17 +127,20 @@ export function pathToIdentity(fullPath: string, relPath: string): DiscoveredFil
 
 /**
  * Parse the post-owner-prefix portion for platform/ext. These two share the
- * same inner layout: [<sys>/<mod>/MANIFEST.yaml | <sys>/<mod>/base_types.yaml
- * (platform only) | <sys>/<mod>/<kind>/<name>.yaml].
+ * same inner layout: [<sys>/<mod>/base.types.yaml (platform only)
+ * | <sys>/<mod>/manifest.module.yaml
+ * | <sys>/<mod>/<stem>.<kind>.yaml].
+ *
+ * Flat: no kind subdirectories. The kind comes from the filename suffix.
  */
 function parseOwned(inner: string[], owner: Owner): DiscoveredFile | null {
-  // platform/base/core/base_types.yaml
+  // platform/base/core/base.types.yaml  (3 parts)
   if (
     owner.kind === 'platform' &&
     inner.length === 3 &&
     inner[0] === 'base' &&
     inner[1] === 'core' &&
-    inner[2] === 'base_types.yaml'
+    inner[2] === 'base.types.yaml'
   ) {
     return {
       kind: 'base_types',
@@ -130,32 +152,35 @@ function parseOwned(inner: string[], owner: Owner): DiscoveredFile | null {
     };
   }
 
-  // <sys>/<mod>/MANIFEST.yaml  (3 parts)
-  if (inner.length === 3 && inner[2] === 'MANIFEST.yaml') {
+  // <sys>/<mod>/<file>  (3 parts) — kind from filename suffix.
+  if (inner.length === 3) {
     const system = inner[0];
     const module = inner[1];
-    if (!system || !module) return null;
-    return {
-      kind: 'module_manifest',
-      system,
-      module,
-      name: '',
-      identity: `module_manifest:${system}.${module}`,
-      owner,
-    };
-  }
+    const file = inner[2];
+    if (!system || !module || !file) return null;
+    const kind = kindFromFilename(file);
+    if (kind === null) return null;
+    const stem = stemFromFilename(file);
+    if (stem === null) return null;
 
-  // <sys>/<mod>/<kindDir>/<file>  (4 parts)
-  if (inner.length === 4) {
-    const system = inner[0];
-    const module = inner[1];
-    const kindDir = inner[2];
-    const file = inner[3];
-    if (!system || !module || !kindDir || !file) return null;
-    const kind = KIND_DIRS.get(kindDir);
-    if (!kind) return null;
-    if (!file.endsWith('.yaml') && !file.endsWith('.yml')) return null;
-    const stem = file.replace(/\.(ya?ml)$/, '');
+    // base_types/module_manifest have no logical name.
+    if (kind === 'base_types' || kind === 'module_manifest') {
+      // module_manifest must use its canonical filename `manifest.module.yaml`.
+      if (kind === 'module_manifest' && file !== 'manifest.module.yaml') return null;
+      // base_types is a global singleton valid ONLY at
+      // platform/base/core/base.types.yaml (handled above). Reject it
+      // anywhere else (including ext and under a different platform module).
+      if (kind === 'base_types') return null;
+      return {
+        kind,
+        system,
+        module,
+        name: '',
+        identity: `${kind}:${system}.${module}`,
+        owner,
+      };
+    }
+
     const name = kebabToPascal(stem);
     return {
       kind,
@@ -171,8 +196,9 @@ function parseOwned(inner: string[], owner: Owner): DiscoveredFile | null {
 }
 
 /**
- * Parse the post-tenant-id portion: <sys>/<mod>/<name>_fields.yaml.
- * Tenant files are always extension_fields; there is no kind subdirectory.
+ * Parse the post-tenant-id portion: <sys>/<mod>/<stem>.<kind>.yaml.
+ * Tenants may only write extension_fields (`.ext.yaml`); other kinds are
+ * rejected here. The kind comes from the filename suffix, same as platform/ext.
  */
 function parseTenant(inner: string[], tenantId: string): DiscoveredFile | null {
   // <sys>/<mod>/<file>  (3 parts)
@@ -181,16 +207,20 @@ function parseTenant(inner: string[], tenantId: string): DiscoveredFile | null {
   const module = inner[1];
   const file = inner[2];
   if (!system || !module || !file) return null;
-  if (!file.endsWith('.yaml') && !file.endsWith('.yml')) return null;
-  const stem = file.replace(/\.(ya?ml)$/, '');
+  const kind = kindFromFilename(file);
+  if (kind === null) return null;
+  // Tenants can only contribute extension_fields.
+  if (kind !== 'extension_fields') return null;
+  const stem = stemFromFilename(file);
+  if (stem === null) return null;
   const name = kebabToPascal(stem);
   const owner: Owner = { kind: 'tenant', id: tenantId };
   return {
-    kind: 'extension_fields',
+    kind,
     system,
     module,
     name,
-    identity: `extension_fields:${system}.${module}.${name}`,
+    identity: `${kind}:${system}.${module}.${name}`,
     owner,
   };
 }
