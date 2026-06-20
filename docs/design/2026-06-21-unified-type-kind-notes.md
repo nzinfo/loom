@@ -132,25 +132,41 @@ const TypeSchema = z.object({
   // form 专属字段（可选，superRefine 校验互斥）
   properties: z.array(scalarPropertySchema).optional(),       // scalar
   fields: z.array(fieldOrInclude).optional(),                 // struct
-  variants: z.array(variantSchema).min(1).optional(),         // enum
-  type_parameters: z.array(typeParameterSchema).optional(),   // struct only
+  variants: z.array(variantSchema).min(1).optional(),         // enum（当前形态）
+  type_parameters: z.array(typeParameterSchema).optional(),   // struct/enum 可选
   constraints: z.array(constraintSchema).optional(),          // struct only
 }).strict().superRefine((data, ctx) => {
-  // scalar: properties 允许，fields/variants/type_parameters 禁止
-  // struct:  fields 允许（与 type_parameters 可组合），properties/variants 禁止
-  // enum:    variants 必填且非空，properties/fields/type_parameters 禁止
+  // scalar: properties 允许；fields/variants/type_parameters/constraints 禁止；
+  //         name 必须小写（编译期强制命名约定）
+  // struct:  fields 允许（与 type_parameters 可组合）；properties/variants 禁止；
+  //         name 必须 PascalCase
+  // enum:    variants 必填且非空（当前形态）；type_parameters 允许（为 Rust 风格
+  //          参数化 enum 预留）；properties/fields 禁止；name 必须 PascalCase
 });
 ```
 
-`superRefine` 规则（form ↔ 专属字段的互斥矩阵）：
+`superRefine` 规则（form ↔ 专属字段的互斥矩阵 + 命名约定）：
 
 | 字段 | scalar | struct | enum |
 |---|---|---|---|
 | `properties` | ✓ | ✗ | ✗ |
 | `fields` | ✗ | ✓（或 type_parameters only） | ✗ |
-| `variants` | ✗ | ✗ | ✓ 必填 |
-| `type_parameters` | ✗ | ✓ 可选 | ✗ |
+| `variants` | ✗ | ✗ | ✓ 必填（当前） |
+| `type_parameters` | ✗ | ✓ 可选 | ✓ 可选 |
 | `constraints` | ✗ | ✓ 可选 | ✗ |
+| **name 大小写** | 小写 `/^[a-z]/` | PascalCase `/^[A-Z]/` | PascalCase `/^[A-Z]/` |
+
+### 3.1 enum 的演进预留
+
+当前 enum 形态是 `variants`（简单枚举值列表）。但 enum 不应被钉死在此形态——未来可能演进为
+**Rust 风格 enum**（带 data 的代数类型，如 `Result<T,E>`、`Option<T>`）。因此：
+
+- `type_parameters` 对 enum 开放（参数化 enum 的基础，如 `Result<T,E>`）
+- enum 的"成员描述"字段当前是 `variants`，未来可能扩展为更丰富的形态（带关联数据的 variant）
+- schema 设计上把 enum 当作"可演进的开放形态"，不在 superRefine 里过度约束
+
+这意味着 enum 是三个 form 里**最有可能变化**的一个。当前实现只需支撑 `variants`，
+但留好扩展空间。
 
 ## 4. 解析规则变更
 
@@ -173,11 +189,16 @@ const valueTypes = collectValueTypeFqns(parsed);  // from kind === 'value_type'
 统一后（一个 registry，按 form 切分）：
 ```ts
 const typesByForm = collectTypes(parsed);    // from kind === 'type'
-const scalars = typesByForm.scalar;          // form === 'scalar' short names
+const scalars = typesByForm.scalar;          // form === 'scalar', 且 owner === platform/base.core
 const valueTypes = typesByForm.struct_enum;  // form !== 'scalar' fqns
 ```
 
 resolveShortName 的签名与逻辑不变，只是两个集合的来源换了。
+
+**标量基底性边界（决策）**：scalar 集合**只收集 base.core 模块**的 scalar form 节点。
+标量是系统基座，只由 platform/base/core 定义——ext/tenant 不定义标量（与现状一致）。
+即 collectTypes 筛选 scalar 时附加条件 `identity.startsWith('type:base.core.')`。
+struct/enum 集合不受此限，收集所有模块。
 
 ## 5. 身份与 $ref 变更
 
@@ -281,17 +302,24 @@ exports:
 
 ### 风险
 - **golden 漂移**：标量拆分理论上不改投影列定义，但需实测验证（万一 deps 图变化影响了排序/去重）
-- **命名约定脆弱性**：scalar 小写 vs struct PascalCase 是约定，不是 schema 强制。若用户定义 `Money`（PascalCase）标量，解析会误判为 struct 候选。缓解：superRefine 可校验 scalar form 的 name 必须小写（`/^[a-z][a-z0-9_]*$/`），struct/enum 必须 PascalCase
+- **命名约定脆弱性**：scalar 小写 vs struct PascalCase 是约定——已通过 schema 层 superRefine 编译期强制（见决策 1），不再是脆弱软约定。
 
-## 9. 待决问题
+## 9. 已确认的决策
 
-1. **scalar name 强制小写校验**：是否在 schema 层加 `superRefine`（scalar name 匹配 `/^[a-z]/`）？倾向加——让命名约定成为编译期保障，而非软约定。
-2. **enum variants 的 form**：当前 value_type 的 variants 形态是否就是 enum form？是。variants 字段从 value_type 专属变成 enum form 专属。
-3. **type_parameters 是否 struct-only**：是。scalar/enum 不接受 type_parameters（superRefine 校验）。
-4. **base.core 短名解析的基底性**：标量拆分后，`decimal` 短名仍应全局可用（不走 using）。collectTypes 构建 scalar set 时**收集所有 form:scalar 节点**（不限 base.core 模块）——还是只收集 base.core 的？倾向**只 base.core**（标量是系统基座，只由 platform 定义，ext/tenant 不定义标量——这与现状一致）。
+1. **scalar name 强制小写校验**：✅ **是**。schema 层 superRefine 校验 scalar form 的 name 匹配 `/^[a-z][a-z0-9_]*$/`；struct/enum 匹配 `/^[A-Z]/`。命名约定成为编译期保障。
+
+2. **enum 的形态边界**：当前是 `variants`（简单枚举值列表），但**不钉死**。enum 是三个 form 里最可能演进的——未来可能变为 **Rust 风格 enum**（带关联数据的代数类型）。因此 schema 上：enum 当前只支撑 `variants`，但 `type_parameters` 对 enum 开放（见决策 3），且 enum 的成员描述字段为后续扩展留空间。
+
+3. **type_parameters 是否 struct-only**：✅ **struct 与 enum 都开放，scalar 禁止**。enum 开放 type_parameters 是为 Rust 风格参数化 enum（如 `Result<T,E>`、`Option<T>`）预留——这些正是带 type_parameters 的 enum。superRefine 只禁止 scalar 带 type_parameters。
+
+4. **标量基底性边界**：✅ **scalar 集合只收集 base.core 模块**。标量是系统基座，只由 platform/base/core 定义；ext/tenant 不定义标量。collectTypes 筛选 scalar 时附加 `identity.startsWith('type:base.core.')`。struct/enum 不受此限。
 
 ## 10. 结论
 
 方向已定：**统一到 type kind + form 三态**。这是一次中等规模的破坏性重构，但与一路"消除特例"的轨迹一致（_shared 移除 → 扩展名编码 kind → 现在 type kind 统一）。
 
-实施前确认 §9 的四个待决问题，特别是 (1) scalar name 强制小写校验、(4) 标量基底性边界。确认后按 §7 步骤推进。
+§9 的四个决策均已确认，按 §7 步骤推进。关键执行要点：
+- TypeSchema 的 superRefine 同时校验 form 互斥矩阵 + name 大小写约定（决策 1）
+- enum 不在 schema 层过度约束（决策 2）——只支撑当前 variants，留扩展空间
+- type_parameters 对 struct/enum 开放（决策 3）
+- collectTypes 的 scalar 切分加 base.core 边界过滤（决策 4）
