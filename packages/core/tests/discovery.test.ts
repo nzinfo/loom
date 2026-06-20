@@ -26,10 +26,10 @@ describe('discovery (Pass 0) — platform', () => {
     const result = await discover({ fs, basePath: '', diagnostics: diag });
     const ids = new Set([...result.files.values()].map((e) => e.identity));
     expect(diag.hasErrors).toBe(false);
-    expect(ids.has('base_types:')).toBe(true);
+    expect(ids.has('type:base.core.String')).toBe(true);
     expect(ids.has('module_manifest:base.core')).toBe(true);
-    expect(ids.has('value_type:base.core.Email')).toBe(true);
-    expect(ids.has('value_type:base.core.Money')).toBe(true);
+    expect(ids.has('type:base.core.Email')).toBe(true);
+    expect(ids.has('type:base.core.Money')).toBe(true);
     expect(ids.has('mixin:base.core.Audit')).toBe(true);
     expect(ids.has('table:base.core.Users')).toBe(true);
     expect(ids.has('entity:base.core.User')).toBe(true);
@@ -93,9 +93,9 @@ describe('discovery (Pass 0) — platform', () => {
       diagnostics: diag,
     });
     expect(diag.hasErrors).toBe(false);
-    expect(findByIdentity(result.files, 'base_types:')).toBeDefined();
+    expect(findByIdentity(result.files, 'type:base.core.String')).toBeDefined();
     expect(findByIdentity(result.files, 'module_manifest:base.core')).toBeDefined();
-    expect(findByIdentity(result.files, 'value_type:base.core.Email')).toBeDefined();
+    expect(findByIdentity(result.files, 'type:base.core.Email')).toBeDefined();
   });
 });
 

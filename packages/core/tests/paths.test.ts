@@ -38,31 +38,26 @@ describe('paths — platform', () => {
     });
   });
 
-  it('recognizes base.types.yaml only at platform/base/core/', () => {
+  it('recognizes a scalar type file (.type.yaml) as a type node', () => {
     expect(
-      pathToIdentity('platform/base/core/base.types.yaml', 'platform/base/core/base.types.yaml'),
+      pathToIdentity(
+        'platform/base/core/decimal.type.yaml',
+        'platform/base/core/decimal.type.yaml',
+      ),
     ).toEqual<DiscoveredFile>({
-      kind: 'base_types',
+      kind: 'type',
       system: 'base',
       module: 'core',
-      name: '',
-      identity: 'base_types:',
+      name: 'Decimal',
+      identity: 'type:base.core.Decimal',
       owner: { kind: 'platform' },
     });
   });
 
-  it('rejects base.types.yaml at any other platform path', () => {
+  it('rejects the former base.types.yaml singleton name (no longer special)', () => {
+    // base_types is gone; base.types.yaml is now an unrecognized filename.
     expect(
-      pathToIdentity('platform/hr/core/base.types.yaml', 'platform/hr/core/base.types.yaml'),
-    ).toBeNull();
-  });
-
-  it('rejects base.types.yaml under ext or tenants', () => {
-    expect(
-      pathToIdentity('ext/acme/base/core/base.types.yaml', 'ext/acme/base/core/base.types.yaml'),
-    ).toBeNull();
-    expect(
-      pathToIdentity('tenants/acme/base.types.yaml', 'tenants/acme/base.types.yaml'),
+      pathToIdentity('platform/base/core/base.types.yaml', 'platform/base/core/base.types.yaml'),
     ).toBeNull();
   });
 
@@ -132,13 +127,13 @@ describe('paths — ext', () => {
     });
   });
 
-  it('ext can define value_type and entity', () => {
+  it('ext can define type (struct) and entity', () => {
     expect(
       pathToIdentity(
-        'ext/acme-corp/retail/pos/order-status.value_type.yaml',
-        'ext/acme-corp/retail/pos/order-status.value_type.yaml',
+        'ext/acme-corp/retail/pos/order-status.type.yaml',
+        'ext/acme-corp/retail/pos/order-status.type.yaml',
       )?.kind,
-    ).toBe('value_type');
+    ).toBe('type');
     expect(
       pathToIdentity(
         'ext/acme-corp/retail/pos/order.entity.yaml',
@@ -182,7 +177,7 @@ describe('paths — legacy / invalid', () => {
     ).toBeNull();
   });
 
-  it('rejects a bare root base.types.yaml (must be under platform/base/core/)', () => {
+  it('rejects a bare root filename with no owner prefix', () => {
     expect(pathToIdentity('base.types.yaml', 'base.types.yaml')).toBeNull();
   });
 
@@ -229,10 +224,10 @@ describe('paths — kind/stem helpers', () => {
   it('kindFromFilename recognizes each kind token', () => {
     expect(kindFromFilename('user.entity.yaml')).toBe('entity');
     expect(kindFromFilename('orders.table.yaml')).toBe('table');
-    expect(kindFromFilename('email.value_type.yaml')).toBe('value_type');
+    expect(kindFromFilename('email.type.yaml')).toBe('type');
     expect(kindFromFilename('audit.mixin.yaml')).toBe('mixin');
     expect(kindFromFilename('user_fields.ext.yaml')).toBe('extension_fields');
-    expect(kindFromFilename('base.types.yaml')).toBe('base_types');
+    expect(kindFromFilename('base.types.yaml')).toBeNull();
     expect(kindFromFilename('manifest.module.yaml')).toBe('module_manifest');
   });
 

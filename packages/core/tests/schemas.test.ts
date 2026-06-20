@@ -1,14 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   type AnyFile,
-  BaseTypesSchema,
   EntitySchema,
   ExtensionFieldsSchema,
   MixinSchema,
   ModuleManifestSchema,
   ParseError,
   TableSchema,
-  ValueTypeSchema,
+  TypeSchema,
   parseFile,
 } from '../src/ir/schemas.js';
 
@@ -75,14 +74,15 @@ fields:
 name: M
 fields:
   - name: email
-    ref: value_type:base.core.Email
+    ref: type:base.core.Email
 `;
     expect(() => parseFile(yaml, 'm.mixin.yaml', 'mixin')).toThrow();
   });
 
-  it('accepts an optional using: list on a value_type file', () => {
+  it('accepts an optional using: list on a type file', () => {
     const yaml = `version: loom-schema/v2
 name: Order
+form: struct
 using:
   - base.core.*
   - retail.pos.types.*
@@ -92,7 +92,7 @@ fields:
       ref: string
       args: { max_length: 100 }
 `;
-    const f = parseFile(yaml, 'order.value_type.yaml', 'value_type');
+    const f = parseFile(yaml, 'order.type.yaml', 'type');
     const data = f.data as { using?: string[] };
     expect(data.using).toEqual(['base.core.*', 'retail.pos.types.*']);
   });
@@ -100,13 +100,14 @@ fields:
   it('accepts a file with no using: key (default base.core.* is implicit)', () => {
     const yaml = `version: loom-schema/v2
 name: Email
+form: struct
 fields:
   - name: value
     type:
       ref: string
       args: { max_length: 254 }
 `;
-    const f = parseFile(yaml, 'email.value_type.yaml', 'value_type');
+    const f = parseFile(yaml, 'email.type.yaml', 'type');
     const data = f.data as { using?: string[] };
     expect(data.using).toBeUndefined();
   });
@@ -127,14 +128,14 @@ fields:
 });
 
 describe('schemas', () => {
-  it('parses base.types.yaml', () => {
+  it('parses a scalar type file (form: scalar)', () => {
     const f = parseFile(
-      'version: loom-schema/v2\nscalars:\n  - name: string\n    description: s\n    properties:\n      - name: max_length\n        type: integer\n        required: true\n',
-      'platform/base/core/base.types.yaml',
-      'base_types',
+      'version: loom-schema/v2\nname: string\nform: scalar\ndescription: s\nproperties:\n  - name: max_length\n    type: integer\n    required: true\n',
+      'platform/base/core/string.type.yaml',
+      'type',
     );
-    expect(f.kind).toBe('base_types');
-    expect(BaseTypesSchema.parse((f as { raw: unknown }).raw)).toBeDefined();
+    expect(f.kind).toBe('type');
+    expect(TypeSchema.parse((f as { raw: unknown }).raw)).toBeDefined();
   });
 
   it('parses a module_manifest', () => {
@@ -147,24 +148,26 @@ describe('schemas', () => {
     expect(ModuleManifestSchema.parse((f as { raw: unknown }).raw)).toBeDefined();
   });
 
-  it('parses a single-field value_type', () => {
+  it('parses a single-field struct type', () => {
     const src = `version: loom-schema/v2
 name: Email
+form: struct
 fields:
   - name: value
     type:
       ref: string
       args: { max_length: 254 }
 `;
-    const f = parseFile(src, 'platform/base/core/email.value_type.yaml', 'value_type');
-    expect(f.kind).toBe('value_type');
-    const vt = ValueTypeSchema.parse((f as { raw: unknown }).raw);
+    const f = parseFile(src, 'platform/base/core/email.type.yaml', 'type');
+    expect(f.kind).toBe('type');
+    const vt = TypeSchema.parse((f as { raw: unknown }).raw);
     expect((vt.fields[0]?.type as { ref: string }).ref).toBe('string');
   });
 
-  it('parses a multi-field value_type with constraints', () => {
+  it('parses a multi-field struct type with constraints', () => {
     const src = `version: loom-schema/v2
 name: Money
+form: struct
 fields:
   - name: amount
     type:
@@ -179,9 +182,9 @@ constraints:
   - kind: check
     expr: amount >= 0
 `;
-    const f = parseFile(src, 'platform/base/core/money.value_type.yaml', 'value_type');
-    expect(f.kind).toBe('value_type');
-    expect(() => ValueTypeSchema.parse((f as { raw: unknown }).raw)).not.toThrow();
+    const f = parseFile(src, 'platform/base/core/money.type.yaml', 'type');
+    expect(f.kind).toBe('type');
+    expect(() => TypeSchema.parse((f as { raw: unknown }).raw)).not.toThrow();
   });
 
   it('parses a mixin', () => {
@@ -247,17 +250,16 @@ fields:
     );
   });
 
-  it('AnyFile is a discriminated union by kind', () => {
+  it('AnyFile is a discriminated union by kind (6 kinds)', () => {
     const cases: AnyFile['kind'][] = [
-      'base_types',
+      'type',
       'module_manifest',
-      'value_type',
       'mixin',
       'table',
       'entity',
       'extension_fields',
     ];
-    expect(new Set(cases).size).toBe(7);
+    expect(new Set(cases).size).toBe(6);
   });
 
   it('parseFile throws ParseError with the right category', () => {
@@ -279,61 +281,72 @@ fields:
   });
 });
 
-describe('value_type forms', () => {
-  it('parses a variants value_type (shorthand array)', () => {
+describe('type forms', () => {
+  it('parses an enum type (shorthand variants array)', () => {
     const src = `version: loom-schema/v2
 name: Status
+form: enum
 variants: [active, inactive, suspended]
 `;
-    const f = parseFile(src, 'status.value_type.yaml', 'value_type');
-    const vt = ValueTypeSchema.parse((f as { raw: unknown }).raw);
+    const f = parseFile(src, 'status.type.yaml', 'type');
+    const vt = TypeSchema.parse((f as { raw: unknown }).raw);
     expect(vt.variants).toEqual(['active', 'inactive', 'suspended']);
     expect(vt.fields).toBeUndefined();
   });
 
-  it('parses a variants value_type (detailed objects)', () => {
+  it('parses an enum type (detailed variants)', () => {
     const src = `version: loom-schema/v2
 name: Status
+form: enum
 variants:
   - value: active
     display_name: 活跃
   - value: inactive
 `;
-    const f = parseFile(src, 'status.value_type.yaml', 'value_type');
-    const vt = ValueTypeSchema.parse((f as { raw: unknown }).raw);
+    const f = parseFile(src, 'status.type.yaml', 'type');
+    const vt = TypeSchema.parse((f as { raw: unknown }).raw);
     expect(vt.variants?.[0]).toEqual({ value: 'active', display_name: '活跃' });
     expect(vt.variants?.[1]).toEqual({ value: 'inactive' });
   });
 
-  it('rejects a value_type with both fields and variants', () => {
+  it('rejects a struct with variants', () => {
     const src = `version: loom-schema/v2
 name: Bad
+form: struct
 fields:
   - name: x
     type: string
 variants: [a, b]
 `;
     expect(() =>
-      ValueTypeSchema.parse(
-        (parseFile(src, 'bad.value_type.yaml', 'value_type') as { raw: unknown }).raw,
-      ),
+      TypeSchema.parse((parseFile(src, 'bad.type.yaml', 'type') as { raw: unknown }).raw),
     ).toThrow();
   });
 
-  it('rejects a value_type with neither fields nor variants', () => {
+  it('rejects a struct with no fields', () => {
     const src = `version: loom-schema/v2
 name: Empty
+form: struct
 `;
     expect(() =>
-      ValueTypeSchema.parse(
-        (parseFile(src, 'empty.value_type.yaml', 'value_type') as { raw: unknown }).raw,
-      ),
+      TypeSchema.parse((parseFile(src, 'empty.type.yaml', 'type') as { raw: unknown }).raw),
     ).toThrow();
   });
 
-  it('parses type_parameters on a value_type', () => {
+  it('rejects an enum with no variants', () => {
+    const src = `version: loom-schema/v2
+name: EmptyEnum
+form: enum
+`;
+    expect(() =>
+      TypeSchema.parse((parseFile(src, 'empty-enum.type.yaml', 'type') as { raw: unknown }).raw),
+    ).toThrow();
+  });
+
+  it('parses type_parameters on a struct type', () => {
     const src = `version: loom-schema/v2
 name: Range
+form: struct
 type_parameters:
   - name: T
     constraint: value
@@ -345,10 +358,47 @@ fields:
   - name: high
     type: T
 `;
-    const f = parseFile(src, 'range.value_type.yaml', 'value_type');
-    const vt = ValueTypeSchema.parse((f as { raw: unknown }).raw);
+    const f = parseFile(src, 'range.type.yaml', 'type');
+    const vt = TypeSchema.parse((f as { raw: unknown }).raw);
     expect(vt.type_parameters?.[0]?.name).toBe('T');
     expect(vt.type_parameters?.[0]?.constraint).toBe('value');
     expect(vt.type_parameters?.[0]?.default).toBe('base.core.integer');
+  });
+
+  it('enforces lowercase scalar names', () => {
+    const src = `version: loom-schema/v2
+name: BadScalar
+form: scalar
+properties: []
+`;
+    expect(() =>
+      TypeSchema.parse((parseFile(src, 'bad-scalar.type.yaml', 'type') as { raw: unknown }).raw),
+    ).toThrow(/lowercase/);
+  });
+
+  it('enforces PascalCase struct names', () => {
+    const src = `version: loom-schema/v2
+name: lowercase
+form: struct
+fields:
+  - name: x
+    type: string
+`;
+    expect(() =>
+      TypeSchema.parse((parseFile(src, 'lowercase.type.yaml', 'type') as { raw: unknown }).raw),
+    ).toThrow(/PascalCase/);
+  });
+
+  it('rejects a scalar with fields', () => {
+    const src = `version: loom-schema/v2
+name: badscalar
+form: scalar
+fields:
+  - name: x
+    type: string
+`;
+    expect(() =>
+      TypeSchema.parse((parseFile(src, 'badscalar.type.yaml', 'type') as { raw: unknown }).raw),
+    ).toThrow();
   });
 });

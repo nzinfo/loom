@@ -32,12 +32,14 @@ describe('projector dialects', () => {
   it('pg: emits CREATE TYPE for enum scalars (spec §11)', async () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
-      'platform/base/core/base.types.yaml':
-        'version: loom-schema/v2\nscalars:\n  - name: bigint\n    properties: []\n  - name: string\n    properties: []\n',
+      'platform/base/core/bigint.type.yaml':
+        'version: loom-schema/v2\nname: bigint\nform: scalar\nproperties: []\n',
+      'platform/base/core/string.type.yaml':
+        'version: loom-schema/v2\nname: string\nform: scalar\nproperties: []\n',
       'platform/base/core/manifest.module.yaml':
         'version: loom-schema/v2\nsystem: base\nmodule: core\nphysical_schema: base_core\n',
-      'platform/base/core/status.value_type.yaml':
-        'version: loom-schema/v2\nname: Status\nvariants: [active, inactive]\n',
+      'platform/base/core/status.type.yaml':
+        'version: loom-schema/v2\nname: Status\nform: enum\nvariants: [active, inactive]\n',
       'platform/base/core/t.table.yaml':
         'version: loom-schema/v2\nname: T\ntable:\n  name: t\n  extension:\n    strategy: none\nfields:\n  - name: id\n    type: bigint\n    required: true\n  - name: status\n    type: base.core.Status\nprimary_key: [id]\n',
     });
@@ -50,16 +52,20 @@ describe('projector dialects', () => {
   it('mysql: emits DECIMAL(18,4) and VARCHAR; enum as ENUM(...)', async () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
-      'platform/base/core/base.types.yaml':
-        'version: loom-schema/v2\nscalars:\n  - name: bigint\n    properties: []\n  - name: decimal\n    properties:\n      - name: precision\n        type: integer\n        required: true\n      - name: scale\n        type: integer\n        required: true\n  - name: string\n    properties:\n      - name: max_length\n        type: integer\n        required: true\n',
+      'platform/base/core/bigint.type.yaml':
+        'version: loom-schema/v2\nname: bigint\nform: scalar\nproperties: []\n',
+      'platform/base/core/decimal.type.yaml':
+        'version: loom-schema/v2\nname: decimal\nform: scalar\nproperties:\n  - { {name: precision, type: integer, required: true, name: scale, type: integer, required: true} }\n',
+      'platform/base/core/string.type.yaml':
+        'version: loom-schema/v2\nname: string\nform: scalar\nproperties:\n  - { {name: max_length, type: integer, required: true} }\n',
       'platform/base/core/manifest.module.yaml':
         'version: loom-schema/v2\nsystem: base\nmodule: core\nphysical_schema: base_core\n',
-      'platform/base/core/status.value_type.yaml':
-        'version: loom-schema/v2\nname: Status\nvariants: [active, inactive]\n',
-      'platform/base/core/money.value_type.yaml':
-        'version: loom-schema/v2\nname: Money\nfields:\n  - name: amount\n    type:\n      ref: decimal\n      args: { precision: 18, scale: 4 }\n  - name: currency_code\n    type:\n      ref: string\n      args: { max_length: 3 }\n',
-      'platform/base/core/email.value_type.yaml':
-        'version: loom-schema/v2\nname: Email\nfields:\n  - name: value\n    type:\n      ref: string\n      args: { max_length: 254 }\n',
+      'platform/base/core/status.type.yaml':
+        'version: loom-schema/v2\nname: Status\nform: enum\nvariants: [active, inactive]\n',
+      'platform/base/core/money.type.yaml':
+        'version: loom-schema/v2\nname: Money\nform: struct\nfields:\n  - name: amount\n    type:\n      ref: decimal\n      args: { precision: 18, scale: 4 }\n  - name: currency_code\n    type:\n      ref: string\n      args: { max_length: 3 }\n',
+      'platform/base/core/email.type.yaml':
+        'version: loom-schema/v2\nname: Email\nform: struct\nfields:\n  - name: value\n    type:\n      ref: string\n      args: { max_length: 254 }\n',
       'platform/base/core/t.table.yaml':
         'version: loom-schema/v2\nname: T\ntable:\n  name: t\n  extension:\n    strategy: none\nfields:\n  - name: id\n    type: bigint\n    required: true\n  - name: s\n    type: base.core.Status\n  - name: m\n    type: base.core.Money\n  - name: email\n    type: base.core.Email\nprimary_key: [id]\n',
     });
@@ -73,14 +79,16 @@ describe('projector dialects', () => {
   it('sqlite: emits NUMERIC for decimal, TEXT for string, CHECK for enum', async () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
-      'platform/base/core/base.types.yaml':
-        'version: loom-schema/v2\nscalars:\n  - name: bigint\n    properties: []\n  - name: decimal\n    properties:\n      - name: precision\n        type: integer\n        required: true\n      - name: scale\n        type: integer\n        required: true\n',
+      'platform/base/core/bigint.type.yaml':
+        'version: loom-schema/v2\nname: bigint\nform: scalar\nproperties: []\n',
+      'platform/base/core/decimal.type.yaml':
+        'version: loom-schema/v2\nname: decimal\nform: scalar\nproperties:\n  - { {name: precision, type: integer, required: true, name: scale, type: integer, required: true} }\n',
       'platform/base/core/manifest.module.yaml':
         'version: loom-schema/v2\nsystem: base\nmodule: core\nphysical_schema: base_core\n',
-      'platform/base/core/status.value_type.yaml':
-        'version: loom-schema/v2\nname: Status\nvariants: [active, inactive]\n',
-      'platform/base/core/money.value_type.yaml':
-        'version: loom-schema/v2\nname: Money\nfields:\n  - name: amount\n    type:\n      ref: decimal\n      args: { precision: 18, scale: 4 }\n',
+      'platform/base/core/status.type.yaml':
+        'version: loom-schema/v2\nname: Status\nform: enum\nvariants: [active, inactive]\n',
+      'platform/base/core/money.type.yaml':
+        'version: loom-schema/v2\nname: Money\nform: struct\nfields:\n  - name: amount\n    type:\n      ref: decimal\n      args: { precision: 18, scale: 4 }\n',
       'platform/base/core/t.table.yaml':
         'version: loom-schema/v2\nname: T\ntable:\n  name: t\n  extension:\n    strategy: none\nfields:\n  - name: id\n    type: bigint\n    required: true\n  - name: s\n    type: base.core.Status\n  - name: m\n    type: base.core.Money\nprimary_key: [id]\n',
     });

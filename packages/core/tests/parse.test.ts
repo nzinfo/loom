@@ -21,8 +21,8 @@ describe('parse (Pass 1)', () => {
   it('emits a version diagnostic on mismatched version', async () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
-      'platform/base/core/base.types.yaml':
-        'version: loom-schema/v9\nscalars:\n  - name: string\n    properties: []\n',
+      'platform/base/core/string.type.yaml':
+        'version: loom-schema/v9\nname: string\nform: scalar\nproperties: []\n',
     });
     const diag = new Diagnostics();
     const { files } = await discover({ fs, basePath: '', diagnostics: diag });

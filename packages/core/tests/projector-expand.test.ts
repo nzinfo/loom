@@ -63,10 +63,10 @@ describe('projector expand', () => {
   it('produces no ext columns for strategy=none', async () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
-      'platform/base/core/base.types.yaml': `version: loom-schema/v2
-scalars:
-  - name: bigint
-    properties: []
+      'platform/base/core/bigint.type.yaml': `version: loom-schema/v2
+name: bigint
+form: scalar
+properties: []
 `,
       'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
 system: base
@@ -96,24 +96,25 @@ primary_key: [id]
   it('exposes enum registry keyed by value_type identity (spec §11)', async () => {
     const { MemoryFileSystem } = await import('./fixtures/memory_fs.js');
     const fs = new MemoryFileSystem({
-      'platform/base/core/base.types.yaml': `version: loom-schema/v2
-scalars:
-  - name: bigint
-    properties: []
+      'platform/base/core/bigint.type.yaml': `version: loom-schema/v2
+name: bigint
+form: scalar
+properties: []
 `,
       'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
 system: base
 module: core
 physical_schema: base_core
 `,
-      'platform/base/core/status.value_type.yaml': `version: loom-schema/v2
+      'platform/base/core/status.type.yaml': `version: loom-schema/v2
 name: Status
+form: enum
 variants: [active, inactive]
 `,
     });
     const { ir } = await load({ fs, basePath: '' });
     const phys = expandTables(ir);
-    expect(phys.enums.get('value_type:base.core.Status')).toEqual(['active', 'inactive']);
+    expect(phys.enums.get('type:base.core.Status')).toEqual(['active', 'inactive']);
   });
 
   it('exposes extension_fields registry keyed by entity identity (spec §7.5)', async () => {
@@ -128,13 +129,10 @@ variants: [active, inactive]
 describe('v2 projector — expandField via type:', () => {
   it('expands a single-segment type to one column', async () => {
     const model = await expandFromStringMap({
-      'platform/base/core/base.types.yaml': `version: loom-schema/v2
-scalars:
-  - { name: bigint, description: i, properties: [] }
-  - name: string
-    description: s
-    properties:
-      - { name: max_length, type: integer, required: true }
+      'platform/base/core/bigint.type.yaml': `version: loom-schema/v2
+name: bigint
+form: scalar
+properties: []
 `,
       'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
 system: base
@@ -164,21 +162,19 @@ primary_key: [id]
 
   it('expands a three-segment single-field value_type ref to one column (no suffix)', async () => {
     const model = await expandFromStringMap({
-      'platform/base/core/base.types.yaml': `version: loom-schema/v2
-scalars:
-  - { name: bigint, description: i, properties: [] }
-  - name: string
-    description: s
-    properties:
-      - { name: max_length, type: integer, required: true }
+      'platform/base/core/bigint.type.yaml': `version: loom-schema/v2
+name: bigint
+form: scalar
+properties: []
 `,
       'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
 system: base
 module: core
 physical_schema: base_core
 `,
-      'platform/base/core/email.value_type.yaml': `version: loom-schema/v2
+      'platform/base/core/email.type.yaml': `version: loom-schema/v2
 name: Email
+form: struct
 fields:
   - name: value
     type:
@@ -206,26 +202,19 @@ primary_key: [id]
 
   it('expands a multi-field value_type ref to N prefixed columns', async () => {
     const model = await expandFromStringMap({
-      'platform/base/core/base.types.yaml': `version: loom-schema/v2
-scalars:
-  - { name: bigint, description: i, properties: [] }
-  - name: decimal
-    description: d
-    properties:
-      - { name: precision, type: integer, required: true }
-      - { name: scale, type: integer, required: true }
-  - name: string
-    description: s
-    properties:
-      - { name: max_length, type: integer, required: true }
+      'platform/base/core/bigint.type.yaml': `version: loom-schema/v2
+name: bigint
+form: scalar
+properties: []
 `,
       'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
 system: base
 module: core
 physical_schema: base_core
 `,
-      'platform/base/core/money.value_type.yaml': `version: loom-schema/v2
+      'platform/base/core/money.type.yaml': `version: loom-schema/v2
 name: Money
+form: struct
 fields:
   - name: amount
     type:
@@ -257,17 +246,19 @@ primary_key: [id]
 
   it('records enumRef as the full value_type identity for an enum value_type', async () => {
     const model = await expandFromStringMap({
-      'platform/base/core/base.types.yaml': `version: loom-schema/v2
-scalars:
-  - { name: bigint, description: i, properties: [] }
+      'platform/base/core/bigint.type.yaml': `version: loom-schema/v2
+name: bigint
+form: scalar
+properties: []
 `,
       'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
 system: base
 module: core
 physical_schema: base_core
 `,
-      'platform/base/core/status.value_type.yaml': `version: loom-schema/v2
+      'platform/base/core/status.type.yaml': `version: loom-schema/v2
 name: Status
+form: enum
 variants: [active, inactive]
 `,
       'platform/base/core/users.table.yaml': `version: loom-schema/v2
@@ -289,7 +280,7 @@ primary_key: [id]
     expect(statusCol).toBeDefined();
     // enumRef must be the full identity, not the bare fqn — the enum
     // registry is keyed by identity and dialect generators look it up.
-    expect(statusCol?.enumRef).toBe('value_type:base.core.Status');
-    expect(model.enums.get('value_type:base.core.Status')).toEqual(['active', 'inactive']);
+    expect(statusCol?.enumRef).toBe('type:base.core.Status');
+    expect(model.enums.get('type:base.core.Status')).toEqual(['active', 'inactive']);
   });
 });

@@ -3,8 +3,8 @@ import { type Ref, formatRef, parseRef } from '../src/ir/refs.js';
 
 describe('refs', () => {
   it('parses a fully-qualified ref', () => {
-    expect(parseRef('value_type:base.core.Email')).toEqual({
-      kind: 'value_type',
+    expect(parseRef('type:base.core.Email')).toEqual({
+      kind: 'type',
       system: 'base',
       module: 'core',
       name: 'Email',
@@ -18,13 +18,13 @@ describe('refs', () => {
 
   it('rejects malformed refs', () => {
     expect(() => parseRef('not-a-ref')).toThrow(/invalid \$ref/);
-    expect(() => parseRef('value_type:base')).toThrow(/invalid \$ref/);
-    expect(() => parseRef('value_type:base.core')).toThrow(/invalid \$ref/);
+    expect(() => parseRef('type:base')).toThrow(/invalid \$ref/);
+    expect(() => parseRef('type:base.core')).toThrow(/invalid \$ref/);
   });
 
   it('parses short-form refs (no system.module)', () => {
-    expect(parseRef('value_type:.Money')).toEqual({
-      kind: 'value_type',
+    expect(parseRef('type:.Money')).toEqual({
+      kind: 'type',
       system: '',
       module: '',
       name: 'Money',
@@ -32,9 +32,9 @@ describe('refs', () => {
   });
 
   it('round-trips formatRef ∘ parseRef for both forms', () => {
-    const fq = 'value_type:base.core.Email';
+    const fq = 'type:base.core.Email';
     expect(formatRef(parseRef(fq))).toBe(fq);
-    const short = 'value_type:.Money';
+    const short = 'type:.Money';
     expect(formatRef(parseRef(short))).toBe(short);
   });
 });

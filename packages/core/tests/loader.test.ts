@@ -22,8 +22,8 @@ describe('load (end-to-end)', () => {
 
   it('respects systemFilter', async () => {
     const fs = new MemoryFileSystem({
-      'platform/base/core/base.types.yaml':
-        'version: loom-schema/v2\nscalars:\n  - name: string\n    properties: []\n',
+      'platform/base/core/string.type.yaml':
+        'version: loom-schema/v2\nname: string\nform: scalar\nproperties: []\n',
       'platform/base/core/a.mixin.yaml':
         'version: loom-schema/v2\nname: A\nfields:\n  - name: x\n    type: string\n',
       'platform/retail/core/b.mixin.yaml':
@@ -31,6 +31,6 @@ describe('load (end-to-end)', () => {
     });
     const result = await load({ fs, basePath: '', systemFilter: ['base'] });
     expect(result.diagnostics.hasErrors).toBe(false);
-    expect([...result.ir.nodes.keys()]).toEqual(['base_types:', 'mixin:base.core.A']);
+    expect([...result.ir.nodes.keys()]).toEqual(['type:base.core.String', 'mixin:base.core.A']);
   });
 });

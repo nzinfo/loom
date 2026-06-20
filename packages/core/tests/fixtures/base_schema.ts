@@ -4,45 +4,54 @@ import { MemoryFileSystem } from './memory_fs.js';
 /**
  * A small but complete loom schema used across loader/projector tests.
  * v2 syntax: single type: key, no base/ref split, no kind prefix on type
- * refs. Covers: base_types, module_manifest, single & multi value_types,
- * mixin include, sidecar_eav table, entity referencing the table,
- * extension_fields targeting the entity.
+ * refs. Covers: scalar/struct/enum types (unified `type` kind), mixin include,
+ * sidecar_eav table, entity referencing the table, extension_fields targeting
+ * the entity.
  *
- * Directory layout uses the v2 owner prefixes (platform/ext/tenants).
+ * Directory layout uses the v2 owner prefixes (platform/ext/tenants). The
+ * layout is flat — kind encoded in the file extension (`.type.yaml` etc).
  * This fixture only contains platform-owned nodes; ext/tenant examples
  * are added by dedicated fixtures in their own tests.
  */
 export function buildBaseSchemaFs(): FileSystem {
   return new MemoryFileSystem({
-    'platform/base/core/base.types.yaml': `version: loom-schema/v2
-scalars:
-  - name: bigint
-    description: 64-bit integer
-    properties: []
-  - name: decimal
-    description: fixed-point
-    properties:
-      - name: precision
-        type: integer
-        required: true
-      - name: scale
-        type: integer
-        required: true
-  - name: string
-    description: var-length string
-    properties:
-      - name: max_length
-        type: integer
-        required: true
-      - name: pattern
-        type: string
-  - name: datetime
-    description: timestamp
-    properties: []
-  - name: boolean
-    description: boolean
-    properties: []
+    // ── scalars (form: scalar) — the system base vocabulary ──
+    'platform/base/core/bigint.type.yaml': `version: loom-schema/v2
+name: bigint
+form: scalar
+description: 64-bit integer
+properties: []
 `,
+    'platform/base/core/decimal.type.yaml': `version: loom-schema/v2
+name: decimal
+form: scalar
+description: fixed-point
+properties:
+  - { name: precision, type: integer, required: true }
+  - { name: scale, type: integer, required: true }
+`,
+    'platform/base/core/string.type.yaml': `version: loom-schema/v2
+name: string
+form: scalar
+description: var-length string
+properties:
+  - { name: max_length, type: integer, required: true }
+  - { name: pattern, type: string }
+`,
+    'platform/base/core/datetime.type.yaml': `version: loom-schema/v2
+name: datetime
+form: scalar
+description: timestamp
+properties: []
+`,
+    'platform/base/core/boolean.type.yaml': `version: loom-schema/v2
+name: boolean
+form: scalar
+description: boolean
+properties: []
+`,
+
+    // ── struct / enum types (form: struct / enum) ──
     'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
 system: base
 module: core
@@ -59,16 +68,18 @@ fields:
     type: datetime
     required: true
 `,
-    'platform/base/core/email.value_type.yaml': `version: loom-schema/v2
+    'platform/base/core/email.type.yaml': `version: loom-schema/v2
 name: Email
+form: struct
 fields:
   - name: value
     type:
       ref: string
       args: { max_length: 254 }
 `,
-    'platform/base/core/money.value_type.yaml': `version: loom-schema/v2
+    'platform/base/core/money.type.yaml': `version: loom-schema/v2
 name: Money
+form: struct
 fields:
   - name: amount
     type:
@@ -81,8 +92,9 @@ fields:
       args: { max_length: 3 }
     required: true
 `,
-    'platform/base/core/range.value_type.yaml': `version: loom-schema/v2
+    'platform/base/core/range.type.yaml': `version: loom-schema/v2
 name: Range
+form: struct
 type_parameters:
   - name: T
     constraint: value
@@ -94,8 +106,9 @@ fields:
   - name: high
     type: T
 `,
-    'platform/base/core/status.value_type.yaml': `version: loom-schema/v2
+    'platform/base/core/status.type.yaml': `version: loom-schema/v2
 name: Status
+form: enum
 variants:
   - value: active
     display_name: Active

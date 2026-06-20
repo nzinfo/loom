@@ -11,13 +11,12 @@ describe('format version', () => {
 
   it('covers every file kind from spec §9', () => {
     expect(FILE_KIND).toEqual([
-      'base_types',
-      'module_manifest',
-      'value_type',
+      'type',
       'mixin',
       'table',
       'entity',
       'extension_fields',
+      'module_manifest',
     ]);
   });
 });
