@@ -69,12 +69,12 @@ exports:                                   # 可选：声明对外的导出（�
 - table 文件聚焦于"这张表长什么样"
 - 与 ERP 的"模块化部署"哲学一致
 
-加载器加载 table 时，自动从所属 module 的 MANIFEST 补全完整物理位置
+加载器加载 table 时，自动从所属 module 的 `manifest.module.yaml` 补全完整物理位置
 （`base_core.users_base`）。
 
-### ext 包的 MANIFEST
+### ext 包的 module_manifest
 
-ext 包（`ext/<provider>/<sys>/<mod>/`）也有自己的 MANIFEST，声明独立的
+ext 包（`ext/<provider>/<sys>/<mod>/`）也有自己的 `manifest.module.yaml`，声明独立的
 `physical_schema`。这让 ext 的物理表落在独立 schema 里，与 platform 隔离：
 
 ```yaml

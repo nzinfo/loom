@@ -49,6 +49,6 @@ scalars:
 
 ## 位置约束
 
-base_types.yaml 唯一合法位置是 `platform/base/core/base.types.yaml`——它是全局
+`base.types.yaml` 唯一合法位置是 `platform/base/core/base.types.yaml`——它是全局
 共享的，ext 和 tenant 都不能定义自己的 base_types（详见
 [01 目录与身份](./01-layout-and-identity.md)）。

@@ -27,7 +27,9 @@ fields:
 
 自定义字段是**部署/配置期**产物（不同租户、不同项目不同），生命周期与
 entity/table（开发期）不同。混在一起，diff 会被频繁的部署配置搅乱。
-单独的 `extension/` 目录便于工具扫描与租户级差异管理。
+单独的 `.ext.yaml` 文件（与 entity 文件平级放在模块目录下）便于工具扫描与
+租户级差异管理。`.ext.yaml` 这个扩展名让加载器一眼识别"这是扩展字段文件"，
+与 entity/table/value_type 等 kind 完全对称。
 
 ## 多 owner 叠加（核心特性）
 
@@ -96,8 +98,11 @@ FROM base_core.users_base u;
 
 | owner | 能写 extension_fields? | 路径 |
 |---|---|---|
-| **platform** | ✓ | `platform/<sys>/<mod>/extension/<name>_fields.yaml` |
-| **ext** | ✓ | `ext/<provider>/<sys>/<mod>/extension/<name>_fields.yaml` |
-| **tenant** | ✓（这是 tenant 唯一能写的 kind） | `tenants/<id>/<sys>/<mod>/<name>_fields.yaml`（无 kind 子目录） |
+| **platform** | ✓ | `platform/<sys>/<mod>/<name>_fields.ext.yaml` |
+| **ext** | ✓ | `ext/<provider>/<sys>/<mod>/<name>_fields.ext.yaml` |
+| **tenant** | ✓（这是 tenant 唯一能写的 kind） | `tenants/<id>/<sys>/<mod>/<name>_fields.ext.yaml` |
+
+三种 owner 用**完全相同**的 `.ext.yaml` 机制，区别只在 owner 前缀。加载器收集所有
+owner 的 `.ext.yaml`、按 entity 聚合（详见下面"多 owner 叠加"）。
 
 详见 [01 目录与身份](./01-layout-and-identity.md) §owner 维度。
