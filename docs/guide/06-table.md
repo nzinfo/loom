@@ -136,7 +136,7 @@ v2 用类型论术语 **variants**（sum type）替代 v1 的工业惯用词 `en
 value_type 的**两种互斥形态之一**（另一种是 `fields`）：
 
 ```yaml
-# platform/base/core/user_status.value_type.yaml
+# platform/base/core/user_status.type.yaml
 version: loom-schema/v2
 name: UserStatus
 variants: [active, inactive, suspended]
@@ -167,7 +167,7 @@ fields:
 >
 > 1. v1 inline 写法（`base: enum, values: [...]`）取消，迁移到独立 value_type
 >    文件用 `variants:` 形态。
-> 2. base_types 里的 `enum` scalar 移除——求和类型现在由 value_type 顶层形态表达，
+> 2. 求和类型现在由 type kind 的 `form: enum` 表达（详见 [03 type](./03-base-types.md)），
 >    不再需要"假装是标量"。
 
 物理投影：

@@ -7,36 +7,39 @@
 
 ```sh
 mkdir -p my-schema/platform/base/core
-touch my-schema/platform/base/core/base.types.yaml
+touch my-schema/platform/base/core/string.type.yaml
 ```
 
 kind 由文件扩展名决定（详见 [01 目录与身份](./01-layout-and-identity.md)），
 所以不需要 kind 子目录——文件扁平地放在模块下。
 
-## 写 base.types.yaml
+## 写标量类型文件
 
-先声明两个最常用的标量：
+标量（scalar）是 loom 的原子词汇表，每个标量是一个独立的 `.type.yaml` 文件：
 
 ```yaml
-# my-schema/platform/base/core/base.types.yaml
+# my-schema/platform/base/core/string.type.yaml
 version: loom-schema/v2
-
-scalars:
-  - name: bigint
-    description: 64-bit integer
-    properties: []
-  - name: string
-    description: var-length string
-    properties:
-      - name: max_length
-        type: integer
-        required: true
-  - name: datetime
-    description: timestamp
-    properties: []
+name: string
+form: scalar
+description: var-length string
+properties:
+  - name: max_length
+    type: integer
+    required: true
 ```
 
-标量目录的完整说明见 [03 base_types](./03-base-types.md)。
+```yaml
+# my-schema/platform/base/core/bigint.type.yaml
+version: loom-schema/v2
+name: bigint
+form: scalar
+description: 64-bit integer
+properties: []
+```
+
+`type` 是统一的类型定义 kind，由 `form` 字段区分 scalar / struct / enum 三态。
+完整说明见 [03 type](./03-base-types.md)。
 
 ## 写 manifest.module.yaml
 
@@ -75,7 +78,7 @@ primary_key: [id]
 ```
 
 v2 用单一 `type:` 键表达字段类型（替代 v1 的 `base` / `ref` 互斥键）：
-单段短名（如 `bigint`、`string`）解析到 base_types 标量；三段全限定名
+单段短名（如 `bigint`、`string`）解析到 scalar 标量；三段全限定名
 （如 `base.core.Email`）解析到 value_type 节点。
 
 `type:` 支持两种形式：

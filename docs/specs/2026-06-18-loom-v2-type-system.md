@@ -13,11 +13,11 @@
 
 v1 把字段的"类型"劈成两个互斥键 `base`（内置标量）与 `ref`（引用 value_type）。
 从类型论看这是错的——两者都是"字段的类型"，应共享单一类型名字空间。v2 用单一
-`type:` 键替代，并引入编程语言式的 `using` 导入机制支持短名引用。base_types 标量
+`type:` 键替代，并引入编程语言式的 `using` 导入机制支持短名引用。scalar 标量
 获得与 value_type 平等的三段名身份，整个类型系统收敛为一个统一名字空间。
 
 **一句话**：`base.core.Email` 自身就声明了"我是类型"（`kind: value_type`），
-引用者只需写"我的类型是 Email"，不需要再标 `value_type:` 前缀。
+引用者只需写"我的类型是 Email"，不需要再标 `type:` 前缀。
 
 ## 1. 背景：v1 的语义错误
 
@@ -30,7 +30,7 @@ v1（spec §10）规定 value_type / table / mixin / extension_fields 的 field 
 # v1
 fields:
   - name: email
-    ref: value_type:base.core.Email     # 自定义类型
+    ref: type:base.core.Email     # 自定义类型
   - name: age
     base: integer                       # 内置标量
 ```
@@ -43,8 +43,8 @@ fields:
 **是同类东西**——都是"类型"。把它们用两个不同的键表达，等于人为把一个语义概念
 劈成两半。
 
-更深层的问题在于 `ref: value_type:base.core.Email` 这个写法本身：它把 **kind 标签**
-（`value_type:`）粘到了**类型引用**上。但 kind 是被引用节点自身的事——Email 节点
+更深层的问题在于 `ref: type:base.core.Email` 这个写法本身：它把 **kind 标签**
+（`type:`）粘到了**类型引用**上。但 kind 是被引用节点自身的事——Email 节点
 的 `kind: value_type` 已经声明了"我是类型"，引用者只需说"我的类型是 Email"。
 
 `kind:` 前缀真正属于**身份系统**（identity = `kind:sys.mod.Name`，用于 mixin include、
@@ -58,7 +58,7 @@ primary_table、ref_table 等**非类型**引用）。类型引用不该复用�
 - **身份**（identity）：`kind:sys.mod.Name`，四段，kind 必填，全局不唯一（同名的
   value_type 和 entity 可以并存）
 - **类型引用**（type reference）：`sys.mod.Name`，三段，不带 kind；解析时加载器查
-  节点表并验证目标 `kind === 'value_type'`，否则报错"X 不是类型"
+  节点表并验证目标 `kind === 'type'`，否则报错"X 不是类型"
 
 这两套名字空间通过"被引用节点必须是 value_type"这一条规则连接，互不冲突。
 
@@ -71,18 +71,18 @@ primary_table、ref_table 等**非类型**引用）。类型引用不该复用�
 时，不需要再加任何前缀。引用者只是说"我的类型是 Email"，是不是类型、是哪种类型，
 由 Email 节点自己携带的 `kind` 决定。
 
-### 2.2 base_types 标量与 value_type 地位平等
+### 2.2 scalar 标量与 value_type 地位平等
 
-v1 里 base_types 标量是单段名（`integer`），value_type 是三段名
+v1 里 scalar 标量是单段名（`integer`），value_type 是三段名
 （`base.core.Email`），两者从语法形态上就不平等。
 
-v2 让 base_types 也成为有身份的"模块"，其标量获得三段名 `base.core.<Scalar>`。
+v2 让 scalar 也成为有身份的节点，每个标量获得身份 `type:base.core.<Name>`。
 这样：
 
 - `base.core.integer`（内置标量）
 - `base.core.Email`（用户 value_type）
 
-都是三段名、都是类型、地位完全平等。差异仅在来源（base_types 注册表 vs value_type
+都是类型、地位完全平等。差异仅在来源（scalar 注册表 vs type 节点表
 节点表），不在"是不是类型"。
 
 ## 3. 字段语法：单一 `type:` 键
@@ -95,7 +95,7 @@ v2 让 base_types 也成为有身份的"模块"，其标量获得三段名 `base
 # v2
 fields:
   - name: age
-    type: integer                       # base_types 短名（默认导入）
+    type: integer                       # scalar 短名（默认导入）
   - name: email
     type: base.core.Email               # value_type 全限定名
   - name: balance
@@ -110,8 +110,8 @@ fields:
 
 | 形态 | 形式 | 含义 | 解析 |
 |---|---|---|---|
-| 短名 | `integer` / `string`（单段，无点） | base_types 标量 | 查 base_types 注册表 |
-| 全限定 | `base.core.Email`（三段，两个点） | value_type 节点 | 查节点表，验证 `kind === 'value_type'` |
+| 短名 | `integer` / `string`（单段，无点） | scalar 标量 | 查 scalar 注册表 |
+| 全限定 | `base.core.Email`（三段，两个点） | type 节点（struct/enum form） | 查节点表，验证 `kind === 'type'` |
 
 形态从语法上就分得开（点号数量不同），不需要 kind 前缀消歧。
 
@@ -151,10 +151,10 @@ fields:
 ### 3.4 错误情况
 
 - `type: base.core.Money` 但 `base.core.Money` 节点的 kind 是 entity（非 value_type）
-  → 报错 `type reference "base.core.Money" resolves to kind=entity, expected value_type`
+  → 报错 `type reference "base.core.Money" resolves to kind=entity, expected type`
 - `type: foo.bar.Baz` 但节点不存在
   → 报错 `unknown type "foo.bar.Baz"`
-- `type: integer` 但 base_types 里没有 `integer`
+- `type: integer` 但 scalar 注册表里没有 `integer`
   → 报错 `unknown scalar "integer"`
 - field 没有 `type`
   → 报错 `field must have a type`
@@ -164,8 +164,8 @@ fields:
 | 场景 | v1 | v2 |
 |---|---|---|
 | 内置标量字段 | `base: integer` | `type: integer`（或详写 `type: {ref: integer}`） |
-| 单字段 value_type 引用 | `ref: value_type:base.core.Email` | `type: base.core.Email` |
-| 多字段 value_type 引用 | `ref: value_type:base.core.Money` | `type: base.core.Money` |
+| 单字段 value_type 引用 | `ref: type:base.core.Email` | `type: base.core.Email` |
+| 多字段 value_type 引用 | `ref: type:base.core.Money` | `type: base.core.Money` |
 | 类型参数（max_length 等） | 散落 field 顶层 | `type.args: { max_length: 254 }` |
 | 枚举 | inline `base: enum, values: [...]` 或 value_type | `variants:` 顶层形态（详见 §6） |
 | field 缺类型 | 报 `must have either base or ref` | 报 `must have a type` |
@@ -174,7 +174,7 @@ fields:
 
 ### 4.1 动机
 
-`type: base.core.Email` 比 v1 的 `ref: value_type:base.core.Email` 干净，但每次
+`type: base.core.Email` 比 v1 的 `ref: type:base.core.Email` 干净，但每次
 都写三段名仍然啰嗦。引入编程语言式的 `using`（类比 C# `using`、Java `import`、
 Go `import`、TypeScript `import`）支持短名引用。
 
@@ -193,7 +193,7 @@ package-level `import`）。模块内的不同文件可以有不同 using——�
 
 ### 4.3 默认导入：`base.core.*`
 
-每个文件隐含 `using: [base.core.*]`，base_types 标量在任何文件里都可以直接用
+每个文件隐含 `using: [base.core.*]`，scalar 标量在任何文件里都可以直接用
 短名（`integer`、`string`、`decimal`、`enum`、`datetime`...）。
 
 类比 Java 默认 `java.lang.*`、C# 默认 `System`、Go 的 builtins。
@@ -243,14 +243,14 @@ using:
 
 1. **形态分流**：单段（无点）走短名解析；三段（两个点）走全限定解析。
 2. **短名解析**：
-   - 先查 base_types 注册表（默认 `base.core.*` 导入）→ 命中即内置标量
+   - 先查 scalar 注册表（base.core 的 scalar form 节点）→ 命中即内置标量
    - 再查当前文件 using 列表：
      - 遍历每条 using，若为 `<ns>.*` 则在 `<ns>.X` 处查节点；若为精确名则直接匹配
    - 若短名在多个 using 命名空间命中 → 报 `ambiguous type reference "X", candidates: ...`
    - 若都没命中 → 报 `unknown type "X"`
 3. **全限定解析**：
    - 直接按 `sys.mod.Name` 查节点表
-   - 验证目标节点 `kind === 'value_type'`，否则报 `resolves to kind=..., expected value_type`
+   - 验证目标节点 `kind === 'type'`，否则报 `resolves to kind=..., expected type`
    - 不存在 → 报 `unknown type "sys.mod.Name"`
    - 全限定引用**不走 using**（已经全限定了）
 
@@ -325,7 +325,7 @@ variants:
 ```
 
 - `fields` 与 `variants` 互斥（reader 校验：二者同时存在或同时缺失都报错）
-- **`enum` 标量从 base_types 移除**——不再需要"假装是标量"，求和类型由 value_type
+- **求和类型由 type kind 的 `form: enum` 表达**——不再需要"假装是标量"，enum 不再是
   顶层形态直接表达
 - variants 元素支持双形式：
   - 简写：裸字符串 → 视为 `{ value: <str> }`
@@ -371,16 +371,15 @@ fields:
 ### 7.2 类型引用是独立名字空间
 
 - 类型引用走 `sys.mod.Name`（三段，无 kind）
-- 与身份系统通过"被引用节点 `kind === 'value_type'`"连接
+- 与身份系统通过"被引用节点 `kind === 'type'`"连接
 - 加载器维护**两个查表**：身份表（全 identity → node）、类型表（sys.mod.Name → value_type node）
 
-### 7.3 base_types 的身份
+### 7.3 scalar 类型的身份
 
-base_types 文件自身身份 = `base_types:base.core`（kind=base_types，sys=base，mod=core）。
+每个 scalar 是独立节点，身份 = `type:base.core.<Name>`（kind=type，form=scalar）。
 其下标量的"类型全限定名"= `base.core.<Scalar>`（如 `base.core.integer`）。
 
-注意：标量本身**不是节点**（不在 IR 节点表里），它们是 base_types 节点 data 里的
-数组项。类型表查询时，加载器先查 base_types 节点的 scalars 数组，再查 value_type
+标量现在是 IR 节点表里的独立节点（与 struct/enum 平等）。类型表查询时，加载器收集 base.core 下所有 scalar form 的 type 节点，再查其它 type
 节点表。
 
 ## 8. version bump
@@ -405,16 +404,16 @@ base_types 文件自身身份 = `base_types:base.core`（kind=base_types，sys=b
     双形式；移除 field 顶层散落的参数键（`.catchall(z.unknown())`），所有标量参数
     收拢到 `type.args`
   - **variants**（§6）：新增 `variantSchema` + `ValueTypeSchema.variants`，与
-    `fields` 经 `.superRefine` 互斥校验；移除 base_types 里的 `enum` 标量
+    `fields`/`variants`/`properties` 经 form 判别的 `.superRefine` 互斥校验
   - **type_parameters**（§12）：新增 `typeParameterSchema` + `ValueTypeSchema.type_parameters`
-  - base_types 节点的 scalar 不变（仍是 data.scalars 数组）
+  - scalar 类型现在是独立 type 节点（不再是某个集合节点的数组项）
 - **ir/typespace.ts**：新增 `normalizeType` 把 string 简写规范化为 descriptor 对象
 - **ir/refs.ts**：新增类型引用解析（`sys.mod.Name` 三段）；与身份 ref（四段）分离
 - **loader/link.ts**：
   - 新增 using 解析（default `base.core.*` + 文件 using 列表）
-  - 新增类型名字空间查表（base_types scalars + value_type nodes）
+  - 类型名字空间查表（scalar form 节点 + struct/enum form 节点）
   - 短名歧义检测
-  - 验证 `type:` 三段名目标 kind === 'value_type'
+  - 验证 `type:` 三段名目标 kind === 'type'
   - 入口 `normalizeType`：所有下游 pass 看到的 type 一律是对象
   - 识别 type_parameters：fields 里 `type: T` 若 T 是声明的 type parameter，跳过解析
 - **loader/validate.ts**：
@@ -551,7 +550,7 @@ type_parameters 与 §3.3 type descriptor 是同一套机制的延伸：
 | 维度 | v1（2026-06-17） | v2（本文档） |
 |---|---|---|
 | 字段类型键 | `base` / `ref` 互斥 | 单一 `type:`（简写或详写 descriptor，§3.3） |
-| 类型引用语法 | `value_type:base.core.Email`（带 kind） | `base.core.Email`（无 kind） |
+| 类型引用语法 | `type:base.core.Email`（带 kind） | `base.core.Email`（无 kind） |
 | 内置标量名 | 单段 `integer` | 短名 `integer` 或全限定 `base.core.integer` |
 | 类型名字空间 | 复用身份空间（带 kind） | 独立三段名空间 |
 | 标量参数位置 | 散落 field 顶层（`max_length`、`precision`...） | 统一收拢到 `type.args`（§3.3） |

@@ -17,7 +17,7 @@
 | [00 总论](./00-overview.md) | 设计理念、安装、三十秒体验 | 第一次接触 loom |
 | [01 目录与身份](./01-layout-and-identity.md) | 路径即身份 + owner 三层归属 | 了解 schema 树怎么放 |
 | [02 快速上手](./02-quickstart.md) | 最小可运行 schema → SQL | 跑通第一个例子 |
-| [03 base_types](./03-base-types.md) | 可用标量目录 | 定义"原子类型" |
+| [03 type](./03-base-types.md) | 类型定义 | scalar / struct / enum 三态 |
 | [04 value_type](./04-value-type.md) | 语义类型包装 + using 导入 + type_parameters | 复用业务类型 |
 | [05 mixin](./05-mixin.md) | 字段组复用 | 抽审计字段组 |
 | [06 table](./06-table.md) | 表定义、扩展策略、枚举/索引/外键 | 落物理表结构 |

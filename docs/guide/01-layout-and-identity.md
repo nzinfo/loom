@@ -14,15 +14,18 @@ system/module/kind/name，它们直接由文件路径推导；同样，节点归
 |---|---|---|
 | `.entity.yaml` | `entity` | 实体 |
 | `.table.yaml` | `table` | 表 |
-| `.value_type.yaml` | `value_type` | 值类型 |
+| `.type.yaml` | `type` | 类型定义（scalar/struct/enum 三态，见 [03 type](./03-base-types.md)） |
 | `.mixin.yaml` | `mixin` | mixin |
 | `.ext.yaml` | `extension_fields` | 扩展字段（租户/扩展叠加） |
-| `.types.yaml` | `base_types` | 标量目录（全局唯一） |
 | `.module.yaml` | `module_manifest` | 模块清单 |
 
 例：`user.entity.yaml`、`orders.table.yaml`、`audit.mixin.yaml`、
-`email.value_type.yaml`、`user_fields.ext.yaml`、`base.types.yaml`、
+`email.type.yaml`、`string.type.yaml`、`user_fields.ext.yaml`、
 `manifest.module.yaml`。
+
+> `type` 是统一的类型定义 kind（scalar/struct/enum 三态，由 `form:` 字段区分），
+> 取代了原先的 `base_types`（集合）+ `value_type`（单体）。标量拆成独立文件，
+> 不再有 `base.types.yaml` 单例。详见 [03 type](./03-base-types.md)。
 
 文件头只有两行：
 
@@ -41,10 +44,12 @@ my-schema/
 ├── platform/                            # 平台内置（权威定义）
 │   └── base/
 │       └── core/
-│           ├── base.types.yaml          # 全局唯一，可用标量目录
+│           ├── bigint.type.yaml         # form: scalar（系统标量，每个一个文件）
+│           ├── string.type.yaml
 │           ├── manifest.module.yaml     # kind: module_manifest
-│           ├── email.value_type.yaml    # kind: value_type
-│           ├── money.value_type.yaml
+│           ├── email.type.yaml          # form: struct
+│           ├── money.type.yaml
+│           ├── status.type.yaml         # form: enum
 │           ├── audit.mixin.yaml         # kind: mixin
 │           ├── users.table.yaml         # kind: table
 │           └── user.entity.yaml         # kind: entity
@@ -66,8 +71,8 @@ my-schema/
 
 | owner | 目录前缀 | 能力 | 典型场景 |
 |---|---|---|---|
-| **platform** | `platform/<sys>/<mod>/` | 全部 kind + base_types + module_manifest | 平台权威定义 |
-| **ext** | `ext/<provider>/<sys>/<mod>/` | 除 base_types 外全部 kind | 第三方扩展包 |
+| **platform** | `platform/<sys>/<mod>/` | 全部 kind（含 scalar form 的 type）+ module_manifest | 平台权威定义 |
+| **ext** | `ext/<provider>/<sys>/<mod>/` | 除 scalar form 外全部 kind | 第三方扩展包 |
 | **tenant** | `tenants/<id>/<sys>/<mod>/` | **仅** extension_fields（`.ext.yaml`） | 租户级字段定制 |
 
 ## 路径推导身份与 owner
@@ -100,7 +105,7 @@ identity 仍是 `kind:sys.mod.Name` 三段不变；owner 是节点的独立字�
 - **kind 由扩展名决定**——扩展名 token 必须在已知集合内，否则 discovery 报
   `identity` 诊断。文件正文不再写 `kind:`
 - 物理表名在 `table.name` 字段显式声明（不依赖推导）
-- `base.types.yaml` 唯一合法位置：`platform/base/core/base.types.yaml`（全局共享）
+- scalar 类型文件（`*.type.yaml` form: scalar）只在 platform/base/core/ 下——标量是系统基底
 - tenant 目录下只能出现 `.ext.yaml` 文件——tenant 层只有 extension_fields 一种 kind
 
 ## 撞名规则与扩展叠加

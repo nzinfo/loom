@@ -60,7 +60,7 @@ physical_schema: base_core
 description: 基础核心模块
 exports:                                   # 可选：声明对外的导出（身份引用形式）
   - entity:base.core.User
-  - value_type:base.core.Email
+  - type:base.core.Email
 ```
 
 好处：

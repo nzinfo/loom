@@ -81,21 +81,21 @@ tenant 的 schema 各自有目录、有身份、有撞名检测。
 ### 2.1 platform
 
 - **角色**：平台内置，权威定义
-- **能力**：定义所有 kind（base_types / module_manifest / value_type / mixin / table /
+- **能力**：定义所有 kind（type / module_manifest / mixin / table /
   entity / extension_fields）
-- **base_types 归属**：`base.types.yaml` 唯一位置在 `platform/base/core/`，全局共享
+- **scalar 归属**：scalar form 的 `*.type.yaml` 只在 platform/base/core/ 下，全局共享
 - **目录**：`platform/<sys>/<mod>/`
 
 ### 2.2 ext:&lt;provider&gt;
 
 - **角色**：第三方扩展包，独立开发者
 - **能力**：完整定义 table / value_type / mixin / entity / extension_fields（除
-  base_types / module_manifest 受限——见下）
+  scalar form 的 type 受限——见下）
 - **撞名规则**：节点 identity 全局唯一——ext 定义的新节点不可与 platform 或其他 ext
   的节点撞名
 - **module_manifest**：ext 包仍需写 `manifest.module.yaml`（声明 physical_schema 等），owner
   字段为 `ext:<provider>`
-- **base_types**：ext **不能**定义 base_types（标量是全局词汇，只由 platform 提供）
+- **scalar 类型**：ext **不能**定义 scalar form 的 type（标量是全局词汇，只由 platform 提供）
 - **目录**：`ext/<provider>/<sys>/<mod>/`
 - **跨 owner 引用**：隐式（ref 不带 owner，按 sys.mod.Name 全局查表；名字唯一保证
   无歧义）
@@ -126,7 +126,7 @@ primary_key: [id]
 
 - **角色**：租户定制，只配置不定义
 - **能力**：**仅** `kind: extension_fields`——给已存在的 entity 挂扩展字段模板
-- **不能**：建 table / value_type / mixin / entity / base_types / module_manifest
+- **不能**：建 table / type(struct/enum) / mixin / entity / type(scalar) / module_manifest
 - **目录**：`tenants/<tenant-id>/<sys>/<mod>/<name>_fields.ext.yaml`（tenant 层
   只有 extension_fields 一种 kind，扩展名即 `.ext.yaml`）
 - **entity 字段**：必须指向已存在的 entity（platform 或 ext 定义的）；指向不存在
@@ -161,7 +161,7 @@ fields:
 ### 3.1 总览
 
 布局是**扁平**的——没有 kind 子目录（`value_type/`、`mixin/` 等），kind 完全由
-文件扩展名编码（`.entity.yaml`、`.table.yaml`、`.value_type.yaml`、`.mixin.yaml`、
+文件扩展名编码（`.entity.yaml`、`.table.yaml`、`.type.yaml`、`.mixin.yaml`、
 `.ext.yaml`、`.types.yaml`、`.module.yaml`）：
 
 ```
@@ -169,8 +169,8 @@ my-schema/
 ├── platform/                              # 平台内置
 │   └── <sys>/<mod>/
 │       ├── manifest.module.yaml           # kind: module_manifest
-│       ├── base.types.yaml                # 仅 platform/base/core/ 有，全局共享
-│       ├── email.value_type.yaml          # kind 由扩展名决定
+│       ├── string.type.yaml               # form: scalar（仅 platform/base/core/，全局共享）
+│       ├── email.type.yaml                # form: struct（kind 由扩展名决定）
 │       ├── users.table.yaml
 │       └── user.entity.yaml
 ├── ext/                                   # 扩展包集合
@@ -194,9 +194,9 @@ my-schema/
 - **ext 下是 provider → sys/mod**——provider 一级，sys/mod 两级，共三级
 - **tenants 下是 tenant-id → sys/mod**——tenant 层只有 extension_fields 一种
   kind（`.ext.yaml`），路径镜像目标 entity 的 sys/mod
-- **kind 由扩展名决定**：`.entity.yaml` / `.table.yaml` / `.value_type.yaml` /
+- **kind 由扩展名决定**：`.entity.yaml` / `.table.yaml` / `.type.yaml` /
   `.mixin.yaml` / `.ext.yaml` / `.types.yaml` / `.module.yaml`，文件正文不写 `kind:`
-- **base.types.yaml 唯一位置**：`platform/base/core/base.types.yaml`，全局共享
+- **scalar 唯一定义处**：scalar form 的 `*.type.yaml` 只在 platform/base/core/，全局共享
 - **文件名 `_fields` 后缀**：extension_fields 文件沿用约定（`user_fields.ext.yaml`），
   `.ext.yaml` 扩展名即 kind 标识
 
@@ -205,7 +205,7 @@ my-schema/
 ### 4.1 identity 不变
 
 - 格式仍为 `<kind>:<sys>.<module>.<PascalName>`（三段，无 owner）
-- base_types 身份仍为 `base_types:base.core`
+- scalar 身份为 `type:base.core.<Name>`（每个标量一个节点）
 - 所有 ref（type 引用、entity 引用、foreign_keys、include 等）不带 owner
 
 ### 4.2 owner 是节点独立字段
@@ -397,26 +397,25 @@ tenants/globex/base/core/user_fields.ext.yaml   # tenant:globex 的
 三个文件 stem 相同（`user_fields`）、都在 `base/core/` 下、但 owner 不同，各自
 合法。加载器按 entity 聚合时不关心文件名，只看 entity 字段 + 字段声明。
 
-## 8. base_types 的归属
+## 8. scalar 类型的归属
 
-### 8.1 唯一位置
+### 8.1 唯一定义处
 
-`base.types.yaml` 全局唯一，位置固定在 `platform/base/core/base.types.yaml`。
+scalar form 的 `*.type.yaml` 只在 `platform/base/core/` 下定义（每个标量一个文件）。
 
-- 身份仍为 `base_types:base.core`（不变）
+- 身份为 `type:base.core.<Name>`（每个标量一个节点）
 - owner 为 `platform`
-- **全局共享**：ext/tenant 隐式依赖 platform 的 base_types
+- **全局共享**：ext/tenant 隐式依赖 platform 的 scalar 类型
 
 ### 8.2 标量短名解析
 
 `integer`、`string` 等短名仍走默认 `base.core.*` 导入（v2 类型系统机制不变）。
-base_types 的物理位置变化不影响短名解析——加载器仍从 IR 的 base_types 节点读 scalars
-数组。
+scalar 类型拆成独立文件不影响短名解析——加载器收集 base.core 下所有 scalar form 的 type 节点。
 
-### 8.3 ext/tenant 不能定义 base_types
+### 8.3 ext/tenant 不能定义 scalar 类型
 
-discovery 阶段检测：`base.types.yaml` 只能出现在 `platform/base/core/` 下。其他位置
-出现 base_types 文件报错。
+link 阶段检测：scalar form 的 type 节点必须位于 `type:base.core.` 下。其它 owner 定义
+scalar 报错（标量是系统基底，只由 platform 提供）。
 
 ## 9. manifest.module.yaml 与 owner
 
@@ -461,10 +460,10 @@ extension_fields 从 nodes map 移出，进独立的 extensionFields map（解�
 
 | Pass | 改动 |
 |---|---|
-| discovery | pathToIdentity 解析 owner 前缀；base_types 位置校验；extension_fields 不进 nodes map |
+| discovery | pathToIdentity 解析 owner 前缀；scalar 位置校验；extension_fields 不进 nodes map |
 | parse | 不变（Zod schema 不加 owner 字段，owner 是路径派生） |
 | link | collectExtensionFields 改为遍历所有 parsed 文件按 entity 聚合；其他不变 |
-| validate | 新增：tenant 目录下只能有 extension_fields；base_types 只在 platform/base/core/；extension_fields 的 entity 字段必须存在 |
+| validate | 新增：tenant 目录下只能有 extension_fields；scalar 类型只在 platform/base/core/；extension_fields 的 entity 字段必须存在 |
 
 ### 10.3 投影器改动
 
@@ -478,11 +477,11 @@ extension_fields 从 nodes map 移出，进独立的 extensionFields map（解�
 ### 11.1 core 包
 
 - **ir/version.ts**：IRNode 加 owner 字段；IR 加 extensionFields map；新增 Owner 类型
-- **ir/paths.ts**：pathToIdentity 解析 owner 前缀（platform/ext/tenants）；base_types
+- **ir/paths.ts**：pathToIdentity 解析 owner 前缀（platform/ext/tenants）；scalar
   路径校验；extension_fields 路径解析
 - **ir/schemas.ts**：无改动（owner 不在 Zod schema 里，是路径派生）
 - **loader/discovery.ts**：移除 `systems/` 前缀剥离；按 owner 前缀分流；extension_fields
-  不进 nodes map；base_types 位置校验
+  不进 nodes map；scalar 位置校验
 - **loader/link.ts**：collectExtensionFields 改为遍历 parsed 按 entity 聚合
 - **loader/validate.ts**：新增 owner 相关校验（tenant 仅 extension_fields、
   extension_fields.entity 必须存在）
@@ -495,7 +494,7 @@ extension_fields 从 nodes map 移出，进独立的 extensionFields map（解�
 
 ### 11.3 测试与固件
 
-- `fixtures/base_schema.ts`：目录迁移（systems/ → platform/）；base_types 移入
+- `fixtures/base_schema.ts`：目录迁移（systems/ → platform/）；base.types.yaml 拆成独立 scalar 文件移入
   platform/base/core/
 - 新增 ext 包示例（如 ext:acme-corp 的 retail.pos.Orders）
 - 新增 tenant 示例（如 tenant:acme 的 user_fields.ext.yaml）
@@ -525,8 +524,8 @@ extension_fields 从 nodes map 移出，进独立的 extensionFields map（解�
 | 维度 | 形态 |
 |---|---|
 | 目录根 | `platform/<sys>/<mod>/`、`ext/<provider>/<sys>/<mod>/`、`tenants/<id>/<sys>/<mod>/` |
-| base_types 位置 | `platform/base/core/base.types.yaml`（全局唯一） |
-| kind 来源 | 文件扩展名（`.entity.yaml` / `.table.yaml` / `.value_type.yaml` / `.mixin.yaml` / `.ext.yaml` / `.types.yaml` / `.module.yaml`） |
+| scalar 定义处 | `platform/base/core/*.type.yaml`（form: scalar） |
+| kind 来源 | 文件扩展名（`.entity.yaml` / `.table.yaml` / `.type.yaml` / `.mixin.yaml` / `.ext.yaml` / `.types.yaml` / `.module.yaml`） |
 | 布局 | 扁平——无 kind 子目录 |
 | identity | `kind:sys.mod.Name` |
 | owner | 节点独立字段，三类枚举，从路径推断 |

@@ -3,7 +3,7 @@
 下面是仓库 `packages/core/tests/fixtures/base_schema.ts` 中的完整 schema，
 对应黄金固件 `base_schema.pg.sql` 的输出。
 
-## base.types.yaml
+## 标量类型文件（scalar form）
 
 ```yaml
 version: loom-schema/v2
@@ -43,10 +43,10 @@ fields:
   - { name: updated_at, type: datetime, required: true }
 ```
 
-## platform/base/core/email.value_type.yaml + money.value_type.yaml
+## platform/base/core/email.type.yaml + money.type.yaml
 
 ```yaml
-# email.value_type.yaml
+# email.type.yaml
 version: loom-schema/v2
 name: Email
 fields:
@@ -55,7 +55,7 @@ fields:
 ```
 
 ```yaml
-# money.value_type.yaml
+# money.type.yaml
 version: loom-schema/v2
 name: Money
 fields:

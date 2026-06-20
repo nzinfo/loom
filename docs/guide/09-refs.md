@@ -11,16 +11,16 @@ loom 的跨文件引用是字符串（不是 map）。v2 把引用明确分成�
 用于 field 的 `type:` 键，目标必须是 value_type 节点。
 
 ```
-base.core.Email              ← base/core/email.value_type.yaml
-base.core.Money              ← base/core/money.value_type.yaml
-retail.pos.types.OrderId     ← retail/pos/types/order_id.value_type.yaml
+base.core.Email              ← base/core/email.type.yaml
+base.core.Money              ← base/core/money.type.yaml
+retail.pos.types.OrderId     ← retail/pos/types/order_id.type.yaml
 ```
 
 逻辑名是 PascalCase（与推导规则一致）。
 
 **解析路径**（详见 [04 value_type](./04-value-type.md) §using 短名解析规则）：
 
-1. 单段短名（`Money`）→ 先查 base_types 注册表，再查当前文件 using 列表
+1. 单段短名（`Money`）→ 先查 scalar 注册表（base.core 的 scalar form 节点），再查当前文件 using 列表
 2. 三段全限定（`base.core.Money`）→ 直接查节点表，验证 `kind === 'value_type'`
 3. 全限定引用**不走 using**（已经全限定了）
 
@@ -52,7 +52,7 @@ fields:
 entity:base.core.User             ← base/core/user.entity.yaml
 table:base.core.Users             ← base/core/users.table.yaml
 mixin:base.core.Audit             ← base/core/audit.mixin.yaml
-value_type:base.core.Email        ← base/core/email.value_type.yaml
+type:base.core.Email        ← base/core/email.type.yaml
 ```
 
 **身份引用出现在哪些位置**：
@@ -63,7 +63,7 @@ value_type:base.core.Email        ← base/core/email.value_type.yaml
 | `ref_table:`（foreign_keys） | `ref_table: entity:base.core.User` | FK 引用目标表 |
 | `- include:`（mixin） | `- include: mixin:base.core.Audit` | fields 数组里展开 mixin |
 | `entity:`（extension_fields） | `entity: entity:base.core.User` | extension_fields 作用于哪个 entity |
-| `exports:`（module_manifest） | `- value_type:base.core.Email` | 声明对外导出的节点 |
+| `exports:`（module_manifest） | `- type:base.core.Email` | 声明对外导出的节点 |
 
 ```yaml
 fields:
