@@ -1,8 +1,7 @@
 /**
  * @loom/core public surface.
  *
- * Re-exports the engine's stable API. See spec
- * `docs/specs/2026-06-17-loom-design.md`.
+ * Re-exports the engine's stable API. See `docs/SPEC.md`.
  */
 export * from './ir/version.js';
 export * from './errors.js';

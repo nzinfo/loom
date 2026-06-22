@@ -59,7 +59,7 @@ my-schema/
                 └── user_fields.ext.yaml # 仅 .ext.yaml，无其它 kind
 ```
 
-**三层 owner 固定枚举**（详见 `docs/specs/2026-06-18-loom-v2-owner-dimension.md`）：
+**三层 owner 固定枚举**（详见 [`SPEC.md`](../SPEC.md) §3）：
 
 | owner | 目录前缀 | 能力 | 典型场景 |
 |---|---|---|---|
@@ -127,7 +127,7 @@ version: loom-schema/v2
 
 `version` 是 wire 版本号，破坏性变更必须 bump。reader 严格匹配。
 v2（`loom-schema/v2`）引入统一 `type:` 键与 `using` 导入机制，不兼容 v1（详见
-`docs/specs/2026-06-18-loom-v2-type-system.md`）。
+[`SPEC.md`](../SPEC.md) §4）。
 
 owner 与 kind **都不写在文件里**——owner 从路径顶层前缀推断，kind 从扩展名推断。
 文件头只有 `version`。

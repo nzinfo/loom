@@ -1,8 +1,8 @@
 /**
  * @loom/core — Forward schema description language engine.
  *
- * Design schema → physical schema projector. See
- * `docs/specs/2026-06-17-loom-design.md` for the full specification.
+ * Design schema → physical schema projector. See `docs/SPEC.md` for the
+ * full specification.
  *
  * This package is environment-agnostic: no Node.js-specific APIs.
  * File system access is injected via the `FileSystem` interface so the

@@ -88,8 +88,6 @@ pnpm --filter @loom/core test
 
 ## 相关文档
 
-- **设计规范**：`docs/specs/2026-06-18-loom-v2-type-system.md`（v2 类型系统）、
-  `docs/specs/2026-06-18-loom-v2-owner-dimension.md`（v2 owner 维度）。
-  （`2026-06-17-loom-design.md` 是 v1 历史快照，已加废弃标记，不反映当前实现。）
+- **规范**：[`docs/SPEC.md`](../SPEC.md)（loom-schema/v2 完整规范，精简权威）
 - **设计记录**：`docs/design/*.md`（实施过程中的关键决策）
 - **实施计划**：`docs/superpowers/plans/*.md`

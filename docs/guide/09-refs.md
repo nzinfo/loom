@@ -102,7 +102,7 @@ fields:
     type: base.core.Money            # 引用 platform 的 type，不带 owner
 ```
 
-详见 `docs/specs/2026-06-18-loom-v2-owner-dimension.md` §4。
+详见 [`SPEC.md`](../SPEC.md) §3、§8。
 
 ## 悬挂 ref
 
