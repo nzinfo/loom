@@ -37,16 +37,8 @@ export function validate(opts: ValidateOptions): ValidateResult {
         const data = node.data as TypeNode;
         // enum form (variants) has no typed fields to check.
         if (data.form === 'enum') break;
-        const localTypeParams = new Set<string>((data.type_parameters ?? []).map((p) => p.name));
         for (const f of (data.fields as FieldLike[] | undefined) ?? []) {
-          checkTypedField(
-            identity,
-            node.kind,
-            f,
-            scalarReqProps,
-            opts.diagnostics,
-            localTypeParams,
-          );
+          checkTypedField(identity, node.kind, f, scalarReqProps, opts.diagnostics);
         }
         break;
       }
@@ -110,7 +102,6 @@ function checkTypedField(
   f: FieldLike,
   scalarReqProps: Map<string, Set<string>>,
   diag: Diagnostics,
-  typeParams: ReadonlySet<string> = new Set(),
 ): void {
   if (scalarReqProps.size === 0) return;
   const typeVal = f.type as string | TypeDescriptor | undefined;
@@ -118,11 +109,6 @@ function checkTypedField(
   // link pass normalizes string → object and rewrites short names to fqns,
   // so ref is a fully-qualified name (e.g. "base.core.decimal").
   const ref = typeof typeVal === 'string' ? typeVal : typeVal.ref;
-
-  // Type parameter reference inside a generic host (e.g. type: T inside a
-  // struct type that declares type_parameters): skip — bound at
-  // instantiation time in the projector.
-  if (typeParams.has(ref)) return;
 
   // Only scalar-form types declare required properties. If ref isn't a known
   // scalar fqn, it's a struct/enum type ref — those are validated at the

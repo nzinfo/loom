@@ -130,30 +130,6 @@ const variantSchema = z.union([
 
 const constraintSchema = z.object({ kind: z.literal('check'), expr: z.string().min(1) }).strict();
 
-/**
- * A type parameter declaration on a struct/enum type (spec v2 §X).
- *
- *   name        — the parameter identifier (referenced in fields as type: <name>)
- *   constraint  — 'type' (any type, incl. another type parameter — for
- *                 generic recursion like Map<K,V>) or 'value' (must be a
- *                 concrete type: scalar short name or type fqn).
- *                 Defaults to 'type'.
- *   default     — default type used when the reference omits this param
- *   description — human-readable note
- *
- * type_parameters are accepted by struct and enum forms (scalar forbids them).
- * v2 allows declaring type_parameters AND referencing them in fields AND
- * passing args at reference sites (full generic form).
- */
-const typeParameterSchema = z
-  .object({
-    name: z.string().min(1),
-    constraint: z.enum(['type', 'value']).optional(),
-    default: z.string().min(1).optional(),
-    description: z.string().optional(),
-  })
-  .strict();
-
 const indexSchema = z
   .object({
     name: z.string().min(1),
@@ -201,7 +177,6 @@ export const TypeSchema = z
     properties: z.array(scalarPropertySchema).optional(), // scalar
     fields: z.array(fieldOrInclude).optional(), // struct
     variants: z.array(variantSchema).min(1).optional(), // enum (current shape)
-    type_parameters: z.array(typeParameterSchema).optional(), // struct/enum
     constraints: z.array(constraintSchema).optional(), // struct only
   })
   .strict()
@@ -226,14 +201,13 @@ export const TypeSchema = z
       });
     }
 
-    const has = (k: 'properties' | 'fields' | 'variants' | 'type_parameters' | 'constraints') =>
-      data[k] !== undefined;
+    const has = (k: 'properties' | 'fields' | 'variants' | 'constraints') => data[k] !== undefined;
 
     if (data.form === 'scalar') {
-      if (has('fields') || has('variants') || has('type_parameters') || has('constraints')) {
+      if (has('fields') || has('variants') || has('constraints')) {
         ctx.addIssue({
           code: 'custom',
-          message: 'scalar type must not have fields/variants/type_parameters/constraints',
+          message: 'scalar type must not have fields/variants/constraints',
           path: ['form'],
         });
       }

@@ -325,28 +325,6 @@ form: enum
     ).toThrow();
   });
 
-  it('parses type_parameters on a struct type', () => {
-    const src = `version: loom-schema/v2
-name: Range
-form: struct
-type_parameters:
-  - name: T
-    constraint: value
-    default: base.core.integer
-    description: element type
-fields:
-  - name: low
-    type: T
-  - name: high
-    type: T
-`;
-    const f = parseFile(src, 'range.type.yaml', 'type');
-    const vt = TypeSchema.parse((f as { raw: unknown }).raw);
-    expect(vt.type_parameters?.[0]?.name).toBe('T');
-    expect(vt.type_parameters?.[0]?.constraint).toBe('value');
-    expect(vt.type_parameters?.[0]?.default).toBe('base.core.integer');
-  });
-
   it('enforces lowercase scalar names', () => {
     const src = `version: loom-schema/v2
 name: BadScalar

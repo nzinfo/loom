@@ -61,11 +61,10 @@ export const EXT_TO_KIND: Readonly<Record<string, FileKind>> = Object.fromEntrie
  *                system base; only defined under base.core. Referenced by
  *                lowercase short name (no `using`).
  *   - `struct` — a composite type with `fields` (one column per field) and
- *                optional `type_parameters` / `constraints`. Referenced by
+ *                optional `constraints`. Referenced by
  *                PascalCase name via `using`.
  *   - `enum`   — a sum type with `variants`. Referenced by PascalCase name.
  *                Open to future Rust-style evolution (associated data,
- *                type_parameters); see design note §3.1.
  */
 export const TYPE_FORMS = ['scalar', 'struct', 'enum'] as const;
 export type TypeForm = (typeof TYPE_FORMS)[number];

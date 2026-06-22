@@ -70,17 +70,7 @@ export async function link(opts: LinkOptions): Promise<LinkResult> {
     if (expanded === null) continue;
 
     const fileUsing = collectUsing(node);
-    const typeParams = collectTypeParameters(node);
-    resolveFieldTypes(
-      expanded,
-      identity,
-      fileUsing,
-      typeFqns,
-      typeParams,
-      opts.parsed,
-      opts.diagnostics,
-      deps,
-    );
+    resolveFieldTypes(expanded, identity, fileUsing, typeFqns, opts.parsed, opts.diagnostics, deps);
 
     nodes.set(identity, withFields(node, expanded));
   }
@@ -220,13 +210,6 @@ function collectUsing(node: IRNode): readonly string[] {
   return [];
 }
 
-/** Read the value_type's optional type_parameters names (empty if absent). */
-function collectTypeParameters(node: IRNode): ReadonlySet<string> {
-  const data = node.data as { type_parameters?: Array<{ name: string }> };
-  if (!Array.isArray(data.type_parameters)) return new Set();
-  return new Set(data.type_parameters.map((p) => p.name));
-}
-
 interface IncludeEntry {
   readonly include: string;
 }
@@ -319,7 +302,6 @@ function resolveFieldTypes(
   identity: Identity,
   using: readonly string[],
   typeFqns: ReadonlySet<string>,
-  typeParams: ReadonlySet<string>,
   parsed: ReadonlyMap<string, AnyFile>,
   diag: Diagnostics,
   deps: Map<Identity, Set<Identity>>,
@@ -335,10 +317,6 @@ function resolveFieldTypes(
     const descriptor = normalizeType(rawType as string | TypeDescriptor);
     // Write back the normalized form so consumers (validate, expand) see object.
     (e as Record<string, unknown>).type = descriptor;
-
-    // Type parameter reference (e.g. type: T inside a generic type):
-    // leave as-is; instantiation happens at expansion when args are passed.
-    if (typeParams.has(descriptor.ref)) continue;
 
     const threeSeg = parseTypeRef(descriptor.ref);
     if (threeSeg !== null) {

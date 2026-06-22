@@ -316,17 +316,7 @@ function expandField(
   }
 
   // form: struct → fields-based expansion below.
-  // Generic instantiation: if the struct declares type_parameters and the
-  // caller passed args binding them, substitute each field's type ref that
-  // names a type parameter with the caller-supplied (or defaulted) type.
-  const typeParams = (
-    vt as unknown as { type_parameters?: Array<{ name: string; default?: string }> }
-  ).type_parameters;
-  const callerArgs = desc.args ?? {};
-  let fields = vt.fields as ReadonlyArray<Record<string, unknown>>;
-  if (typeParams && typeParams.length > 0) {
-    fields = instantiateFields(fields, typeParams, callerArgs);
-  }
+  const fields = vt.fields as ReadonlyArray<Record<string, unknown>>;
 
   const vtNodeForField = {
     kind: 'type' as const,
@@ -338,12 +328,9 @@ function expandField(
     const inner = fields[0] as Record<string, unknown>;
     const innerDesc = descriptorOf(inner);
     const scalar = scalarNameOf(innerDesc.ref, ir);
-    // newtype: a scalar + semantic label. The struct's inner field declares
-    // default args (e.g. max_length: 254 on Email); the referencing field may
-    // pass args to OVERRIDE/TIGHTEN them (e.g. max_length: 100 on a specific
-    // usage). Merge with the caller's args taking precedence per-key.
-    const callerArgs = desc.args ?? {};
-    const props = { ...(innerDesc.args ?? {}), ...callerArgs };
+    // newtype: constraint belongs to the type definition — use the inner
+    // field's declared args verbatim (caller args on a struct ref are ignored).
+    const props = innerDesc.args ?? {};
     let enumRef: string | undefined;
     if (scalar === 'enum' && Array.isArray(props.values)) {
       enumRef = targetId;

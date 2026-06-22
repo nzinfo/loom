@@ -89,16 +89,15 @@ fields:
     'platform/base/core/range.type.yaml': `version: loom-schema/v2
 name: Range
 form: struct
-type_parameters:
-  - name: T
-    constraint: value
-    default: base.core.bigint
-    description: element type
 fields:
   - name: low
-    type: T
+    type:
+      ref: decimal
+      args: { precision: 18, scale: 4 }
   - name: high
-    type: T
+    type:
+      ref: decimal
+      args: { precision: 18, scale: 4 }
 `,
     'platform/base/core/status.type.yaml': `version: loom-schema/v2
 name: Status
@@ -130,9 +129,7 @@ fields:
   - name: balance
     type: base.core.Money
   - name: price_range
-    type:
-      ref: base.core.Range
-      args: { T: decimal }
+    type: base.core.Range
   - name: status
     type: base.core.Status
 primary_key: [id]
