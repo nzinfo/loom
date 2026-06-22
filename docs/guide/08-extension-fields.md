@@ -118,29 +118,33 @@ tenant:acme 的 user_fields:    [tax_id]
 
 ### 为什么 extension_fields 不进 nodes map
 
-loom 的 IR 有一个 `nodes` map，key 是 identity，要求**全局唯一**：一个 identity
-只能对应一个节点定义（如 `type:base.core.Money` 只有一个定义）。这条唯一性规则
-是 `$ref` 解析的前提——查表必须得到唯一答案。
+loom 的 IR 有一个 `nodes` map，key 是 identity，要求**全局唯一**——一个 identity
+只能对应一个节点定义（如 `type:base.core.Money` 全局只有一个）。`$ref` 解析依赖
+这一点：查表必须得到唯一答案。如果两个文件推导出同一 identity，discovery 阶段就
+报 `duplicate identity` 错误。
 
-但 extension_fields 天然违反这条规则。多个 owner 会给**同一个 entity** 写
-extension_fields，而且可能写**同一个 group**：
+但 extension_fields 天然要打破这条规则。多个 owner 给同一个 entity 加扩展字段时，
+**会用相同的文件名**（这是约定，不是巧合）：
 
 ```
-platform/base/core/user_profile.ext.yaml      → entity:base.core.User, group: profile
-tenants/acme/base/core/user_fields.ext.yaml   → entity:base.core.User, group: profile
+platform/base/core/user_fields.ext.yaml      → extension_fields:base.core.User_fields
+tenants/acme/base/core/user_fields.ext.yaml  → extension_fields:base.core.User_fields
 ```
 
-这两个文件都在给 User 的 profile 组加字段。它们的 identity 会重复（都指向同一
-entity），这在 nodes map 里是不允许的——会触发 duplicate identity 错误。
+两个文件名相同（都叫 `user_fields.ext.yaml`），推导出的 identity 完全一样。这在
+nodes map 的唯一性规则下是不允许的。
 
-所以 extension_fields 走一条不同的路：**不进 nodes map，而是单独收集到
-`IR.extensionFields` registry**。这个 registry 按 **entity identity 分桶**（不是按
-文件 identity），同一个 entity 的所有扩展字段（来自不同 owner、不同文件）叠加成
-一个数组。唯一性约束从"identity 唯一"放宽为"同 entity 内字段名唯一"（同名字段才
-报错，见上面"同名字段冲突"）。
+所以 extension_fields 走一条独立的路：
 
-这条分离让 nodes map 保持干净的"一 identity 一节点"语义，同时允许扩展字段自由
-叠加。详见 [11 加载管线](./11-pipeline.md)。
+1. **discovery 阶段豁免**：extension_fields 的 identity 重复不报错（其他 kind 会）
+2. **parse 阶段分流**：ext 文件不进 `parsed` 主表（那是给 type/table/entity 的），
+   而是收集到单独的 `extensionFieldsFiles` 列表
+3. **link 阶段聚合**：所有 ext 文件按**它们指向的 entity identity** 分桶，叠加成
+   `IR.extensionFields` registry。唯一性约束从"文件 identity 唯一"放宽为"同 entity
+   内字段名唯一"（同名字段才报错，见上面"同名字段冲突"）
+
+这条分离让 nodes map 保持干净的"一 identity 一节点"语义，同时允许扩展字段跨 owner
+自由叠加。详见 [11 加载管线](./11-pipeline.md)。
 
 ## view 中的展开
 
