@@ -63,7 +63,7 @@ type:base.core.Email        ← base/core/email.type.yaml
 | `ref_table:`（foreign_keys） | `ref_table: entity:base.core.User` | FK 引用目标表 |
 | `- include:`（mixin） | `- include: mixin:base.core.Audit` | fields 数组里展开 mixin |
 | `entity:`（extension_fields） | `entity: entity:base.core.User` | extension_fields 作用于哪个 entity |
-| `exports:`（module_manifest） | `- type:base.core.Email` | 声明对外导出的节点 |
+| `exports:`（entity） | `- type:base.core.Email` | 声明对外导出的节点 |
 
 ```yaml
 fields:

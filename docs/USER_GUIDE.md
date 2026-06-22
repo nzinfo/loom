@@ -23,7 +23,7 @@ loom 是面向 ERP 的 design schema DSL——以业务语义描述数据模型�
 
 - [05 mixin](./guide/05-mixin.md) — 字段组复用
 - [06 table](./guide/06-table.md) — 表定义、三种扩展策略、variants、索引、外键
-- [07 entity 与 module_manifest](./guide/07-entity-and-manifest.md) — 业务身份、物理 schema 归属
+- [07 entity](./guide/07-entity.md) — 业务身份、物理 schema 归属
 - [08 extension_fields](./guide/08-extension-fields.md) — 自定义字段模板、多 owner 叠加
 
 ### 引用与加载

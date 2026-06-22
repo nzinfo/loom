@@ -15,11 +15,9 @@ system/module/kind/name，它们直接由文件路径推导；同样，节点归
 | `.type.yaml` | `type` | 类型定义（scalar/struct/enum 三态，见 [03 type](./03-base-types.md)） |
 | `.mixin.yaml` | `mixin` | mixin |
 | `.ext.yaml` | `extension_fields` | 扩展字段（租户/扩展叠加） |
-| `.module.yaml` | `module_manifest` | 模块清单 |
 
 例：`user.entity.yaml`、`orders.table.yaml`、`audit.mixin.yaml`、
-`email.type.yaml`、`string.type.yaml`、`user_fields.ext.yaml`、
-`manifest.module.yaml`。
+`email.type.yaml`、`string.type.yaml`、`user_fields.ext.yaml`。
 
 > `type` 是统一的类型定义 kind（scalar/struct/enum 三态，由 `form:` 字段区分），
 > 取代了原先的 `base_types`（集合）+ `value_type`（单体）。标量拆成独立文件，
@@ -44,7 +42,6 @@ my-schema/
 │       └── core/
 │           ├── bigint.type.yaml         # form: scalar（系统标量，每个一个文件）
 │           ├── string.type.yaml
-│           ├── manifest.module.yaml     # kind: module_manifest
 │           ├── email.type.yaml          # form: struct
 │           ├── money.type.yaml
 │           ├── status.type.yaml         # form: enum
@@ -55,7 +52,6 @@ my-schema/
 │   └── <provider>/                      # 如 acme-corp
 │       └── <system>/
 │           └── <module>/
-│               ├── manifest.module.yaml
 │               ├── orders.table.yaml
 │               └── user_fields.ext.yaml # kind: extension_fields
 └── tenants/                             # 租户定制（仅扩展字段）
@@ -69,7 +65,7 @@ my-schema/
 
 | owner | 目录前缀 | 能力 | 典型场景 |
 |---|---|---|---|
-| **platform** | `platform/<sys>/<mod>/` | 全部 kind（含 scalar form 的 type）+ module_manifest | 平台权威定义 |
+| **platform** | `platform/<sys>/<mod>/` | 全部 kind | 平台权威定义 |
 | **ext** | `ext/<provider>/<sys>/<mod>/` | 除 scalar form 外全部 kind | 第三方扩展包 |
 | **tenant** | `tenants/<id>/<sys>/<mod>/` | **仅** extension_fields（`.ext.yaml`） | 租户级字段定制 |
 

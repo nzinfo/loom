@@ -4,6 +4,8 @@
 
 近期完成的类型系统与布局演进（按时间倒序）：
 
+- **module_manifest 移除**——physical_schema 改为投影期派生（`<system>_<module>`）+
+  CLI `--physical-schema` 覆盖，删除一个 kind + N 个 manifest 文件
 - **统一短名解析 + 声明名身份**——scalar/struct/enum 走同一条解析路径（查 using 命名空间，
   默认含 `base.core.*`），scalar 不再特殊；身份默认从路径推导，文件声明的 `name:` 覆盖
   （让 scalar 用小写名 `bigint` 而非 `Bigint`）。详见

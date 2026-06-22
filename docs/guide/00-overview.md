@@ -21,7 +21,7 @@
 | [04 类型引用与 using](./04-type-refs.md) | 类型引用语法、using 导入、Type Descriptor | 复用业务类型 |
 | [05 mixin](./05-mixin.md) | 字段组复用 | 抽审计字段组 |
 | [06 table](./06-table.md) | 表定义、扩展策略、枚举/索引/外键 | 落物理表结构 |
-| [07 entity 与 module_manifest](./07-entity-and-manifest.md) | 业务身份层 + 物理归属 | ERP 业务建模 |
+| [07 entity](./07-entity.md) | 业务身份层 + 物理归属 | ERP 业务建模 |
 | [08 extension_fields](./08-extension-fields.md) | 自定义字段模板（多 owner 叠加） | 租户/扩展字段 |
 | [09 refs](./09-refs.md) | 类型引用 vs 身份引用 | 跨文件引用语义 |
 | [10 cli](./10-cli.md) | 命令行参考 | 工具链 |

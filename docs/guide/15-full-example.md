@@ -23,15 +23,6 @@ scalars:
   - { name: boolean,  description: boolean,   properties: [] }
 ```
 
-## platform/base/core/manifest.module.yaml
-
-```yaml
-version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
-description: core module
-```
 
 ## platform/base/core/audit.mixin.yaml
 

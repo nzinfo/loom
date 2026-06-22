@@ -41,19 +41,6 @@ properties: []
 `type` 是统一的类型定义 kind，由 `form` 字段区分 scalar / struct / enum 三态。
 完整说明见 [03 type](./03-base-types.md)。
 
-## 写 manifest.module.yaml
-
-```yaml
-# my-schema/platform/base/core/manifest.module.yaml
-version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
-description: core module
-```
-
-`physical_schema` 决定了这个模块下所有表的物理 schema 前缀（PG schema / MySQL database）。
-详见 [07 entity 与 module_manifest](./07-entity-and-manifest.md)。
 
 ## 写第一张表
 

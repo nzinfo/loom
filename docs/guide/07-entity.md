@@ -1,6 +1,4 @@
-# entity 与 module_manifest
-
-## entity：业务身份层
+# entity：业务身份层
 
 `table` 承载物理结构 + 扩展策略；`entity` 在 table 之上加**业务身份**：
 
@@ -47,41 +45,38 @@ fields:
 
 ---
 
-## module_manifest：physical_schema 归属
+## physical_schema：投影期派生（无 manifest 文件）
 
-物理 schema 空间（PG schema / MySQL database）是**模块级别决策**，不该 per-table 配置：
+物理 schema 空间（PG schema / MySQL database）是**投影期决策**，不是逻辑模型的一部分。
+loom 不再有 `module_manifest` 文件——physical_schema 在投影时从模块路径**派生**：
 
-```yaml
-# platform/base/core/manifest.module.yaml
-version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
-description: 基础核心模块
-exports:                                   # 可选：声明对外的导出（身份引用形式）
-  - entity:base.core.User
-  - type:base.core.Email
+```
+base.core   → base_core        (<system>_<module>)
+retail.pos  → retail_pos
+retail.types → retail_types
 ```
 
-好处：
+### 自定义物理 schema：CLI `--physical-schema` 覆盖
 
-- 模块迁移（重命名 physical_schema）只改一处
-- table 文件聚焦于"这张表长什么样"
-- 与 ERP 的"模块化部署"哲学一致
+如果派生名不满足需求（如 ext 包要隔离到独立 schema），用 `loom project` 的
+`--physical-schema` 覆盖（可重复）：
 
-加载器加载 table 时，自动从所属 module 的 `manifest.module.yaml` 补全完整物理位置
-（`base_core.users_base`）。
-
-### ext 包的 module_manifest
-
-ext 包（`ext/<provider>/<sys>/<mod>/`）也有自己的 `manifest.module.yaml`，声明独立的
-`physical_schema`。这让 ext 的物理表落在独立 schema 里，与 platform 隔离：
-
-```yaml
-# ext/acme-corp/retail/pos/manifest.module.yaml
-version: loom-schema/v2
-system: retail
-module: pos
-physical_schema: acme_retail_pos          # ext 自己的 schema
-description: acme-corp retail POS extension
+```sh
+loom project sql --dialect pg \
+  --physical-schema retail.pos=acme_retail_pos \
+  my-schema/
 ```
+
+覆盖以模块 fqn 为键（`retail.pos`），替换派生名。
+
+### 为什么不再用 manifest 文件
+
+`module_manifest` 原本承载 physical_schema，但它本质是投影期配置，不是逻辑声明：
+- schema 描述"业务长什么样"，physical_schema 描述"落到哪个物理库"——两件事
+- manifest 唯一实际被消费的字段就是 physical_schema，其余（system/module/exports）要么
+  路径已推导、要么未实现
+- 派生 + CLI 覆盖覆盖了全部真实用例，省掉一个 kind + N 个文件
+
+如果未来 physical_schema 配置变复杂（命名策略、多方言偏好等），再引入一个投影期
+配置文件（`loom.config.yaml`）作为默认来源——届时它会有多个字段撑着，引入代价才划算。
+当前 CLI 覆盖已足够。
