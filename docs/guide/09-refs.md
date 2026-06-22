@@ -18,7 +18,7 @@ retail.pos.types.OrderId     ← retail/pos/types/order_id.type.yaml
 
 逻辑名是 PascalCase（与推导规则一致）。
 
-**解析路径**（详见 [04 value_type](./04-value-type.md) §using 短名解析规则）：
+**解析路径**（详见 [04 value_type](./04-type-refs.md) §using 短名解析规则）：
 
 1. 单段短名（`Money`）→ 先查 scalar 注册表（base.core 的 scalar form 节点），再查当前文件 using 列表
 2. 三段全限定（`base.core.Money`）→ 直接查节点表，验证 `kind === 'value_type'`

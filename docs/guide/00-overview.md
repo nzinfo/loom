@@ -18,7 +18,7 @@
 | [01 目录与身份](./01-layout-and-identity.md) | 路径即身份 + owner 三层归属 | 了解 schema 树怎么放 |
 | [02 快速上手](./02-quickstart.md) | 最小可运行 schema → SQL | 跑通第一个例子 |
 | [03 type](./03-base-types.md) | 类型定义 | scalar / struct / enum 三态 |
-| [04 value_type](./04-value-type.md) | 语义类型包装 + using 导入 + type_parameters | 复用业务类型 |
+| [04 类型引用与 using](./04-type-refs.md) | 类型引用语法、using 导入、Type Descriptor | 复用业务类型 |
 | [05 mixin](./05-mixin.md) | 字段组复用 | 抽审计字段组 |
 | [06 table](./06-table.md) | 表定义、扩展策略、枚举/索引/外键 | 落物理表结构 |
 | [07 entity 与 module_manifest](./07-entity-and-manifest.md) | 业务身份层 + 物理归属 | ERP 业务建模 |
@@ -88,8 +88,8 @@ pnpm --filter @loom/core test
 
 ## 相关文档
 
-- **设计规范**：`docs/specs/2026-06-17-loom-design.md`（v1 完整设计）、
-  `docs/specs/2026-06-18-loom-v2-type-system.md`（v2 类型系统）、
-  `docs/specs/2026-06-18-loom-v2-owner-dimension.md`（v2 owner 维度）
+- **设计规范**：`docs/specs/2026-06-18-loom-v2-type-system.md`（v2 类型系统）、
+  `docs/specs/2026-06-18-loom-v2-owner-dimension.md`（v2 owner 维度）。
+  （`2026-06-17-loom-design.md` 是 v1 历史快照，已加废弃标记，不反映当前实现。）
 - **设计记录**：`docs/design/*.md`（实施过程中的关键决策）
 - **实施计划**：`docs/superpowers/plans/*.md`

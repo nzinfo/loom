@@ -212,7 +212,7 @@ fields:
 > **类型参数与值参数共享 `type.args`**：`max_length`（值参数）和 `T`（类型参数）
 > 都写在 args 里，加载器按"是否为声明的 type parameter 名"区分。
 
-详见 [04 类型引用与 using](./04-value-type.md)。
+详见 [04 类型引用与 using](./04-type-refs.md)。
 
 ## 校验规则（编译期）
 

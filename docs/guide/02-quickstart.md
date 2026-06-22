@@ -87,7 +87,7 @@ v2 用单一 `type:` 键表达字段类型（替代 v1 的 `base` / `ref` 互斥
   ——所有标量参数（`max_length`、`precision`、`scale`、`pattern`）都收拢到
   `args`，不再写在 field 顶层
 
-详见 [04 value_type](./04-value-type.md) §单一 type: 键。
+详见 [04 value_type](./04-type-refs.md) §单一 type: 键。
 
 ## 校验
 

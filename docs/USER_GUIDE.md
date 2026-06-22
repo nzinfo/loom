@@ -17,7 +17,7 @@ loom 是面向 ERP 的 design schema DSL——以业务语义描述数据模型�
 ### 数据类型
 
 - [03 base_types](./guide/03-base-types.md) — 标量目录
-- [04 value_type](./guide/04-value-type.md) — 语义类型包装、using、type_parameters
+- [04 value_type](./guide/04-type-refs.md) — 语义类型包装、using、type_parameters
 
 ### 模型构件
 
