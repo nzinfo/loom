@@ -117,7 +117,6 @@ table:
   extension:
     strategy: sidecar_eav
     ext_table: users_ext
-    view: users
 fields:
   - name: id
     type: bigint
@@ -146,6 +145,7 @@ name: User
 primary_table: table:base.core.Users
 business_keys: [email]
 audit: true
+view: users
 `,
     'platform/base/core/user_fields.ext.yaml': `version: loom-schema/v2
 entity: entity:base.core.User

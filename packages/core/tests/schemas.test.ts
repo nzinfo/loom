@@ -189,7 +189,6 @@ table:
   extension:
     strategy: sidecar_eav
     ext_table: users_ext
-    view: users
 fields:
   - name: id
     type: bigint

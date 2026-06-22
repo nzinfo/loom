@@ -152,7 +152,6 @@ const extensionSchema = z
   .object({
     strategy: z.enum(['none', 'json_column', 'sidecar_eav']),
     ext_table: z.string().min(1).optional(),
-    view: z.string().min(1).optional(),
   })
   .strict();
 
@@ -276,6 +275,11 @@ export const EntitySchema = z
     primary_table: z.string().min(1),
     business_keys: z.array(z.string().min(1)).optional(),
     audit: z.boolean().optional(),
+    /** View name for the entity's logical view over sidecar_eav tables.
+     * Defined on entity (not table) because the view is the entity's physical
+     * projection — it unifies base + ext into the entity's complete field set.
+     * Omitted = no view created. */
+    view: z.string().min(1).optional(),
   })
   .strict();
 

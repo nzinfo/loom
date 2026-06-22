@@ -270,7 +270,6 @@ table:
   extension:
     strategy: sidecar_eav
     ext_table: users_ext
-    view: users
 fields:
   - { name: id, type: string, required: true }
 primary_key: [id]
@@ -308,7 +307,6 @@ table:
   extension:
     strategy: sidecar_eav
     ext_table: users_ext
-    view: users
 fields:
   - { name: id, type: string, required: true }
 primary_key: [id]
@@ -349,7 +347,6 @@ table:
   extension:
     strategy: sidecar_eav
     ext_table: users_ext
-    view: users
 fields:
   - { name: id, type: string, required: true }
 primary_key: [id]

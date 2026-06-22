@@ -69,11 +69,30 @@ export function expandTables(
   // Collect enums first (referenced during table expansion).
   collectEnums(ir, enums);
 
+  // Build a table-identity → entity-view-name map so tables can look up
+  // their entity's declared view name (the view is an entity-level concern,
+  // not a table-level one).
+  const tableToView = new Map<string, string | undefined>();
+  for (const [, node] of ir.nodes) {
+    if (node.kind !== 'entity') continue;
+    const entityData = node.data as { primary_table?: string; view?: string };
+    if (entityData.primary_table !== undefined) {
+      tableToView.set(entityData.primary_table, entityData.view);
+    }
+  }
+
   // Expand each table node.
   for (const [identity, node] of ir.nodes) {
     if (node.kind !== 'table') continue;
 
-    const table = expandTable(node, ir, enums, extensionFields, physicalSchemaOverrides);
+    const table = expandTable(
+      node,
+      ir,
+      enums,
+      extensionFields,
+      physicalSchemaOverrides,
+      tableToView,
+    );
     tables.push(table);
   }
 
@@ -92,6 +111,7 @@ function expandTable(
   enums: Map<string, ReadonlyArray<string>>,
   extensionFields: Map<string, ReadonlyArray<ExtensionFieldEntry>>,
   physicalSchemaOverrides?: ReadonlyMap<string, string>,
+  tableToView?: ReadonlyMap<string, string | undefined>,
 ): PhysicalTable {
   const { data } = node;
   const tableName = data.table.name;
@@ -129,8 +149,10 @@ function expandTable(
     return result;
   });
 
-  const extTable = strategy === 'sidecar_eav' ? data.table.extension.ext_table : undefined;
-  const view = strategy === 'sidecar_eav' ? data.table.extension.view : undefined;
+  // ext_table: default = <table_name>_ext; view: from entity (or undefined).
+  const extTable =
+    strategy === 'sidecar_eav' ? (data.table.extension.ext_table ?? `${tableName}_ext`) : undefined;
+  const view = tableToView?.get(node.identity);
 
   const base: PhysicalTable = {
     name: tableName,
