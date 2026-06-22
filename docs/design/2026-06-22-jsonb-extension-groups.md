@@ -71,7 +71,9 @@ base_id=1, tenant_id=1, group_name='profile',
   values='{"nickname":"Bob"}'
 ```
 
-**100 个字段分成 5 组 → 每 entity 每 tenant 5 行**（而非 100 行）。
+**分组粒度是文件级**——一个 `.ext.yaml` 文件里所有字段共享同一个 group。行数 =
+你划分了多少个文件（组）。把 100 个字段拆到 5 个文件 → 每 entity 每 tenant 5 行
+（而非 100 行）；塞进 1 个文件 → 1 行。组划分是作者的主动设计决策。
 
 ### 2.3 view：LEFT JOIN + JSON 提取
 

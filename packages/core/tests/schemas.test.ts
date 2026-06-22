@@ -218,7 +218,6 @@ fields:
     type:
       ref: string
       args: { max_length: 50 }
-    default_scope: tenant
 `;
     const f = parseFile(src, 'platform/base/core/user_fields.ext.yaml', 'extension_fields');
     expect(() => ExtensionFieldsSchema.parse((f as { raw: unknown }).raw)).not.toThrow();

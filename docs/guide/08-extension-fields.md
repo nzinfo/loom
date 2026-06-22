@@ -22,7 +22,6 @@ fields:
     type:
       ref: string
       args: { max_length: 50 }
-    default_scope: tenant
   - name: bio
     type: { ref: string, args: { max_length: 500 } }
 
@@ -33,10 +32,8 @@ group: finance
 fields:
   - name: credit_limit
     type: base.core.Money              # 多字段 type（form: struct）也能用
-    default_scope: tenant
   - name: customer_grade
     type: base.core.CustomerGrade      # form: enum 的 type（详见 06-table §variants）
-    default_scope: tenant
 ```
 
 物理上，`profile` 组和 `finance` 组各占 ext 表的一行（每实体 + 每 tenant +
@@ -49,7 +46,9 @@ base_id=1, tenant_id=NULL, group_name='finance',
   values='{"credit_limit_amount":5000,"credit_limit_currency_code":"USD","customer_grade":"vip"}'
 ```
 
-**100 个字段分成 5 组 → 每 entity 每 tenant 5 行**（而非每字段一行）。
+**分组粒度是文件级**——一个 `.ext.yaml` 文件里所有字段共享同一个 group。所以
+行数 = 你划分了多少个文件（组）。把 100 个字段拆到 5 个文件 → 每 entity 每 tenant
+5 行；塞进 1 个文件 → 1 行。组划分是作者的主动设计决策。
 
 ### 为什么按组而非按字段
 
@@ -92,7 +91,6 @@ group: profile
 fields:
   - name: nickname
     type: { ref: string, args: { max_length: 50 } }
-    default_scope: tenant
 ```
 
 叠加结果：User 的扩展字段 = `{ tax_id, nickname }`。两个字段属于不同组

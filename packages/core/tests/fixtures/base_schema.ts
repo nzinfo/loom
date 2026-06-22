@@ -155,7 +155,6 @@ fields:
     type:
       ref: string
       args: { max_length: 50 }
-    default_scope: tenant
   - name: bio
     type:
       ref: string
@@ -167,7 +166,6 @@ group: finance
 fields:
   - name: credit_limit
     type: base.core.Money
-    default_scope: tenant
 `,
 
     // ── ext:acme-corp — independent module with its own physical schema ──
@@ -202,7 +200,6 @@ fields:
     type:
       ref: string
       args: { max_length: 32 }
-    default_scope: tenant
 `,
   });
 }

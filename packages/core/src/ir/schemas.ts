@@ -100,7 +100,6 @@ const typeField = z
     required: z.boolean().optional(),
     unique: z.boolean().optional(),
     default: z.unknown().optional(),
-    default_scope: z.string().min(1).optional(),
     /** Physical column name / prefix override. Default = name. Empty string
      * ('') = flatten: target's fields are inserted without a prefix (the
      * mixin-flatten behavior, now expressed via a struct ref with column: ''). */

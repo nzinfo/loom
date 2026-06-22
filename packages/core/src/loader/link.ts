@@ -186,7 +186,6 @@ function collectExtensionFields(
           scalar: '',
           refValueTypeId: `type:${ref}`,
           props: desc.args ?? {},
-          ...(f.default_scope !== undefined ? { defaultScope: String(f.default_scope) } : {}),
           group,
         });
       } else {
@@ -194,7 +193,6 @@ function collectExtensionFields(
           name: fieldName,
           scalar: ref,
           props: desc.args ?? {},
-          ...(f.default_scope !== undefined ? { defaultScope: String(f.default_scope) } : {}),
           group,
         });
       }

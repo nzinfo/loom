@@ -59,7 +59,7 @@ describe('projector views (JSONB extension groups)', () => {
       'platform/base/core/user.entity.yaml':
         'version: loom-schema/v2\nname: User\nprimary_table: table:base.core.Users\nview: users\n',
       'platform/base/core/user_finance.ext.yaml':
-        'version: loom-schema/v2\nentity: entity:base.core.User\ngroup: finance\nfields:\n  - name: credit_limit\n    type: base.core.Money\n    default_scope: tenant\n',
+        'version: loom-schema/v2\nentity: entity:base.core.User\ngroup: finance\nfields:\n  - name: credit_limit\n    type: base.core.Money\n',
     });
     const { ir } = await load({ fs, basePath: '' });
     const model = expandTables(ir);

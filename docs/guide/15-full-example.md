@@ -119,7 +119,6 @@ group: profile                  # 扩展组名（省略则默认 = 文件 stem�
 fields:
   - name: nickname
     type: { ref: string, args: { max_length: 50 } }
-    default_scope: tenant
   - name: bio
     type: { ref: string, args: { max_length: 500 } }
 ```
@@ -132,7 +131,6 @@ group: finance
 fields:
   - name: credit_limit
     type: base.core.Money
-    default_scope: tenant
 ```
 
 ## 投影输出（PG）
