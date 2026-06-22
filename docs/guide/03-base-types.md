@@ -117,8 +117,8 @@ fields:
 # → 物理：email VARCHAR(254)（用 Email 内部声明的 max_length: 254）
 ```
 
-newtype 的本质是"标量 + 语义标签"。struct 内部声明的 args（如 `max_length: 254`）是
-**默认约束**；引用方可以传 args **覆盖/收紧**（按 key 覆盖，引用方优先）：
+newtype 的约束（如 `max_length: 254`）属于**类型定义本身**，引用方不可覆盖。
+想要不同约束，定义一个新类型：
 
 ```yaml
 # short-email.type.yaml

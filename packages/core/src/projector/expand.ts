@@ -46,43 +46,6 @@ function scalarNameOf(ref: string, ir: IR): string {
 }
 
 /**
- * Substitute type parameters in a generic value_type's fields with the
- * caller-supplied bindings (or declared defaults). Returns a shallow-copied
- * field list with each field's `type` rewritten where its ref names a type
- * parameter.
- *
- *   typeParams: [{name:'T', default:'base.core.integer'}]
- *   callerArgs: {T: 'decimal'}  (or {} → use default)
- *
- * For each field whose type ref is 'T', the ref is replaced with the bound
- * type (string form; any args/meta on the binding are not propagated — v2
- * only supports binding to a bare type name).
- */
-function instantiateFields(
-  fields: ReadonlyArray<Record<string, unknown>>,
-  typeParams: ReadonlyArray<{ name: string; default?: string }>,
-  callerArgs: Record<string, unknown>,
-): ReadonlyArray<Record<string, unknown>> {
-  const bindings = new Map<string, string>();
-  for (const tp of typeParams) {
-    const v = callerArgs[tp.name];
-    if (typeof v === 'string') {
-      bindings.set(tp.name, v);
-    } else if (tp.default !== undefined) {
-      bindings.set(tp.name, tp.default);
-    }
-  }
-  if (bindings.size === 0) return fields;
-  return fields.map((f) => {
-    const desc = descriptorOf(f);
-    if (!bindings.has(desc.ref)) return f;
-    const bound = bindings.get(desc.ref);
-    if (bound === undefined) return f;
-    return { ...f, type: { ref: bound, ...(desc.args ? { args: desc.args } : {}) } };
-  });
-}
-
-/**
  * Main entry point: project a design IR to a physical model.
  *
  * - Expands mixins into inline fields.
