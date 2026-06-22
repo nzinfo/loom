@@ -29,6 +29,23 @@ function descriptorOf(field: Record<string, unknown>): TypeDescriptor {
 }
 
 /**
+ * Resolve a sub-field's type ref to the scalar name a dialect expects.
+ *
+ * After unified resolution, a sub-field's type ref is a fully-qualified name
+ * (e.g. "base.core.string"). Identity == declared-name fqn, so we look up the
+ * node directly and return its `data.name` (the declared short name dialects
+ * key on). Returns the ref unchanged if no node matches (e.g. a literal the
+ * caller already passed through, or an unbound form).
+ */
+function scalarNameOf(ref: string, ir: IR): string {
+  const node = ir.nodes.get(`type:${ref}`);
+  if (node?.kind === 'type' && (node.data as TypeNode).form === 'scalar') {
+    return (node.data as TypeNode).name;
+  }
+  return ref;
+}
+
+/**
  * Substitute type parameters in a generic value_type's fields with the
  * caller-supplied bindings (or declared defaults). Returns a shallow-copied
  * field list with each field's `type` rewritten where its ref names a type
@@ -250,20 +267,11 @@ function expandField(
   const desc = descriptorOf(f);
   const ref = desc.ref;
 
-  // Single-segment: direct base_types scalar.
-  if (!ref.includes('.')) {
-    const result: PhysicalColumn = {
-      name: fName,
-      scalar: ref,
-      required: f.required === true,
-      unique: f.unique === true,
-      props: desc.args ?? {},
-    };
-    return [result];
-  }
-
-  // Three-segment: type reference. Link pass verified existence + kind
-  // and rewrote short-name matches to their fqn, so ref is `sys.mod.Name`.
+  // After link, every ref is a fully-qualified name (sys.mod.declaredName) —
+  // short names were resolved against the using namespace and rewritten.
+  // Identity == declared-name fqn (parse corrects it from the file's `name:`),
+  // so the ref IS the identity body. Look up the node and branch by its FORM
+  // (scalar/struct/enum). This is the unified projection rule (design note §4.4).
   const targetId = `type:${ref}`;
   const vtNode = ir.nodes.get(targetId);
   if (!vtNode) {
@@ -275,9 +283,37 @@ function expandField(
 
   const vt = vtNode.data as TypeNode;
 
-  // Generic instantiation: if the value_type declares type_parameters and
-  // the caller passed args binding them, substitute each field's type ref
-  // that names a type parameter with the caller-supplied (or defaulted) type.
+  // form: scalar → one column, dialect keyed by the scalar's declared name.
+  if (vt.form === 'scalar') {
+    const result: PhysicalColumn = {
+      name: fName,
+      scalar: vt.name,
+      required: f.required === true,
+      unique: f.unique === true,
+      props: desc.args ?? {},
+    };
+    return [result];
+  }
+
+  // form: enum → single column backed by the enum registry. The column's
+  // scalar is 'string' for dialect purposes; enumRef drives PG ENUM /
+  // MySQL ENUM / SQLite CHECK.
+  if (vt.form === 'enum') {
+    const result: PhysicalColumn = {
+      name: fName,
+      scalar: 'string',
+      required: f.required === true,
+      unique: f.unique === true,
+      props: {},
+      enumRef: targetId,
+    };
+    return [result];
+  }
+
+  // form: struct → fields-based expansion below.
+  // Generic instantiation: if the struct declares type_parameters and the
+  // caller passed args binding them, substitute each field's type ref that
+  // names a type parameter with the caller-supplied (or defaulted) type.
   const typeParams = (
     vt as unknown as { type_parameters?: Array<{ name: string; default?: string }> }
   ).type_parameters;
@@ -293,26 +329,10 @@ function expandField(
     fields: fields as ValueTypeNode['fields'],
   };
 
-  // Variants form (sum type): render as a single column backed by the
-  // enum registry. The column's scalar is reported as 'string' for dialect
-  // purposes; the enumRef drives PG ENUM / MySQL ENUM / SQLite CHECK.
-  const variants = (vt as unknown as { variants?: ReadonlyArray<unknown> }).variants;
-  if (variants && variants.length > 0) {
-    const result: PhysicalColumn = {
-      name: fName,
-      scalar: 'string',
-      required: f.required === true,
-      unique: f.unique === true,
-      props: {},
-      enumRef: targetId,
-    };
-    return [result];
-  }
-
   if (isSingleFieldValueType(vtNodeForField)) {
     const inner = fields[0] as Record<string, unknown>;
     const innerDesc = descriptorOf(inner);
-    const scalar = innerDesc.ref;
+    const scalar = scalarNameOf(innerDesc.ref, ir);
     const props = innerDesc.args ?? {};
     let enumRef: string | undefined;
     if (scalar === 'enum' && Array.isArray(props.values)) {
@@ -329,12 +349,12 @@ function expandField(
     return [result];
   }
 
-  // Multi-field value_type: one column per subfield.
+  // Multi-field struct: one column per subfield.
   const expanded = expandValueColumns(fName, vtNodeForField);
   return expanded.map((col, idx) => {
     const subField = fields[idx] as Record<string, unknown>;
     const subDesc = descriptorOf(subField);
-    const subType = subDesc.ref;
+    const subType = scalarNameOf(subDesc.ref, ir);
     const subProps = subDesc.args ?? {};
     const result: PhysicalColumn = {
       name: col.name,

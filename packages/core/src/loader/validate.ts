@@ -25,15 +25,11 @@ export interface ValidateResult {
 
 type FieldLike = Record<string, unknown>;
 
-interface ScalarInfo {
-  readonly name: string;
-  readonly requiredProps: Set<string>;
-}
-
 export function validate(opts: ValidateOptions): ValidateResult {
-  const scalars = collectScalars(opts.ir);
-  const scalarNames = new Set<string>(scalars.map((s) => s.name));
-  const requiredProps = new Map<string, Set<string>>(scalars.map((s) => [s.name, s.requiredProps]));
+  // Required-properties per scalar, keyed by the scalar's fqn (e.g.
+  // "base.core.decimal"). After unified resolution all field type refs are
+  // fqns, so we look up by fqn.
+  const scalarReqProps = collectScalarRequiredProps(opts.ir);
 
   for (const [identity, node] of opts.ir.nodes) {
     switch (node.kind) {
@@ -47,8 +43,7 @@ export function validate(opts: ValidateOptions): ValidateResult {
             identity,
             node.kind,
             f,
-            scalarNames,
-            requiredProps,
+            scalarReqProps,
             opts.diagnostics,
             localTypeParams,
           );
@@ -58,12 +53,12 @@ export function validate(opts: ValidateOptions): ValidateResult {
       case 'mixin': {
         const data = node.data as { fields?: FieldLike[] };
         for (const f of data.fields ?? []) {
-          checkTypedField(identity, node.kind, f, scalarNames, requiredProps, opts.diagnostics);
+          checkTypedField(identity, node.kind, f, scalarReqProps, opts.diagnostics);
         }
         break;
       }
       case 'table': {
-        checkTable(identity, node.data as Table, scalarNames, requiredProps, opts.diagnostics);
+        checkTable(identity, node.data as Table, scalarReqProps, opts.diagnostics);
         break;
       }
       default:
@@ -77,7 +72,7 @@ export function validate(opts: ValidateOptions): ValidateResult {
   // primary_table (spec §7, §6.9).
   for (const [entityId, entries] of opts.ir.extensionFields) {
     for (const entry of entries) {
-      checkExtensionEntry(entityId, entry, scalarNames, requiredProps, opts.diagnostics);
+      checkExtensionEntry(entityId, entry, scalarReqProps, opts.diagnostics);
     }
     checkExtensionTarget(entityId, opts.ir, opts.diagnostics);
   }
@@ -85,57 +80,56 @@ export function validate(opts: ValidateOptions): ValidateResult {
   return { diagnostics: opts.diagnostics };
 }
 
-/** Collect scalar (form: scalar) info from base.core type nodes. */
-function collectScalars(ir: IR): ScalarInfo[] {
-  const out: ScalarInfo[] = [];
+/** Collect scalar (form: scalar) required-properties, keyed by BOTH the
+ * scalar's fqn (e.g. "base.core.decimal") and its short name (e.g. "decimal").
+ *
+ * Field type refs (post-link) are fqns, so checkTypedField looks up by fqn.
+ * Extension field entries store the raw short name (they bypass
+ * resolveFieldTypes), so checkExtensionEntry looks up by short name. */
+function collectScalarRequiredProps(ir: IR): Map<string, Set<string>> {
+  const m = new Map<string, Set<string>>();
   for (const [identity, node] of ir.nodes) {
     if (node.kind !== 'type') continue;
     const data = node.data as TypeNode;
     if (data.form !== 'scalar') continue;
     if (!identity.startsWith('type:base.core.')) continue;
-    const requiredProps = new Set<string>();
+    const fqn = identity.slice('type:'.length);
+    const req = new Set<string>();
     for (const p of data.properties ?? []) {
-      if (p.required) requiredProps.add(p.name);
+      if (p.required) req.add(p.name);
     }
-    out.push({ name: data.name, requiredProps });
+    m.set(fqn, req);
+    m.set(data.name, req); // short name alias for extension-field lookups
   }
-  return out;
+  return m;
 }
 
 function checkTypedField(
   identity: string,
   hostKind: FileKind,
   f: FieldLike,
-  scalarNames: Set<string>,
-  requiredProps: Map<string, Set<string>>,
+  scalarReqProps: Map<string, Set<string>>,
   diag: Diagnostics,
   typeParams: ReadonlySet<string> = new Set(),
 ): void {
-  if (scalarNames.size === 0) return;
+  if (scalarReqProps.size === 0) return;
   const typeVal = f.type as string | TypeDescriptor | undefined;
   if (typeVal === undefined) return;
-  // link pass normalizes string → object; accept either for safety.
+  // link pass normalizes string → object and rewrites short names to fqns,
+  // so ref is a fully-qualified name (e.g. "base.core.decimal").
   const ref = typeof typeVal === 'string' ? typeVal : typeVal.ref;
-  // Three-segment (type ref): skip — validated at the referenced type file.
-  if (ref.includes('.')) return;
 
   // Type parameter reference inside a generic host (e.g. type: T inside a
   // struct type that declares type_parameters): skip — bound at
   // instantiation time in the projector.
   if (typeParams.has(ref)) return;
 
-  // Single-segment: must be a known scalar.
-  if (!scalarNames.has(ref)) {
-    diag.add({
-      category: 'schema',
-      file: identity,
-      line: 1,
-      column: 1,
-      message: `unknown scalar type "${ref}" (not a declared scalar)`,
-    });
-    return;
-  }
-  const req = requiredProps.get(ref) ?? new Set<string>();
+  // Only scalar-form types declare required properties. If ref isn't a known
+  // scalar fqn, it's a struct/enum type ref — those are validated at the
+  // referenced type file itself (existence/kind checked in link).
+  const req = scalarReqProps.get(ref);
+  if (req === undefined) return;
+
   const args = typeof typeVal === 'object' && typeVal.args ? typeVal.args : {};
   for (const rp of req) {
     if (!(rp in args)) {
@@ -153,8 +147,7 @@ function checkTypedField(
 function checkTable(
   identity: string,
   t: Table,
-  scalarNames: Set<string>,
-  requiredProps: Map<string, Set<string>>,
+  scalarReqProps: Map<string, Set<string>>,
   diag: Diagnostics,
 ): void {
   const requiredFieldNames = new Set<string>();
@@ -163,7 +156,7 @@ function checkTable(
     if (typeof fieldRec.name === 'string' && fieldRec.required === true) {
       requiredFieldNames.add(fieldRec.name);
     }
-    checkTypedField(identity, 'table', fieldRec, scalarNames, requiredProps, diag);
+    checkTypedField(identity, 'table', fieldRec, scalarReqProps, diag);
   }
   for (const pk of t.primary_key) {
     if (!requiredFieldNames.has(pk)) {
@@ -181,21 +174,22 @@ function checkTable(
 /**
  * Validate a single extension field entry's scalar type.
  *
- * Single-segment (scalar) refs must be a known scalar and supply any required
- * properties. Type refs (refValueTypeId set) are validated at the referenced
- * type file itself.
+ * Extension entries store the raw short name in `scalar` (they bypass
+ * resolveFieldTypes). scalarReqProps is keyed by both fqn and short name, so
+ * we look up by the short name. Type refs (refValueTypeId set) are validated
+ * at the referenced type file itself.
  */
 function checkExtensionEntry(
   entityId: string,
   entry: ExtensionFieldEntry,
-  scalarNames: Set<string>,
-  requiredProps: Map<string, Set<string>>,
+  scalarReqProps: Map<string, Set<string>>,
   diag: Diagnostics,
 ): void {
   if (entry.refValueTypeId !== undefined) return; // type ref — checked elsewhere
   if (entry.scalar === '') return;
-  if (scalarNames.size === 0) return;
-  if (!scalarNames.has(entry.scalar)) {
+  if (scalarReqProps.size === 0) return;
+  const req = scalarReqProps.get(entry.scalar);
+  if (req === undefined) {
     diag.add({
       category: 'schema',
       file: entityId,
@@ -205,7 +199,6 @@ function checkExtensionEntry(
     });
     return;
   }
-  const req = requiredProps.get(entry.scalar) ?? new Set<string>();
   for (const rp of req) {
     if (!(rp in entry.props)) {
       diag.add({

@@ -11,6 +11,13 @@ import type { FileSystem } from './fs.js';
  * Failures become `parse` (or `version`) diagnostics; the file is dropped
  * from the parsed map but does not abort the pass.
  *
+ * Identity correction: discovery derives a provisional identity from the
+ * path stem (kebab → PascalCase). For name-bearing kinds (type/mixin/table/
+ * entity) the file declares a `name:` which is authoritative — parse rebuilds
+ * the identity from it. This keeps the stem-derived identity as the default
+ * (when it matches) while letting the declared name override (e.g. a scalar
+ * `bigint.type.yaml` declares `name: bigint`, not the PascalCased `Bigint`).
+ *
  * Returns two collections:
  *   - `parsed`: identity → AnyFile for non-extension_fields nodes (unique).
  *   - `extensionFieldsFiles`: list of { identity, owner, file } for every
@@ -32,6 +39,30 @@ export interface ParseResult {
   readonly parsed: ReadonlyMap<string, AnyFile>;
   readonly extensionFieldsFiles: ReadonlyArray<ParsedExtensionFields>;
   readonly diagnostics: Diagnostics;
+}
+
+/** Kinds whose file declares an authoritative `name:` that overrides the
+ * stem-derived provisional identity. */
+const NAME_BEARING_KINDS = new Set(['type', 'mixin', 'table', 'entity']);
+
+/**
+ * Rebuild a name-bearing node's identity from its declared `name:`.
+ *
+ * Discovery produced `<kind>:<sys>.<mod>.<StemName>`. The declared name
+ * replaces the StemName segment: `<kind>:<sys>.<mod>.<declaredName>`.
+ * Returns the original identity for non-name-bearing kinds.
+ */
+function correctedIdentity(provisional: string, file: AnyFile): string {
+  if (!NAME_BEARING_KINDS.has(file.kind)) return provisional;
+  const declaredName = (file.data as { name?: unknown }).name;
+  if (typeof declaredName !== 'string' || declaredName === '') return provisional;
+  const colonIdx = provisional.indexOf(':');
+  if (colonIdx < 0) return provisional;
+  const kind = provisional.slice(0, colonIdx);
+  const body = provisional.slice(colonIdx + 1); // sys.mod.<StemName>
+  const dot2 = body.lastIndexOf('.');
+  if (dot2 < 0) return provisional;
+  return `${kind}:${body.slice(0, dot2 + 1)}${declaredName}`;
 }
 
 export async function parseAll(opts: ParseOptions): Promise<ParseResult> {
@@ -58,7 +89,7 @@ export async function parseAll(opts: ParseOptions): Promise<ParseResult> {
       if (f.kind === 'extension_fields') {
         extensionFieldsFiles.push({ identity: entry.identity, file: f });
       } else {
-        parsed.set(entry.identity, f);
+        parsed.set(correctedIdentity(entry.identity, f), f);
       }
     } catch (e) {
       // ParseError carries a typed category; everything else is a parse fault.

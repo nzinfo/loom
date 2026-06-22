@@ -51,14 +51,15 @@ export async function link(opts: LinkOptions): Promise<LinkResult> {
   // (parse already split extension_fields out into opts.extensionFieldsFiles;
   // parsed contains only node-defining kinds.)
   for (const [identity, file] of opts.parsed) {
-    const owner = ownerOf(identity, opts.files);
+    const owner = ownerOfFile(file.file, opts.files);
     nodes.set(identity, { ...file, identity, owner });
     deps.set(identity, new Set());
   }
 
-  // Collect candidate sets for type resolution.
-  const scalars = collectScalars(opts.parsed);
-  const valueTypes = collectValueTypeFqns(opts.parsed);
+  // Collect the unified type set: all type-node fqns (scalar + struct + enum).
+  // Short-name resolution uses ONLY this set + the using list (which always
+  // includes the implicit default base.core.*). No scalar special-case.
+  const typeFqns = collectTypeFqns(opts.parsed);
 
   // Resolve type refs + expand mixins per file.
   for (const [identity, node] of nodes) {
@@ -74,8 +75,7 @@ export async function link(opts: LinkOptions): Promise<LinkResult> {
       expanded,
       identity,
       fileUsing,
-      scalars,
-      valueTypes,
+      typeFqns,
       typeParams,
       opts.parsed,
       opts.diagnostics,
@@ -116,31 +116,16 @@ function withFields(node: IRNode, fields: FieldsHost): IRNode {
   return updated as IRNode;
 }
 
-/** Collect scalar (form: scalar) short names from base.core type nodes.
+/** Collect ALL type-node fully-qualified names (sys.mod.declaredName).
  *
- * Scalars are the system base — only defined under base.core (platform/ext
- * elsewhere may define struct/enum types, but not scalars). See design note
- * decision 4. */
-function collectScalars(parsed: ReadonlyMap<string, AnyFile>): Set<string> {
-  const scalars = new Set<string>();
-  for (const [identity, f] of parsed) {
-    if (f.kind !== 'type') continue;
-    const data = f.data as TypeNode;
-    if (data.form !== 'scalar') continue;
-    if (!identity.startsWith('type:base.core.')) continue;
-    scalars.add(data.name);
-  }
-  return scalars;
-}
-
-/** Collect struct/enum (non-scalar) type fully-qualified names (sys.mod.Name). */
-function collectValueTypeFqns(parsed: ReadonlyMap<string, AnyFile>): Set<string> {
+ * Identity now uses the declared name (parse corrects it), so the fqn is
+ * simply the identity body. Unified resolution: scalar/struct/enum are all
+ * equal — they resolve through the using namespace (which always includes
+ * the implicit base.core.* default). See design note §4. */
+function collectTypeFqns(parsed: ReadonlyMap<string, AnyFile>): Set<string> {
   const fqns = new Set<string>();
   for (const [identity, f] of parsed) {
     if (f.kind !== 'type') continue;
-    const data = f.data as TypeNode;
-    if (data.form === 'scalar') continue;
-    // Identity format: type:sys.mod.Name
     const colonIdx = identity.indexOf(':');
     if (colonIdx < 0) continue;
     fqns.add(identity.slice(colonIdx + 1));
@@ -148,12 +133,14 @@ function collectValueTypeFqns(parsed: ReadonlyMap<string, AnyFile>): Set<string>
   return fqns;
 }
 
-/** Look up the owner for an identity from the discovery files map. */
-function ownerOf(identity: Identity, files?: ReadonlyMap<string, DiscoveredEntry>): Owner {
+/** Look up the owner for a file by its path from the discovery files map.
+ * Identity can't be used because parse corrects it (declared name overrides
+ * the stem-derived provisional identity), so discovery's identity no longer
+ * matches the node's. Path is stable. */
+function ownerOfFile(filePath: string, files?: ReadonlyMap<string, DiscoveredEntry>): Owner {
   if (files !== undefined) {
-    for (const entry of files.values()) {
-      if (entry.identity === identity) return entry.meta.owner;
-    }
+    const entry = files.get(filePath);
+    if (entry !== undefined) return entry.meta.owner;
   }
   return { kind: 'platform' };
 }
@@ -318,26 +305,28 @@ function expandIncludes(
 }
 
 /**
- * Resolve every field's `type:` value (spec v2 §3, §4.6).
+ * Resolve every field's `type:` value (spec v2 §3, §4.6, unified).
  *
- *   - single-segment name  → resolveShortName against scalars + using
+ *   - single-segment name  → resolveShortName against using (incl. implicit
+ *                            base.core.* default); rewrite to fqn on hit
  *   - three-segment name   → direct fqn; verify target is a type node
  *
- * Single-segment names that resolve to scalars stay as-is. Names resolved
- * via using are rewritten to their fqn so downstream passes don't need
- * the using context.
+ * All short names that resolve are rewritten to their fqn so downstream
+ * passes (validate, expand) see only fqns and branch by the target's form.
  */
 function resolveFieldTypes(
   host: FieldsHost,
   identity: Identity,
   using: readonly string[],
-  scalars: ReadonlySet<string>,
-  valueTypes: ReadonlySet<string>,
+  typeFqns: ReadonlySet<string>,
   typeParams: ReadonlySet<string>,
   parsed: ReadonlyMap<string, AnyFile>,
   diag: Diagnostics,
   deps: Map<Identity, Set<Identity>>,
 ): void {
+  // The implicit default base.core.* is always available — every type in
+  // base.core (scalar AND struct/enum) is globally resolvable by short name.
+  const usingWithDefault = using.includes('base.core.*') ? using : [...using, 'base.core.*'];
   for (const e of host.fields) {
     if (typeof e !== 'object' || e === null) continue;
     if (!('type' in e)) continue;
@@ -347,7 +336,7 @@ function resolveFieldTypes(
     // Write back the normalized form so consumers (validate, expand) see object.
     (e as Record<string, unknown>).type = descriptor;
 
-    // Type parameter reference (e.g. type: T inside a generic value_type):
+    // Type parameter reference (e.g. type: T inside a generic type):
     // leave as-is; instantiation happens at expansion when args are passed.
     if (typeParams.has(descriptor.ref)) continue;
 
@@ -359,9 +348,8 @@ function resolveFieldTypes(
         e as Record<string, unknown>,
         descriptor.ref,
         identity,
-        using,
-        scalars,
-        valueTypes,
+        usingWithDefault,
+        typeFqns,
         diag,
         deps,
       );
@@ -381,40 +369,31 @@ function resolveThreeSegment(
   const targetId = `type:${fqn}`;
   const target = parsed.get(targetId);
 
-  if (!target) {
-    // Check if any node with this fqn exists (for better error message)
-    const anyNode = [...parsed.entries()].find(([id]) => id.endsWith(`:${fqn}`));
-    if (anyNode) {
-      diag.add({
-        category: 'kind_mismatch',
-        file: identity,
-        line: 1,
-        column: 1,
-        message: `type reference "${fqn}" resolves to kind=${anyNode[1].kind}, expected type`,
-      });
-      return;
-    }
-    diag.add({
-      category: 'dangling_ref',
-      file: identity,
-      line: 1,
-      column: 1,
-      message: `unknown type "${fqn}"`,
-    });
+  if (target) {
+    deps.get(identity)?.add(targetId);
     return;
   }
 
-  if (target.kind !== 'type') {
+  // No type node with this fqn. Check whether ANY node has it (different kind)
+  // for a clearer kind_mismatch diagnostic.
+  const anyNode = [...parsed.entries()].find(([id]) => id.endsWith(`:${fqn}`));
+  if (anyNode) {
     diag.add({
       category: 'kind_mismatch',
       file: identity,
       line: 1,
       column: 1,
-      message: `type reference "${fqn}" resolves to kind=${target.kind}, expected type`,
+      message: `type reference "${fqn}" resolves to kind=${anyNode[1].kind}, expected type`,
     });
     return;
   }
-  deps.get(identity)?.add(targetId);
+  diag.add({
+    category: 'dangling_ref',
+    file: identity,
+    line: 1,
+    column: 1,
+    message: `unknown type "${fqn}"`,
+  });
 }
 
 function resolveSingleSegment(
@@ -422,8 +401,7 @@ function resolveSingleSegment(
   shortName: string,
   identity: Identity,
   using: readonly string[],
-  scalars: ReadonlySet<string>,
-  valueTypes: ReadonlySet<string>,
+  typeFqns: ReadonlySet<string>,
   diag: Diagnostics,
   deps: Map<Identity, Set<Identity>>,
 ): void {
@@ -441,13 +419,15 @@ function resolveSingleSegment(
     return;
   }
 
-  const result = resolveShortName(shortName, using, scalars, valueTypes);
+  // Unified resolution: ALL types (scalar/struct/enum) resolve the same way —
+  // through the using namespace. base.core.* is in `using` by default, so
+  // base.core types resolve by short name; ext types need explicit using.
+  const result = resolveShortName(shortName, using, typeFqns);
   switch (result.kind) {
-    case 'scalar':
-      // Stays as-is; base_types short name flows to the projector.
-      return;
-    case 'value_type': {
+    case 'resolved': {
       // Rewrite the descriptor's ref to its fqn; args/meta stay attached.
+      // Identity == declared-name fqn (parse corrects it), so the fqn IS the
+      // identity body — expand looks it up directly.
       const desc = field.type as TypeDescriptor;
       desc.ref = result.fqn;
       const targetId = `type:${result.fqn}`;

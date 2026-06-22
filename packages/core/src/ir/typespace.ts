@@ -62,60 +62,55 @@ export function parseTypeRef(s: string): TypeRef | null {
 }
 
 /**
- * Result of resolving a short name against a candidate type namespace.
+ * Result of resolving a short name against the type namespace.
  *
- *   scalar     — matched a base_types scalar (default namespace, always wins)
- *   value_type — matched a value_type node via using imports
+ *   resolved   — matched exactly one type via using imports
  *   ambiguous  — multiple using imports matched; caller must emit a diagnostic
  *   unknown    — nothing matched; caller must emit a diagnostic
+ *
+ * Note: all types are equal — scalar/struct/enum differ only in projection
+ * form, not in resolution. base.core's types are globally available because
+ * base.core is the default using namespace, not because scalars are special.
  */
 export type ResolutionResult =
-  | { readonly kind: 'scalar'; readonly name: string }
-  | { readonly kind: 'value_type'; readonly fqn: string }
+  | { readonly kind: 'resolved'; readonly fqn: string }
   | { readonly kind: 'ambiguous'; readonly candidates: readonly string[] }
   | { readonly kind: 'unknown' };
 
 /**
  * Resolve a single-segment short name against the type namespace.
  *
- * @param shortName  the bare name (e.g. "integer", "Email")
- * @param using      the file's explicit using list (wildcards `ns.*` and
- *                   precise names `ns.Name`); default `base.core.*` is NOT
- *                   included here — the caller adds it for scalars only
- *                   (scalars are always available, value_types are not)
- * @param scalars    base_types scalar short-name set (the implicit namespace)
- * @param valueTypes fully-qualified value_type names available in the IR
+ * @param shortName  the bare name (e.g. "integer", "Email", "Money")
+ * @param using      the file's using list (wildcards `ns.*` and precise names
+ *                   `ns.Name`). The default `base.core.*` is injected by the
+ *                   caller before calling — all types in base.core (scalar AND
+ *                   struct/enum) are globally available that way.
+ * @param typeFqns   fully-qualified names of ALL type nodes in the IR
+ *                   (scalar + struct + enum,不分 form)
  *
- * Resolution order (spec §4.6):
- *   1. scalar lookup (default namespace, always wins)
- *   2. precise using entries (direct fqn match)
- *   3. wildcard using entries (ns.* → ns.shortName if it exists in valueTypes)
- *   4. ambiguity if >1 distinct fqn across steps 2-3
- *   5. unknown
+ * Resolution order (spec §4.6, unified):
+ *   1. precise using entries (direct fqn match)
+ *   2. wildcard using entries (ns.* → ns.shortName if it exists in typeFqns)
+ *   3. ambiguity if >1 distinct fqn
+ *   4. unknown
  */
 export function resolveShortName(
   shortName: string,
   using: readonly string[],
-  scalars: ReadonlySet<string>,
-  valueTypes: ReadonlySet<string>,
+  typeFqns: ReadonlySet<string>,
 ): ResolutionResult {
-  // Step 1: scalar default namespace.
-  if (scalars.has(shortName)) {
-    return { kind: 'scalar', name: shortName };
-  }
-
-  // Step 2-3: collect candidate fqns from using entries.
+  // Collect candidate fqns from using entries.
   const candidates = new Set<string>();
   for (const entry of using) {
     if (entry.endsWith('.*')) {
       const ns = entry.slice(0, -2);
       const fqn = `${ns}.${shortName}`;
-      if (valueTypes.has(fqn)) candidates.add(fqn);
+      if (typeFqns.has(fqn)) candidates.add(fqn);
     } else {
       // Precise name: matches only if its last segment equals shortName.
       const lastDot = entry.lastIndexOf('.');
       const lastName = lastDot < 0 ? entry : entry.slice(lastDot + 1);
-      if (lastName === shortName && valueTypes.has(entry)) {
+      if (lastName === shortName && typeFqns.has(entry)) {
         candidates.add(entry);
       }
     }
@@ -124,7 +119,7 @@ export function resolveShortName(
   if (candidates.size === 0) return { kind: 'unknown' };
   if (candidates.size === 1) {
     const fqn = [...candidates][0] as string;
-    return { kind: 'value_type', fqn };
+    return { kind: 'resolved', fqn };
   }
   return { kind: 'ambiguous', candidates: [...candidates].sort() };
 }
