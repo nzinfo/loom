@@ -78,7 +78,7 @@ table:
     ext_table: users_ext
 ```
 
-物理结构（JSONB 扩展组模型——每实体 + 每 tenant + **每组**一行）：
+物理结构（JSONB 扩展组模型）：
 
 ```
 ┌─────────────────────┐         ┌──────────────────────────────────┐
@@ -86,30 +86,30 @@ table:
 │ (主表)              │ 1 ──── N │ (JSONB 扩展组表)                 │
 ├─────────────────────┤         ├──────────────────────────────────┤
 │ id BIGINT PK        │ ◀────── │ base_id BIGINT  FK→users_base.id │
-│ email               │         │ tenant_id BIGINT  (NULL=全局)     │
-│ created_at          │         │ group_name VARCHAR(50)            │
+│ email               │         │ scope BIGINT NOT NULL             │
+│ created_at          │         │ group_name VARCHAR(50) NOT NULL   │
 │ ...                 │         │ values JSONB                      │
 └─────────────────────┘         │ created_at TIMESTAMPTZ           │
                                 └──────────────────────────────────┘
 ```
 
-行的维度是 `(base_id, tenant_id, group_name)`：
+行的维度是 `(base_id, scope, group_name)`——三者组合唯一。两个正交的维度：
 
-- **`tenant_id`** 表达数据可见性 scope，**不区分数据来源**。platform 和 ext provider
-  的扩展字段都是全局的（`tenant_id = NULL`，所有租户可见）；只有 tenant owner 的扩展
-  字段是租户专属（`tenant_id = <租户id>`）。所以 ext 表不需要额外的 vendor/provider
-  列——从可见性看，platform 和 ext provider 等价，都是全局
-- **`group_name`** 是扩展组名（来自 `.ext.yaml` 的 `group:` 或文件 stem）。一个 ext
-  文件 = 一组 = 运行时一组行
+- **`group`**（编译期概念）：字段打包维度。一个 `.ext.yaml` 文件 = 一个 group。
+  决定哪些字段打包进同一个 JSONB 文档。来自 `group:` 声明或文件 stem。
+- **`scope`**（运行时概念）：数据归属维度。标识这行数据是谁的——每个 owner（platform /
+  ext:provider / tenant:id）有自己的 scope hash 值。一个 base 记录的同一个 group 可能
+  来自多个 scope（如 platform 全局数据 + tenant 专属数据各占一行）。
 
 ```
-base_id=1, tenant_id=NULL, group_name='profile',  values='{"nickname":"Alice"}'      ← platform 定义的字段
-base_id=1, tenant_id=NULL, group_name='finance',  values='{"credit_limit_amount":5000}' ← platform 定义的字段
-base_id=1, tenant_id=1,   group_name='profile',  values='{"customer_no":"C001"}'    ← tenant:acme 定义的字段
+base_id=1, scope=hash(platform),     group_name='profile', values='{"nickname":"Alice"}'
+base_id=1, scope=hash(tenant:acme),  group_name='profile', values='{"customer_no":"C001"}'
+base_id=1, scope=hash(platform),     group_name='finance', values='{"credit_limit_amount":5000}'
+base_id=1, scope=hash(ext:acme),     group_name='tax',      values='{"tax_id":"123"}'
 ```
 
-如果想审计"某行数据是哪个 ext provider 写的"，用 `group_name` 承载来源（如 `acme_tax`
-而非 `tax`），或在运行时加审计列——这是应用的决策，loom 编译期不关心。
+scope 列只存 hash 值（由应用计算写入），loom 编译期不关心具体值。view 也不按 scope
+过滤——可见性是查询阶段的事（应用加 `WHERE scope = ...`）。
 
 > 策略名保留为 `sidecar_eav`（向下兼容），但物理模型已是 JSONB 扩展组，不再是旧的
 > typed-column EAV。背景与权衡见

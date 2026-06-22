@@ -16,7 +16,7 @@ CREATE UNIQUE INDEX idx_users_email ON base_core.users_base (email);
 
 CREATE TABLE base_core.users_ext (
   base_id BIGINT NOT NULL,
-  tenant_id BIGINT,
+  scope BIGINT NOT NULL,
   group_name VARCHAR(50) NOT NULL,
   values JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

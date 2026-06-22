@@ -52,27 +52,30 @@ fields:
 ```sql
 CREATE TABLE users_ext (
   base_id BIGINT NOT NULL,
-  tenant_id BIGINT,
+  scope BIGINT NOT NULL,
   group_name VARCHAR(50) NOT NULL,
   values JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
 
-数据（每实体 + 每 tenant + 每组一行）：
+行维度 `(base_id, scope, group_name)`——group 是编译期字段打包维度，scope 是运行时
+数据归属维度（每个 owner 有自己的 scope hash）。两者正交。
+
+数据（每实体 + 每 scope + 每组一行）：
 ```
-base_id=1, tenant_id=NULL, group_name='profile',
+base_id=1, scope=hash(platform), group_name='profile',
   values='{"nickname":"Alice","avatar":"x.png","bio":"engineer"}'
 
-base_id=1, tenant_id=NULL, group_name='finance',
+base_id=1, scope=hash(platform), group_name='finance',
   values='{"credit_limit_amount":5000,"credit_limit_currency_code":"USD","score":750}'
 
-base_id=1, tenant_id=1, group_name='profile',
+base_id=1, scope=hash(tenant:1), group_name='profile',
   values='{"nickname":"Bob"}'
 ```
 
 **分组粒度是文件级**——一个 `.ext.yaml` 文件里所有字段共享同一个 group。行数 =
-你划分了多少个文件（组）。把 100 个字段拆到 5 个文件 → 每 entity 每 tenant 5 行
+你划分了多少个文件（组）× 多少个 scope。把 100 个字段拆到 5 个文件 → 每个 scope 5 行
 （而非 100 行）；塞进 1 个文件 → 1 行。组划分是作者的主动设计决策。
 
 ### 2.3 view：LEFT JOIN + JSON 提取
@@ -86,10 +89,11 @@ SELECT
   (f.values->>'credit_limit_amount')::numeric AS credit_limit_amount
 FROM base_core.users_base u
 LEFT JOIN base_core.users_ext p ON p.base_id = u.id AND p.group_name = 'profile'
-  AND (p.tenant_id IS NULL OR p.tenant_id = current_tenant())
-LEFT JOIN base_core.users_ext f ON f.base_id = u.id AND f.group_name = 'finance'
-  AND (f.tenant_id IS NULL OR f.tenant_id = current_tenant());
+LEFT JOIN base_core.users_ext f ON f.base_id = u.id AND f.group_name = 'finance';
 ```
+
+view 不按 scope 过滤——可见性是查询阶段的事（应用加 `WHERE scope = ...`）。如果同一
+group 有多行（不同 scope），view 会产生多行。
 
 **N 个 group → N 个 LEFT JOIN + JSON 提取**（而非 N 个子查询）。
 
@@ -124,7 +128,8 @@ LEFT JOIN base_core.users_ext f ON f.base_id = u.id AND f.group_name = 'finance'
 三种方言的 `extTableBlock` 已重写：
 - 删除 `field_name`、`data_type`、6 个 typed value 列
 - 新增 `group_name VARCHAR(50) NOT NULL` + `values JSONB NOT NULL`
-- 保留 `base_id`、`tenant_id`、`created_at`
+- `tenant_id` 改为 `scope BIGINT NOT NULL`（数据归属 hash，替代 tenant_id）
+- 保留 `base_id`、`created_at`
 
 方言差异：
 - pg：`values JSONB NOT NULL DEFAULT '{}'::jsonb`、`TIMESTAMPTZ`

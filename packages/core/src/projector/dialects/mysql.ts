@@ -59,7 +59,7 @@ function extTableBlock(t: PhysicalTable): string {
   const lines: string[] = [];
   lines.push(`CREATE TABLE ${extQual} (`);
   lines.push('  base_id BIGINT NOT NULL,');
-  lines.push('  tenant_id BIGINT,');
+  lines.push('  scope BIGINT NOT NULL,');
   lines.push('  group_name VARCHAR(50) NOT NULL,');
   lines.push('  values JSON NOT NULL DEFAULT (JSON_OBJECT()),');
   lines.push('  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)');

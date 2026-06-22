@@ -40,15 +40,19 @@ fields:
 每组一行），组内字段是该行 JSONB 的独立 key：
 
 ```
-base_id=1, tenant_id=NULL, group_name='profile',
+base_id=1, scope=hash(platform), group_name='profile',
   values='{"nickname":"Alice","bio":"engineer"}'
-base_id=1, tenant_id=NULL, group_name='finance',
+base_id=1, scope=hash(platform), group_name='finance',
   values='{"credit_limit_amount":5000,"credit_limit_currency_code":"USD","customer_grade":"vip"}'
 ```
 
+> **group vs scope**：group 是编译期概念（字段打包维度，一个 ext 文件 = 一个 group）；
+> scope 是运行时概念（数据归属维度，标识这行数据是哪个 owner 的）。两者正交——同一个
+> group 可以有多行（不同 scope）。详见 [06 table](./06-table.md) §sidecar_eav。
+
 **分组粒度是文件级**——一个 `.ext.yaml` 文件里所有字段共享同一个 group。所以
-行数 = 你划分了多少个文件（组）。把 100 个字段拆到 5 个文件 → 每 entity 每 tenant
-5 行；塞进 1 个文件 → 1 行。组划分是作者的主动设计决策。
+行数 = 你划分了多少个文件（组）。把 100 个字段拆到 5 个文件 → 每个 scope 5 行；
+塞进 1 个文件 → 1 行。组划分是作者的主动设计决策。
 
 ### 为什么按组而非按字段
 
@@ -143,11 +147,11 @@ entity:base.core.User 的扩展字段（按 group 组织）：
     credit_limit
 ```
 
-投影时，每个 ext 文件在 ext 表里对应一组行（`group_name` + `values` JSONB）。
+投影时，每个 ext 文件在 ext 表里对应一组行（`scope` + `group_name` + `values` JSONB）。
 同名 group 的字段从同一个 JOIN 提取——上面 platform 和 tenant:acme 的两个
 `profile` 文件，view 里都从 `p` JOIN 取值（`p.values->>'nickname'`、
 `p.values->>'customer_no'`）。但它们是**各自独立的 JSONB 行**：platform 的 profile
-和 tenant:acme 的 profile 是不同的物理行（tenant_id 不同），不是合并成一行。
+和 tenant:acme 的 profile 是不同的物理行（scope 不同），不是合并成一行。
 
 唯一性约束也从"文件 identity 唯一"变成"同 entity 内字段名唯一"（同名字段才报错，
 见上面"同名字段冲突"）。
