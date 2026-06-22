@@ -1,0 +1,7 @@
+version: loom-schema/v2
+name: decimal
+form: scalar
+description: fixed-point number
+properties:
+  - { name: precision, type: integer, required: true }
+  - { name: scale, type: integer, required: true }

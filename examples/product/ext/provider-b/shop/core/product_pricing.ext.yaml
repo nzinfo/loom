@@ -1,0 +1,12 @@
+version: loom-schema/v2
+entity: entity:shop.core.Product
+using:
+  - shop.core.*
+group: pricing
+fields:
+  - name: discount_rate
+    type:
+      ref: decimal
+      args: { precision: 5, scale: 2 }
+  - name: tier_price
+    type: shop.core.Money

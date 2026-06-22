@@ -10,6 +10,7 @@
  */
 import process from 'node:process';
 import { checkCommand } from './commands/check.js';
+import { fieldsCommand } from './commands/fields.js';
 import { projectCommand } from './commands/project.js';
 import { versionCommand } from './commands/version.js';
 
@@ -19,6 +20,7 @@ function usage(): void {
 commands:
   version                                  print version info (spec §16.2)
   check <path>                             load + validate (spec §8.7)
+  fields <path> <entity>                   inspect an entity's fields (base + ext groups)
   project sql --dialect <d> [--out <f>] [--physical-schema <mod>=<name>]... <path>   project to SQL DDL (spec §8.8)
   fmt <path>                               reformat in place (not yet implemented)
   lift <physical.yaml>                     reverse-lift (not yet implemented)
@@ -66,6 +68,21 @@ async function main(argv: string[]): Promise<number> {
         return 64;
       }
       return await checkCommand({ path });
+    }
+    case 'fields': {
+      const path = rest[0];
+      const entity = rest[1];
+      if (path === undefined) {
+        process.stderr.write('error: fields requires a path and entity identity\n');
+        return 64;
+      }
+      if (entity === undefined) {
+        process.stderr.write(
+          'error: fields requires an entity identity (e.g. entity:shop.core.Product)\n',
+        );
+        return 64;
+      }
+      return await fieldsCommand({ path, entity });
     }
     case 'project': {
       const sub = rest[0];

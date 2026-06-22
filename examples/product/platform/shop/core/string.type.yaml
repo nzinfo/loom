@@ -1,0 +1,6 @@
+version: loom-schema/v2
+name: string
+form: scalar
+description: var-length string
+properties:
+  - { name: max_length, type: integer, required: true }
