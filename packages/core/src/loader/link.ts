@@ -148,6 +148,13 @@ function collectExtensionFields(
   for (const { identity, file } of extensionFieldsFiles) {
     const ef = file.data as ExtensionFields;
     const entityRef = ef.entity;
+    // Group: from the .ext.yaml's group field, or default to the file stem.
+    const fileStem =
+      file.file
+        .split('/')
+        .pop()
+        ?.replace(/\.ext\.ya?ml$/, '') ?? 'default';
+    const group = ef.group ?? fileStem;
 
     let bucket = byEntity.get(entityRef);
     if (bucket === undefined) {
@@ -180,6 +187,7 @@ function collectExtensionFields(
           refValueTypeId: `type:${ref}`,
           props: desc.args ?? {},
           ...(f.default_scope !== undefined ? { defaultScope: String(f.default_scope) } : {}),
+          group,
         });
       } else {
         bucket.push({
@@ -187,6 +195,7 @@ function collectExtensionFields(
           scalar: ref,
           props: desc.args ?? {},
           ...(f.default_scope !== undefined ? { defaultScope: String(f.default_scope) } : {}),
+          group,
         });
       }
     }

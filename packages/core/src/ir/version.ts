@@ -105,6 +105,10 @@ export interface ExtensionFieldEntry {
   readonly props: Readonly<Record<string, unknown>>;
   readonly refValueTypeId?: string;
   readonly defaultScope?: string;
+  /** Extension group this field belongs to (from the .ext.yaml's group:
+   * field, or the file stem if omitted). Fields in the same group are
+   * packed into one JSONB row in the ext table. */
+  readonly group: string;
 }
 
 /** Placeholder — full IR types will be added in implementation phases. */

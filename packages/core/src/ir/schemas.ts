@@ -287,6 +287,9 @@ export const ExtensionFieldsSchema = z
   .object({
     version: versionSchema,
     entity: z.string().min(1),
+    /** Extension group name. Fields in the same group are packed into one
+     * JSONB row in the ext table. Optional — defaults to the file stem. */
+    group: z.string().min(1).optional(),
     using: usingSchema,
     fields: z.array(typeField).min(1),
   })
