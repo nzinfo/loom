@@ -1,7 +1,7 @@
 # 设计记录：JSONB 扩展组取代 EAV
 
 - **日期**：2026-06-22
-- **状态**：设计中（schema 层已落地，投影层待实现）
+- **状态**：已实现（schema 层 + 投影层均落地，3 方言 + golden 已更新）
 - **动机**：EAV typed columns 在 100+ 扩展字段时行数爆炸（一字段一行）、查询慢（N 个子查询）、multi-field struct 拆行不原子。JSONB 扩展组是综合更优的存储模型。
 
 ## 1. 背景：当前 sidecar_eav 的物理模型
@@ -113,26 +113,26 @@ LEFT JOIN base_core.users_ext f ON f.base_id = u.id AND f.group_name = 'finance'
 - `ExtensionFieldEntry`：新增 `group: string` 属性
 - `collectExtensionFields`（link.ts）：从 `.ext.yaml` 的 `group:` 或文件 stem 填充 group
 
-## 5. 待实现（投影层）
+## 5. 投影层实现（已完成）
 
 ### 5.1 ext 表 DDL（pg/mysql/sqlite）
 
-三种方言的 `extTableBlock` 重写：
+三种方言的 `extTableBlock` 已重写：
 - 删除 `field_name`、`data_type`、6 个 typed value 列
 - 新增 `group_name VARCHAR(50) NOT NULL` + `values JSONB NOT NULL`
 - 保留 `base_id`、`tenant_id`、`created_at`
 
 方言差异：
-- pg：`values JSONB`、`TIMESTAMPTZ`
-- mysql：`values JSON`、`DATETIME(3)`
-- sqlite：`values TEXT`（存 JSON 字符串）、`TEXT`（时间）
+- pg：`values JSONB NOT NULL DEFAULT '{}'::jsonb`、`TIMESTAMPTZ`
+- mysql：`values JSON NOT NULL DEFAULT (JSON_OBJECT())`、`DATETIME(6)`
+- sqlite：`values TEXT NOT NULL DEFAULT '{}'`、`TEXT`（时间）
 
-### 5.2 PivotView 接口重设计
+### 5.2 PivotView 接口重设计（已完成）
 
 ```ts
 interface GroupJoin {
   readonly group: string;       // group name
-  readonly alias: string;       // SQL alias (e.g. 'p', 'f')
+  readonly alias: string;       // SQL alias (e.g. 'p', 'f', 'e0')
 }
 interface PivotColumn {
   readonly fieldName: string;   // JSON key in the group's values
@@ -140,7 +140,6 @@ interface PivotColumn {
 }
 interface PivotView {
   readonly viewName: string;
-  readonly schema?: string;
   readonly baseTable: string;
   readonly extTable: string;
   readonly baseColumns: readonly string[];
@@ -149,21 +148,27 @@ interface PivotView {
 }
 ```
 
-### 5.3 buildPivotViews 重写
+### 5.3 buildPivotViews 重写（已完成）
 
-- 按 entity 收集所有扩展字段，按 group 分组
-- 每个 group 生成一个 GroupJoin（alias 用 group 首字母或递增）
-- 每个 field 生成一个 PivotColumn（fieldName = field name or `<prefix>_<subfield>`，groupAlias = 所在 group 的 alias）
+- 按 entity 收集所有扩展字段，按 group 分组（保持首次出现顺序）
+- 每个 group 生成一个 GroupJoin（alias 用 group 首字母小写；冲突时回退 e0/e1/...；
+  'u' 保留给 base table）
+- 每个 field 生成一个 PivotColumn（fieldName = field name or `<prefix>_<subfield>`，
+  groupAlias = 所在 group 的 alias）；多字段 struct ref 展开成多个 JSON key
 
-### 5.4 方言 view block 重写
+### 5.4 方言 view block 重写（已完成）
 
 pg/mysql/sqlite 的 `viewBlock` 改为 LEFT JOIN + JSON 提取：
-- pg/mysql：`alias.values->>'field' AS field`
+- pg：`alias.values->>'field' AS field`
+- mysql：`` alias.values->>'$.field' AS field ``
 - sqlite：`json_extract(alias.values, '$.field') AS field`
 
-### 5.5 golden 更新
+JOIN 子句：`LEFT JOIN <ext> <alias> ON <alias>.base_id = u.id AND <alias>.group_name = '<group>'`
 
-ext 表 DDL + view 语句变化，golden 需重新生成。
+### 5.5 golden 更新（已完成）
+
+`base_schema.pg.sql` 已重新生成：ext 表 DDL 用 `group_name + values JSONB`，
+view 用两个 LEFT JOIN（profile 组 + finance 组）+ JSON 提取。
 
 ## 6. multi-field struct 在 JSONB 里的展开
 

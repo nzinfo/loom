@@ -5,8 +5,8 @@
 > SQL DDL（PostgreSQL / MySQL / SQLite）。
 >
 > 核心理念：**先建模，再投影**。设计层关注语义（"用户有邮箱、有余额"），投影层
-> 关注物理实现（"邮箱是 VARCHAR(254)、余额是 NUMERIC(18,4)，扩展字段走 sidecar
-> EAV 表 + 透视视图"）。
+> 关注物理实现（"邮箱是 VARCHAR(254)、余额是 NUMERIC(18,4)，扩展字段按组打包进
+> sidecar JSONB 扩展表 + 透视视图"）。
 
 ## 这套文档怎么读
 

@@ -66,14 +66,8 @@ function extTableBlock(t: PhysicalTable): string {
   lines.push(`CREATE TABLE ${extQual} (`);
   lines.push('  base_id INTEGER NOT NULL,');
   lines.push('  tenant_id INTEGER,');
-  lines.push('  field_name TEXT NOT NULL,');
-  lines.push('  data_type TEXT NOT NULL,');
-  lines.push('  int_value INTEGER,');
-  lines.push('  decimal_value NUMERIC,');
-  lines.push('  string_value TEXT,');
-  lines.push('  datetime_value TEXT,');
-  lines.push('  boolean_value INTEGER,');
-  lines.push('  json_value TEXT,');
+  lines.push('  group_name TEXT NOT NULL,');
+  lines.push("  values TEXT NOT NULL DEFAULT '{}',");
   lines.push("  created_at TEXT NOT NULL DEFAULT (datetime('now'))");
   lines.push(');');
   return lines.join('\n');
@@ -82,11 +76,13 @@ function extTableBlock(t: PhysicalTable): string {
 function viewBlock(v: PivotView): string {
   const selectCols: string[] = [...v.baseColumns];
   for (const c of v.columns) {
-    selectCols.push(
-      `(SELECT ${c.eavColumn} FROM ${v.extTable} e WHERE e.base_id = u.id AND e.field_name = '${c.fieldName}' LIMIT 1) AS ${c.fieldName}`,
-    );
+    selectCols.push(`json_extract(${c.groupAlias}.values, '$.${c.fieldName}') AS ${c.fieldName}`);
   }
-  return `CREATE VIEW ${v.viewName} AS\nSELECT\n${selectCols.map((c) => `  ${c}`).join(',\n')}\nFROM ${v.baseTable} u;`;
+  const joins = v.groupJoins.map(
+    (g) =>
+      `LEFT JOIN ${v.extTable} ${g.alias} ON ${g.alias}.base_id = u.id AND ${g.alias}.group_name = '${g.group}'`,
+  );
+  return `CREATE VIEW ${v.viewName} AS\nSELECT\n${selectCols.map((c) => `  ${c}`).join(',\n')}\nFROM ${v.baseTable} u${joins.length > 0 ? '\n' : ''}${joins.join('\n')};`;
 }
 
 function sqliteType(c: PhysicalColumn): string {

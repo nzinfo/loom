@@ -1,41 +1,37 @@
-import type { Entity } from '../ir/schemas.js';
 /**
- * Sidecar EAV pivot view generator. See spec §7.4.
+ * Sidecar JSONB pivot view generator. See
+ * `docs/design/2026-06-22-jsonb-extension-groups.md`.
  *
  * For each sidecar_eav table whose entity has declared extension_fields,
  * produce a dialect-neutral PivotView describing:
  *   - the base + ext physical table names
- *   - one PivotColumn per declared extension field, with the EAV column
- *     (string_value / decimal_value / etc.) chosen by scalar type
- *   - multi-field value_type refs expanded into N columns using the same
- *     <prefix>_<subname> convention as the main table (spec §5.5)
+ *   - one GroupJoin per distinct extension group (each group becomes one
+ *     LEFT JOIN on the ext table, filtered by group_name)
+ *   - one PivotColumn per declared extension field (multi-field struct refs
+ *     expand into N columns using the same <prefix>_<subname> convention
+ *     as the main table), each tagged with its group's join alias
  *
- * Dialect layers render PivotView into actual CREATE VIEW SQL.
+ * Dialect layers render PivotView into CREATE VIEW SQL with LEFT JOIN +
+ * JSON extraction (pg/mysql: `->>`, sqlite: `json_extract`).
  */
+import type { Entity } from '../ir/schemas.js';
 import type { IR } from '../ir/version.js';
-import type { PhysicalModel } from './types.js';
+import type { ExtensionFieldEntry, PhysicalModel } from './types.js';
 
-/** Which ext-table value column holds a given scalar. Spec §7.3. */
-const EAV_COLUMN_BY_SCALAR: Record<string, string> = {
-  boolean: 'boolean_value',
-  integer: 'int_value',
-  bigint: 'int_value',
-  decimal: 'decimal_value',
-  string: 'string_value',
-  text: 'string_value',
-  datetime: 'datetime_value',
-  date: 'datetime_value',
-  uuid: 'string_value',
-  bytes: 'json_value',
-  json: 'json_value',
-  enum: 'string_value',
-};
+/** A LEFT JOIN on the ext table for one extension group. */
+export interface GroupJoin {
+  /** Group name (matches ext table's group_name column). */
+  readonly group: string;
+  /** SQL alias for this join (e.g. 'p', 'f', 'e0'). */
+  readonly alias: string;
+}
 
+/** A pivot column: one JSON key extracted from a group's values. */
 export interface PivotColumn {
-  /** Field name as declared in extension_fields (or expanded prefix_subname). */
+  /** JSON key in the group's values document (or expanded prefix_subname). */
   readonly fieldName: string;
-  /** EAV physical column the value is stored in. */
-  readonly eavColumn: string;
+  /** Alias of the GroupJoin whose values document holds this key. */
+  readonly groupAlias: string;
 }
 
 export interface PivotView {
@@ -44,6 +40,7 @@ export interface PivotView {
   readonly extTable: string;
   readonly baseColumns: readonly string[];
   readonly columns: readonly PivotColumn[];
+  readonly groupJoins: readonly GroupJoin[];
 }
 
 export function buildPivotViews(model: PhysicalModel, ir: IR): PivotView[] {
@@ -83,29 +80,45 @@ export function buildPivotViews(model: PhysicalModel, ir: IR): PivotView[] {
     }
 
     const extFields = entityId !== undefined ? model.extensionFields.get(entityId) : undefined;
+
+    // Assign SQL aliases to each group ('u' is reserved for the base table).
+    const usedAliases = new Set<string>(['u']);
+    const groupJoins: GroupJoin[] = [];
+    const groupToAlias = new Map<string, string>();
+    if (extFields) {
+      for (const ef of extFields) {
+        if (!groupToAlias.has(ef.group)) {
+          const alias = pickGroupAlias(ef.group, usedAliases);
+          groupToAlias.set(ef.group, alias);
+          groupJoins.push({ group: ef.group, alias });
+        }
+      }
+    }
+
+    // Build pivot columns. Multi-field struct refs expand into N columns,
+    // each in the same group as their parent field.
     const pivotCols: PivotColumn[] = [];
     if (extFields) {
       for (const ef of extFields) {
+        const gAlias = groupToAlias.get(ef.group);
+        if (gAlias === undefined) continue;
+
         if (ef.refValueTypeId) {
-          // Multi/single-field type ref → expand into physical columns.
+          // Multi/single-field struct ref → expand into JSON keys.
           const vtNode = ir.nodes.get(ef.refValueTypeId);
           if (vtNode?.kind !== 'type') continue;
-          for (const f of vtNode.data.fields ?? []) {
-            const fRec = f as Record<string, unknown>;
-            const rawType = fRec.type;
-            const subScalar =
-              typeof rawType === 'string'
-                ? rawType
-                : ((rawType as { ref?: string })?.ref ?? 'string');
+          const vtFields =
+            (vtNode.data as { fields?: ReadonlyArray<{ name: string }> }).fields ?? [];
+          for (const f of vtFields) {
             pivotCols.push({
-              fieldName: `${ef.name}_${(f as { name: string }).name}`,
-              eavColumn: EAV_COLUMN_BY_SCALAR[subScalar] ?? 'string_value',
+              fieldName: `${ef.name}_${f.name}`,
+              groupAlias: gAlias,
             });
           }
         } else {
           pivotCols.push({
             fieldName: ef.name,
-            eavColumn: EAV_COLUMN_BY_SCALAR[ef.scalar] ?? 'string_value',
+            groupAlias: gAlias,
           });
         }
       }
@@ -117,7 +130,26 @@ export function buildPivotViews(model: PhysicalModel, ir: IR): PivotView[] {
       extTable: table.extTableName,
       baseColumns: table.columns.map((c) => c.name),
       columns: pivotCols,
+      groupJoins,
     });
   }
   return out;
+}
+
+/**
+ * Pick a short SQL alias for a group. Prefers the first character of the
+ * group name (lowercased) when available; falls back to e0, e1, ... to
+ * avoid collisions (including with the base table alias 'u').
+ */
+function pickGroupAlias(group: string, used: Set<string>): string {
+  const first = group.charAt(0).toLowerCase();
+  if (/[a-z]/.test(first) && !used.has(first)) {
+    used.add(first);
+    return first;
+  }
+  let i = 0;
+  while (used.has(`e${i}`)) i++;
+  const alias = `e${i}`;
+  used.add(alias);
+  return alias;
 }

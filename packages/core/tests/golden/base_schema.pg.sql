@@ -17,14 +17,8 @@ CREATE UNIQUE INDEX idx_users_email ON base_core.users_base (email);
 CREATE TABLE base_core.users_ext (
   base_id BIGINT NOT NULL,
   tenant_id BIGINT,
-  field_name VARCHAR(100) NOT NULL,
-  data_type VARCHAR(20) NOT NULL,
-  int_value BIGINT,
-  decimal_value NUMERIC(18,4),
-  string_value TEXT,
-  datetime_value TIMESTAMPTZ,
-  boolean_value BOOLEAN,
-  json_value JSONB,
+  group_name VARCHAR(50) NOT NULL,
+  values JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -48,6 +42,11 @@ SELECT
   price_range_low,
   price_range_high,
   status,
-  (SELECT string_value FROM users_ext e WHERE e.base_id = u.id AND e.field_name = 'nickname' LIMIT 1) AS nickname,
-  (SELECT string_value FROM users_ext e WHERE e.base_id = u.id AND e.field_name = 'customer_no' LIMIT 1) AS customer_no
-FROM base_core.users_base u;
+  p.values->>'nickname' AS nickname,
+  p.values->>'bio' AS bio,
+  f.values->>'credit_limit_amount' AS credit_limit_amount,
+  f.values->>'credit_limit_currency_code' AS credit_limit_currency_code,
+  p.values->>'customer_no' AS customer_no
+FROM base_core.users_base u
+LEFT JOIN users_ext p ON p.base_id = u.id AND p.group_name = 'profile'
+LEFT JOIN users_ext f ON f.base_id = u.id AND f.group_name = 'finance';

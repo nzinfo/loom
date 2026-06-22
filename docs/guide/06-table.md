@@ -78,28 +78,29 @@ table:
     ext_table: users_ext
 ```
 
-物理结构：
+物理结构（JSONB 扩展组模型——每实体 + 每 tenant + **每组**一行）：
 
 ```
 ┌─────────────────────┐         ┌──────────────────────────────────┐
 │ users_base          │         │ users_ext                        │
-│ (主表)              │ 1 ──── N │ (EAV 扩展表)                     │
+│ (主表)              │ 1 ──── N │ (JSONB 扩展组表)                 │
 ├─────────────────────┤         ├──────────────────────────────────┤
 │ id BIGINT PK        │ ◀────── │ base_id BIGINT  FK→users_base.id │
 │ email               │         │ tenant_id BIGINT                  │
-│ created_at          │         │ field_name VARCHAR(100)          │
-│ ...                 │         │ data_type VARCHAR(20)            │
-└─────────────────────┘         │ int_value BIGINT                 │
-                                │ decimal_value DECIMAL(18,4)      │
-                                │ string_value TEXT                │
-                                │ datetime_value TIMESTAMPTZ       │
-                                │ boolean_value BOOLEAN            │
-                                │ json_value JSONB                 │
-                                │ created_at TIMESTAMPTZ           │
+│ created_at          │         │ group_name VARCHAR(50)            │
+│ ...                 │         │ values JSONB                      │
+└─────────────────────┘         │ created_at TIMESTAMPTZ           │
                                 └──────────────────────────────────┘
 ```
 
-每行 = 一个自定义字段实例。`data_type` 标记值的物理列。
+每个扩展字段属于一个 **group**（在 `.ext.yaml` 的 `group:` 字段声明）。同组的字段
+打包成一行，是该行 `values` JSONB 文档的独立 key。100 个字段分成 5 组 → 每 entity
+每 tenant 仅 5 行（而非每字段一行）。分组与扩展字段声明详见
+[08 extension_fields](./08-extension-fields.md)。
+
+> 策略名保留为 `sidecar_eav`（向下兼容），但物理模型已是 JSONB 扩展组，不再是旧的
+> typed-column EAV。背景与权衡见
+> [设计记录：JSONB 扩展组](../design/2026-06-22-jsonb-extension-groups.md)。
 
 ### view：在 entity 上声明
 
@@ -118,20 +119,24 @@ view: users                    # 可选；省略则不创建 view
 ```sql
 CREATE VIEW users AS
 SELECT
-  id,
-  created_at,
-  updated_at,
-  email,
-  (SELECT string_value FROM users_ext e
-   WHERE e.base_id = u.id AND e.field_name = 'nickname' LIMIT 1) AS nickname
-FROM base_core.users_base u;
+  u.id,
+  u.created_at,
+  u.updated_at,
+  u.email,
+  p.values->>'nickname' AS nickname,
+  p.values->>'bio' AS bio,
+  f.values->>'credit_limit_amount' AS credit_limit_amount
+FROM base_core.users_base u
+LEFT JOIN users_ext p ON p.base_id = u.id AND p.group_name = 'profile'
+LEFT JOIN users_ext f ON f.base_id = u.id AND f.group_name = 'finance';
 ```
 
-view 把 EAV 行转列（pivot 子查询）。**应用代码始终用 view 名（`users`）**，
+view 用 **LEFT JOIN**（每组一个，按 `group_name` 过滤）+ **JSON 提取**（`->>'key'`）
+把组内的 JSON key 展开成虚拟列。**应用代码始终用 view 名（`users`）**，
 不直接访问 `_base`/`_ext`。
 
 多 owner 叠加的扩展字段（platform + ext + tenant）都会在 view 里展开成各自的
-虚拟列，详见 [08 extension_fields](./08-extension-fields.md)。
+虚拟列——同组共享一个 JOIN，不同组各自 JOIN。详见 [08 extension_fields](./08-extension-fields.md)。
 
 ### 物理表名编码约定
 

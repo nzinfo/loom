@@ -147,13 +147,26 @@ business_keys: [email]
 audit: true
 view: users
 `,
-    'platform/base/core/user_fields.ext.yaml': `version: loom-schema/v2
+    'platform/base/core/user_profile.ext.yaml': `version: loom-schema/v2
 entity: entity:base.core.User
+group: profile
 fields:
   - name: nickname
     type:
       ref: string
       args: { max_length: 50 }
+    default_scope: tenant
+  - name: bio
+    type:
+      ref: string
+      args: { max_length: 500 }
+`,
+    'platform/base/core/user_finance.ext.yaml': `version: loom-schema/v2
+entity: entity:base.core.User
+group: finance
+fields:
+  - name: credit_limit
+    type: base.core.Money
     default_scope: tenant
 `,
 
@@ -183,6 +196,7 @@ primary_key: [id]
     // ── tenant:acme — per-tenant extension field on platform's User entity ──
     'tenants/acme/base/core/user_fields.ext.yaml': `version: loom-schema/v2
 entity: entity:base.core.User
+group: profile
 fields:
   - name: customer_no
     type:

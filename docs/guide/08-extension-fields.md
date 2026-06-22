@@ -1,20 +1,36 @@
 # extension_fields：自定义字段模板
 
-EAV 表完全动态会带来隐患（任意字段都能加）。`extension_fields` 文件**预声明**
-"允许哪些自定义字段、什么类型"，作为运行时校验和 view 生成的依据。
+完全动态的字段会带来隐患（任意字段都能加，无法校验类型）。`extension_fields`
+文件**预声明**"允许哪些自定义字段、什么类型、属于哪个组"，作为运行时校验和
+view 生成的依据。
 
-## 定义模板
+预声明的字段不是散落到物理表的列，而是**按组打包**进 sidecar 表的 JSONB 列。
+详见 [设计记录：JSONB 扩展组](../design/2026-06-22-jsonb-extension-groups.md)。
+
+## 扩展组（group）
+
+多个扩展字段属于同一个 **group**，打包成 ext 表里的一行 JSONB。组由
+`.ext.yaml` 的 `group:` 字段声明（可选，省略时默认 = 文件 stem）。
 
 ```yaml
-# platform/base/core/user_fields.ext.yaml
+# platform/base/core/user_profile.ext.yaml
 version: loom-schema/v2
-entity: entity:base.core.User           # 作用于哪个 entity（身份引用，kind 前缀保留）
+entity: entity:base.core.User
+group: profile
 fields:
   - name: nickname
     type:
       ref: string
       args: { max_length: 50 }
-    default_scope: tenant              # 租户级自定义
+    default_scope: tenant
+  - name: bio
+    type: { ref: string, args: { max_length: 500 } }
+
+# platform/base/core/user_finance.ext.yaml
+version: loom-schema/v2
+entity: entity:base.core.User
+group: finance
+fields:
   - name: credit_limit
     type: base.core.Money              # 多字段 type（form: struct）也能用
     default_scope: tenant
@@ -22,6 +38,29 @@ fields:
     type: base.core.CustomerGrade      # form: enum 的 type（详见 06-table §variants）
     default_scope: tenant
 ```
+
+物理上，`profile` 组和 `finance` 组各占 ext 表的一行（每实体 + 每 tenant +
+每组一行），组内字段是该行 JSONB 的独立 key：
+
+```
+base_id=1, tenant_id=NULL, group_name='profile',
+  values='{"nickname":"Alice","bio":"engineer"}'
+base_id=1, tenant_id=NULL, group_name='finance',
+  values='{"credit_limit_amount":5000,"credit_limit_currency_code":"USD","customer_grade":"vip"}'
+```
+
+**100 个字段分成 5 组 → 每 entity 每 tenant 5 行**（而非每字段一行）。
+
+### 为什么按组而非按字段
+
+| 维度 | 按字段一行（旧 EAV） | 按组一行（JSONB 扩展组） |
+|---|---|---|
+| 100 字段行数 | 100 | 5（按组） |
+| 查询 | N 个子查询 | N 个 LEFT JOIN + JSON 提取 |
+| multi-field struct | 拆多行 | 同组 JSON 内多 key |
+| 字段级审计 | ✓ 每行 created_at | ✗（组级审计） |
+
+对 ERP 典型行为（整体写入、全量读取、偶尔过滤），扩展组更合适。
 
 ## 为什么独立文件
 
@@ -41,6 +80,7 @@ entity 写 extension_fields，加载器**收集所有**并叠加。最终该 ent
 # ext:acme-corp 给 platform 的 User entity 挂扩展字段
 # ext/acme-corp/base/core/user_fields.ext.yaml
 entity: entity:base.core.User
+group: finance
 fields:
   - name: tax_id
     type: { ref: string, args: { max_length: 20 } }
@@ -48,13 +88,15 @@ fields:
 # tenant:acme 给同一个 entity 挂另一组扩展字段
 # tenants/acme/base/core/user_fields.ext.yaml
 entity: entity:base.core.User
+group: profile
 fields:
   - name: nickname
     type: { ref: string, args: { max_length: 50 } }
     default_scope: tenant
 ```
 
-叠加结果：User 的扩展字段 = `{ tax_id, nickname }`，都进 EAV pivot view。
+叠加结果：User 的扩展字段 = `{ tax_id, nickname }`。两个字段属于不同组
+（finance / profile），所以 ext 表里是两行；都进同一张 view。
 
 ### 同名字段冲突 = 硬错误
 
@@ -79,30 +121,42 @@ extension_fields 不进入 IR 的 nodes map（避免与节点定义的 identity 
 
 ## view 中的展开
 
-模板里声明的每个字段都会在 view 里展开成虚拟列。多字段 type（form: struct，如 Money）
-会展开成多个虚拟列（`credit_limit_amount`、`credit_limit_currency_code`）。
-
-多 owner 叠加的字段都会在同一张 view 里展开。例如 platform 的 `nickname` 和
-tenant:acme 的 `customer_no` 都进 `users` view：
+模板里声明的每个字段都会在 view 里展开成虚拟列——通过 LEFT JOIN ext 表 +
+JSON 提取。每个组生成一个 JOIN（按 `group_name` 过滤）：
 
 ```sql
 CREATE VIEW users AS
 SELECT
-  id, email, ...,
-  (SELECT string_value FROM users_ext e WHERE e.base_id = u.id AND e.field_name = 'nickname' LIMIT 1) AS nickname,
-  (SELECT string_value FROM users_ext e WHERE e.base_id = u.id AND e.field_name = 'customer_no' LIMIT 1) AS customer_no
-FROM base_core.users_base u;
+  u.id, u.email, ...,
+  p.values->>'nickname' AS nickname,
+  p.values->>'bio' AS bio,
+  f.values->>'tax_id' AS tax_id,
+  f.values->>'credit_limit_amount' AS credit_limit_amount,
+  f.values->>'credit_limit_currency_code' AS credit_limit_currency_code
+FROM base_core.users_base u
+LEFT JOIN users_ext p ON p.base_id = u.id AND p.group_name = 'profile'
+LEFT JOIN users_ext f ON f.base_id = u.id AND p.group_name = 'finance';
 ```
+
+多字段 type（form: struct，如 Money）展开成多个 JSON key
+（`credit_limit_amount`、`credit_limit_currency_code`），都落在同一组的 JSON 文档里。
+多 owner 叠加的字段都会在同一张 view 里展开——platform 的 `nickname` 和
+tenant:acme 的 `customer_no` 若属同一组则共享一个 JOIN，不同组则各自 JOIN。
+
+方言差异：
+- **pg**：`p.values->>'nickname'`
+- **mysql**：`` p.values->>'$.nickname' ``
+- **sqlite**：`json_extract(p.values, '$.nickname')`
 
 ## 谁能写 extension_fields
 
 | owner | 能写 extension_fields? | 路径 |
 |---|---|---|
-| **platform** | ✓ | `platform/<sys>/<mod>/<name>_fields.ext.yaml` |
-| **ext** | ✓ | `ext/<provider>/<sys>/<mod>/<name>_fields.ext.yaml` |
-| **tenant** | ✓（这是 tenant 唯一能写的 kind） | `tenants/<id>/<sys>/<mod>/<name>_fields.ext.yaml` |
+| **platform** | ✓ | `platform/<sys>/<mod>/<name>_*.ext.yaml` |
+| **ext** | ✓ | `ext/<provider>/<sys>/<mod>/<name>_*.ext.yaml` |
+| **tenant** | ✓（这是 tenant 唯一能写的 kind） | `tenants/<id>/<sys>/<mod>/<name>_*.ext.yaml` |
 
 三种 owner 用**完全相同**的 `.ext.yaml` 机制，区别只在 owner 前缀。加载器收集所有
-owner 的 `.ext.yaml`、按 entity 聚合（详见下面"多 owner 叠加"）。
+owner 的 `.ext.yaml`、按 entity 聚合（详见上面"多 owner 叠加"）。
 
 详见 [01 目录与身份](./01-layout-and-identity.md) §owner 维度。

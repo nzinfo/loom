@@ -23,10 +23,13 @@ describe('projector dialects', () => {
     expect(await pg()).toContain('CREATE TABLE base_core.users_base');
   });
 
-  it('pg: emits CREATE VIEW users as a pivot over users_ext (spec §7.4)', async () => {
+  it('pg: emits CREATE VIEW users as a LEFT JOIN over users_ext (JSONB groups)', async () => {
     const sql = await pg();
     expect(sql).toContain('CREATE VIEW users');
-    expect(sql).toMatch(/FROM users_ext e WHERE e\.base_id = u\.id AND e\.field_name = 'nickname'/);
+    expect(sql).toMatch(
+      /LEFT JOIN users_ext .* ON .*\.base_id = u\.id AND .*\.group_name = 'profile'/,
+    );
+    expect(sql).toMatch(/\.values->>'nickname' AS nickname/);
   });
 
   it('pg: emits CREATE TYPE for enum scalars (spec §11)', async () => {

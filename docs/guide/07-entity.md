@@ -11,7 +11,7 @@ description: 系统用户主体
 primary_table: table:base.core.Users     # 强引用一张 table（身份引用，kind 前缀保留）
 business_keys: [email]                   # 业务唯一标识（区别于主键 id）
 audit: true
-view: users                              # 可选：逻辑视图名（sidecar_eav 时创建 view）
+view: users                              # 可选：逻辑视图名（sidecar_eav 时按扩展组创建 view）
 ```
 
 **关键点：**
