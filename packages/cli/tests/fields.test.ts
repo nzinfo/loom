@@ -37,12 +37,12 @@ describe('loom fields command', () => {
     expect(output).toContain('base fields');
     expect(output).toContain('id');
     expect(output).toContain('base_price_amount');
-    // Extension groups
-    expect(output).toContain('group: inventory');
+    // Extension groups with owner source
+    expect(output).toContain('group: inventory (ext:provider-a)');
     expect(output).toContain('sku');
-    expect(output).toContain('group: pricing');
+    expect(output).toContain('group: pricing (ext:provider-b)');
     expect(output).toContain('tier_price_amount');
-    expect(output).toContain('group: logistics');
+    expect(output).toContain('group: logistics (ext:provider-b)');
     expect(output).toContain('shipping_weight');
   });
 

@@ -108,6 +108,9 @@ export interface ExtensionFieldEntry {
    * field, or the file stem if omitted). Fields in the same group are
    * packed into one JSONB row in the ext table. */
   readonly group: string;
+  /** Owner that declared this field (platform / ext:provider / tenant:id),
+   * derived from the .ext.yaml file's directory path. */
+  readonly owner: Owner;
 }
 
 /** Placeholder — full IR types will be added in implementation phases. */

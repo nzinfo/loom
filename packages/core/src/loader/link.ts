@@ -77,7 +77,11 @@ export async function link(opts: LinkOptions): Promise<LinkResult> {
   // Aggregate extension_fields across owners into the registry keyed by
   // entity identity. Same-name field across owners on the same entity is
   // a hard error (spec §7).
-  const extensionFields = collectExtensionFields(opts.extensionFieldsFiles ?? [], opts.diagnostics);
+  const extensionFields = collectExtensionFields(
+    opts.extensionFieldsFiles ?? [],
+    opts.files,
+    opts.diagnostics,
+  );
 
   const ir: IR = {
     nodes: nodes as ReadonlyMap<Identity, IRNode>,
@@ -139,6 +143,7 @@ function ownerOfFile(filePath: string, files?: ReadonlyMap<string, DiscoveredEnt
  */
 function collectExtensionFields(
   extensionFieldsFiles: ReadonlyArray<ParsedExtensionFields>,
+  files: ReadonlyMap<string, DiscoveredEntry> | undefined,
   diag: Diagnostics,
 ): Map<Identity, ReadonlyArray<ExtensionFieldEntry>> {
   const byEntity = new Map<Identity, ExtensionFieldEntry[]>();
@@ -155,6 +160,7 @@ function collectExtensionFields(
         .pop()
         ?.replace(/\.ext\.ya?ml$/, '') ?? 'default';
     const group = ef.group ?? fileStem;
+    const owner = ownerOfFile(file.file, files);
 
     let bucket = byEntity.get(entityRef);
     if (bucket === undefined) {
@@ -187,6 +193,7 @@ function collectExtensionFields(
           refValueTypeId: `type:${ref}`,
           props: desc.args ?? {},
           group,
+          owner,
         });
       } else {
         bucket.push({
@@ -194,6 +201,7 @@ function collectExtensionFields(
           scalar: ref,
           props: desc.args ?? {},
           group,
+          owner,
         });
       }
     }

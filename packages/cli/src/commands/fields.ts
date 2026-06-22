@@ -3,7 +3,7 @@ import type { Dirent } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import process from 'node:process';
 import { type FileSystem, expandTables, load } from '@loom/core';
-import type { ExtensionFieldEntry, IR, PhysicalColumn, PhysicalTable } from '@loom/core';
+import type { ExtensionFieldEntry, IR, Owner, PhysicalColumn, PhysicalTable } from '@loom/core';
 
 class NodeFileSystem implements FileSystem {
   async readFile(path: string): Promise<Uint8Array> {
@@ -107,7 +107,8 @@ export async function fieldsCommand(opts: FieldsOptions): Promise<number> {
     for (const group of groupOrder) {
       const entries = byGroup.get(group);
       if (entries === undefined) continue;
-      out.push(`── group: ${group} ──────────────────────`);
+      const ownerStr = entries[0] ? formatOwner(entries[0].owner) : 'unknown';
+      out.push(`── group: ${group} (${ownerStr}) ──────────────────────`);
       for (const ef of entries) {
         for (const line of formatExtField(ef, ir)) {
           out.push(`  ${line}`);
@@ -119,6 +120,18 @@ export async function fieldsCommand(opts: FieldsOptions): Promise<number> {
 
   process.stdout.write(`${out.join('\n')}\n`);
   return 0;
+}
+
+/** Format an Owner into a human-readable source string. */
+function formatOwner(owner: Owner): string {
+  switch (owner.kind) {
+    case 'platform':
+      return 'platform';
+    case 'ext':
+      return `ext:${owner.provider}`;
+    case 'tenant':
+      return `tenant:${owner.id}`;
+  }
 }
 
 /** Format a physical column's type string. */
