@@ -114,8 +114,28 @@ fields:
     type: base.core.Email
     required: true
     unique: true
-# → 物理：email VARCHAR(254)
+# → 物理：email VARCHAR(254)（用 Email 内部声明的 max_length: 254）
 ```
+
+newtype 的本质是"标量 + 语义标签"。struct 内部声明的 args（如 `max_length: 254`）是
+**默认约束**；引用方可以传 args **覆盖/收紧**（按 key 覆盖，引用方优先）：
+
+```yaml
+fields:
+  - name: short_email
+    type:
+      ref: base.core.Email
+      args: { max_length: 100 }     # ← 覆盖 Email 的默认 254
+# → 物理：short_email VARCHAR(100)
+```
+
+```yaml
+fields:
+  - name: raw_email
+    type: base.core.Email           # ← 不传 args，用默认 254
+# → 物理：raw_email VARCHAR(254)
+```
+
 
 ### 多字段 struct
 

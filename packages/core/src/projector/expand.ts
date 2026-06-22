@@ -338,7 +338,12 @@ function expandField(
     const inner = fields[0] as Record<string, unknown>;
     const innerDesc = descriptorOf(inner);
     const scalar = scalarNameOf(innerDesc.ref, ir);
-    const props = innerDesc.args ?? {};
+    // newtype: a scalar + semantic label. The struct's inner field declares
+    // default args (e.g. max_length: 254 on Email); the referencing field may
+    // pass args to OVERRIDE/TIGHTEN them (e.g. max_length: 100 on a specific
+    // usage). Merge with the caller's args taking precedence per-key.
+    const callerArgs = desc.args ?? {};
+    const props = { ...(innerDesc.args ?? {}), ...callerArgs };
     let enumRef: string | undefined;
     if (scalar === 'enum' && Array.isArray(props.values)) {
       enumRef = targetId;
