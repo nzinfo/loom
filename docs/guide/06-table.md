@@ -143,7 +143,7 @@ view 用 **LEFT JOIN**（每组一个，按 `group_name` 过滤）+ **JSON 提�
 - `none` / `json_column`：`foo`
 - `sidecar_eav`：`foo_base`（主表）+ `foo_ext`（扩展表），view 暴露 `foo`
 
-三种策略可以叠加 mixin（彼此正交）。
+三种策略彼此正交；字段组复用走 struct 引用 + `column: ''`（详见 [05 字段复用](./05-mixin.md)）。
 
 ---
 

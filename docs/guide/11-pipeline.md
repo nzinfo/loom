@@ -46,8 +46,8 @@ value 携带 `meta.identity`、`meta.owner`、`meta.kind`。**kind 由文件扩�
 
 读取每个 DiscoveredEntry 的字节，YAML parse + Zod schema 校验。输出两个集合：
 
-- `parsed: Map<identity, AnyFile>` — 节点定义类（type / table / entity / extension_fields
-  / type（scalar form）），identity 唯一，供 `$ref` 查表
+- `parsed: Map<identity, AnyFile>` — 节点定义类（type / table / entity），
+  identity 唯一，供 `$ref` 查表
 - `extensionFieldsFiles: Array<{ identity, file }>` — 所有 extension_fields 文件，
   identity 可重复
 
@@ -64,7 +64,8 @@ value 携带 `meta.identity`、`meta.owner`、`meta.kind`。**kind 由文件扩�
 
 跨文件语义校验（Zod 表达不了的）：
 
-- field 的单段短名必须是 scalar form 声明的标量（`unknown scalar`）
+- field 的单段短名必须能在 using 命名空间（默认含 `base.core.*`）里解析到
+  某个 type 节点（scalar/struct/enum 统一，不分流）；解析不到报 `unknown type`
 - scalar 标记 required 的 property 必须出现在 `type.args`
 - `primary_key` 字段必须是 `required: true`
 - extension_fields 的目标 entity 必须存在，且 primary_table 是 `sidecar_eav`

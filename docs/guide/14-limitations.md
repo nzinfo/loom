@@ -26,7 +26,7 @@
 - **owner 三层维度**——platform / ext / tenant 三层归属，从路径顶层前缀推断
 - **单一 `type:` 键 + using 导入**——取代 v1 的 `base`/`ref` 互斥键，引入编程语言式
   `using:` 短名导入
-- **`_shared/` 取消**——所有 kind 落模块目录，跨模块复用走 `using` + `exports`
+- **`_shared/` 取消**——所有 kind 落模块目录，跨模块复用走 `using` 导入
 
 ## v0.2.0 已知局限
 

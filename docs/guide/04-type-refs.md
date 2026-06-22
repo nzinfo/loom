@@ -184,8 +184,10 @@ fields:
 
 ### using 的校验
 
-- using 条目的命名空间或精确名必须存在 → 否则 `unknown using target "..."`
 - using 列表为空时可省略 `using:` 键
+- using 条目本身不校验存在性——它只是短名解析的命名空间前缀。引用的类型
+  找不到时报 `unknown type "X"`（而非"using target 不存在"），因为"类型是否存在"
+  由 type 节点表决定，与 using 声明无关
 
 ---
 
