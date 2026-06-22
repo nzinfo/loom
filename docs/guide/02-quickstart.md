@@ -79,7 +79,7 @@ primary_key: [id]
 
 v2 用单一 `type:` 键表达字段类型（替代 v1 的 `base` / `ref` 互斥键）：
 单段短名（如 `bigint`、`string`）解析到 scalar 标量；三段全限定名
-（如 `base.core.Email`）解析到 value_type 节点。
+（如 `base.core.Email`）解析到 type 节点（form: struct）。
 
 `type:` 支持两种形式：
 - **简写**：裸字符串 `type: bigint`、`type: base.core.Email`
@@ -87,7 +87,7 @@ v2 用单一 `type:` 键表达字段类型（替代 v1 的 `base` / `ref` 互斥
   ——所有标量参数（`max_length`、`precision`、`scale`、`pattern`）都收拢到
   `args`，不再写在 field 顶层
 
-详见 [04 value_type](./04-type-refs.md) §单一 type: 键。
+详见 [04 类型引用](./04-type-refs.md) §单一 type: 键。
 
 ## 校验
 

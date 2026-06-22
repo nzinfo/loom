@@ -133,7 +133,7 @@ view 把 EAV 行转列（pivot 子查询）。**应用代码始终用 view 名�
 ## variants：枚举的求和类型形态
 
 v2 用类型论术语 **variants**（sum type）替代 v1 的工业惯用词 `enum`。variants 是
-value_type 的**两种互斥形态之一**（另一种是 `fields`）：
+type 的 **form: enum**（与 `form: struct` 互斥）：
 
 ```yaml
 # platform/base/core/user_status.type.yaml
@@ -152,7 +152,7 @@ variants:
 - variants 元素支持双形式：字符串视为 `{ value: <str> }`；详写用 `value` 作为键
   （**不是** `name`——`value` 更贴切，对齐 sum type 的"分支值"概念）
 
-引用处和其他 value_type 完全一样：
+引用处和其他 type 完全一样：
 
 ```yaml
 fields:
@@ -160,12 +160,12 @@ fields:
     type: base.core.UserStatus         # 或经 using 短名：type: UserStatus
 ```
 
-投影器自动识别目标 value_type 是 fields 形态还是 variants 形态，把 variants 投成
+投影器按目标 type 节点的 form 分叉：enum form 的 variants 投成
 单列（列标量报告为 `string`），值列表进入 enum registry 驱动方言生成。
 
 > **v2 破坏性变更**：
 >
-> 1. v1 inline 写法（`base: enum, values: [...]`）取消，迁移到独立 value_type
+> 1. v1 inline 写法（`base: enum, values: [...]`）取消，迁移到独立 type 节点（form: enum）
 >    文件用 `variants:` 形态。
 > 2. 求和类型现在由 type kind 的 `form: enum` 表达（详见 [03 type](./03-base-types.md)），
 >    不再需要"假装是标量"。
@@ -178,7 +178,7 @@ fields:
 | MySQL | 列内联 `ENUM('active','inactive','suspended')` |
 | SQLite | `TEXT` + `CHECK (value IN ('active','inactive','suspended'))` |
 
-variants 严格说是 value_type 的事，但因为通常在 table 字段里被引用，放在这里说明。
+variants 严格说是 type（form: enum）的事，但因为通常在 table 字段里被引用，放在这里说明。
 
 ---
 

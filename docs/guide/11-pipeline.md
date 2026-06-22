@@ -46,7 +46,7 @@ value 携带 `meta.identity`、`meta.owner`、`meta.kind`。**kind 由文件扩�
 
 读取每个 DiscoveredEntry 的字节，YAML parse + Zod schema 校验。输出两个集合：
 
-- `parsed: Map<identity, AnyFile>` — 节点定义类（value_type / mixin / table / entity
+- `parsed: Map<identity, AnyFile>` — 节点定义类（type / mixin / table / entity
   / module_manifest / type（scalar form）），identity 唯一，供 `$ref` 查表
 - `extensionFieldsFiles: Array<{ identity, file }>` — 所有 extension_fields 文件，
   identity 可重复

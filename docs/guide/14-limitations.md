@@ -4,6 +4,10 @@
 
 近期完成的类型系统与布局演进（按时间倒序）：
 
+- **统一短名解析 + 声明名身份**——scalar/struct/enum 走同一条解析路径（查 using 命名空间，
+  默认含 `base.core.*`），scalar 不再特殊；身份默认从路径推导，文件声明的 `name:` 覆盖
+  （让 scalar 用小写名 `bigint` 而非 `Bigint`）。详见
+  `docs/design/2026-06-21-unified-type-kind-notes.md` §11
 - **统一 type kind**（`base_types` + `value_type` → `type` + `form` 三态）——消除唯一的
   "集合 kind"特例，标量拆成独立 `.type.yaml` 文件，身份前缀统一为 `type:`。
   详见 `docs/design/2026-06-21-unified-type-kind-notes.md`

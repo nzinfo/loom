@@ -16,10 +16,10 @@ fields:
       args: { max_length: 50 }
     default_scope: tenant              # 租户级自定义
   - name: credit_limit
-    type: base.core.Money              # 多字段 value_type 也能用
+    type: base.core.Money              # 多字段 type（form: struct）也能用
     default_scope: tenant
   - name: customer_grade
-    type: base.core.CustomerGrade      # variants 形态的 value_type（详见 06-table §variants）
+    type: base.core.CustomerGrade      # form: enum 的 type（详见 06-table §variants）
     default_scope: tenant
 ```
 
@@ -29,7 +29,7 @@ fields:
 entity/table（开发期）不同。混在一起，diff 会被频繁的部署配置搅乱。
 单独的 `.ext.yaml` 文件（与 entity 文件平级放在模块目录下）便于工具扫描与
 租户级差异管理。`.ext.yaml` 这个扩展名让加载器一眼识别"这是扩展字段文件"，
-与 entity/table/value_type 等 kind 完全对称。
+与 entity/table/type 等 kind 完全对称。
 
 ## 多 owner 叠加（核心特性）
 
@@ -79,7 +79,7 @@ extension_fields 不进入 IR 的 nodes map（避免与节点定义的 identity 
 
 ## view 中的展开
 
-模板里声明的每个字段都会在 view 里展开成虚拟列。多字段 value_type（如 Money）
+模板里声明的每个字段都会在 view 里展开成虚拟列。多字段 type（form: struct，如 Money）
 会展开成多个虚拟列（`credit_limit_amount`、`credit_limit_currency_code`）。
 
 多 owner 叠加的字段都会在同一张 view 里展开。例如 platform 的 `nickname` 和
