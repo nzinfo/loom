@@ -13,8 +13,7 @@ table:
   name: users_base                      # 物理表名（不依赖推导）
   extension:
     strategy: sidecar_eav               # none | json_column | sidecar_eav
-    ext_table: users_ext                # sidecar_eav 专用
-    view: users                         # sidecar_eav 专用
+    ext_table: users_ext                # 可选，默认 <table_name>_ext
 fields:
   - { name: id, type: bigint, required: true }
   - name: audit
@@ -43,11 +42,11 @@ foreign_keys:                           # 可选
 
 `table.table.extension.strategy` 决定如何承载自定义字段：
 
-| strategy | 物理布局 | 适用场景 | view 是否必填 |
+| strategy | 物理布局 | 适用场景 |
 |---|---|---|---|
 | `none` | 单表 `foo` | 审计、配置、关联表 | 否 |
 | `json_column` | 单表 `foo`，加 `_ext JSONB` 列 | 简单少量自定义字段 | 否 |
-| `sidecar_eav` | `foo_base` + `foo_ext` + view `foo` | ERP 大量动态字段 | 是 |
+| `sidecar_eav` | `foo_base` + `foo_ext`（view 在 entity 声明） | ERP 大量动态字段 |
 
 ### none（默认）
 
@@ -77,7 +76,6 @@ table:
   extension:
     strategy: sidecar_eav
     ext_table: users_ext
-    view: users
 ```
 
 物理结构：
@@ -103,7 +101,19 @@ table:
 
 每行 = 一个自定义字段实例。`data_type` 标记值的物理列。
 
-### 自动生成的 view
+### view：在 entity 上声明
+
+view 是 entity 的逻辑视图（base + ext 联合成 entity 视角的完整字段集），
+所以在 **entity** 上声明，不在 table 上。省略则不创建 view。
+
+```yaml
+# user.entity.yaml
+name: User
+primary_table: table:base.core.Users
+view: users                    # 可选；省略则不创建 view
+```
+
+### pivot view 的展开
 
 ```sql
 CREATE VIEW users AS

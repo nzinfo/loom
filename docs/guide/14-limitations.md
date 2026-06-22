@@ -4,6 +4,9 @@
 
 近期完成的类型系统与布局演进（按时间倒序）：
 
+- **view 从 table 移到 entity**——view 是 entity 的逻辑视图（base+ext 联合），
+  在 entity 上声明而非 table extension。省略则不创建 view。ext_table 默认
+  `<table>_ext`，多个 table 可共用同一个 ext 表。
 - **mixin 合并到 struct**——mixin 不再是独立 kind；原 mixin（如 Audit）现在是
   form:struct，引用时用 `type:` + `column: ''`（空字符串=flatten，无前缀）。
   `include:` 语法删除，FILE_KIND 5→4。`column` 字段同时支持物理列名覆盖。
