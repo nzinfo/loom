@@ -10,7 +10,7 @@ describe('parseTypeRef', () => {
     });
   });
 
-  it('returns null for a single-segment name (base_types short name)', () => {
+  it('returns null for a single-segment name (scalar short name — not a type ref)', () => {
     expect(parseTypeRef('integer')).toBeNull();
   });
 
@@ -34,42 +34,44 @@ describe('parseTypeRef', () => {
 });
 
 describe('resolveShortName', () => {
-  // Candidate set: base_types scalars (single-segment names) + value_type
-  // fully-qualified names. Provided by the caller (link pass).
-  const scalars = new Set(['integer', 'string', 'decimal', 'datetime', 'boolean', 'enum']);
-  const valueTypes = new Set(['base.core.Email', 'base.core.Money', 'retail.pos.types.Money']);
+  // Unified candidate set: ALL type fqns (scalar + struct + enum). Scalars
+  // are first-class types — they resolve through using just like struct/enum.
+  // base.core's types are globally available because base.core.* is injected
+  // by the caller as a default, not because scalars are special.
+  const typeFqns = new Set([
+    'base.core.integer',
+    'base.core.string',
+    'base.core.decimal',
+    'base.core.datetime',
+    'base.core.boolean',
+    'base.core.Email',
+    'base.core.Money',
+    'retail.pos.types.Money',
+  ]);
 
-  it('resolves a base_types scalar short name regardless of using', () => {
-    const result = resolveShortName('integer', [], scalars, valueTypes);
-    expect(result.kind).toBe('scalar');
-    if (result.kind === 'scalar') {
-      expect(result.name).toBe('integer');
+  it('resolves a scalar short name via the default base.core.* namespace', () => {
+    const result = resolveShortName('integer', ['base.core.*'], typeFqns);
+    expect(result.kind).toBe('resolved');
+    if (result.kind === 'resolved') {
+      expect(result.fqn).toBe('base.core.integer');
     }
   });
 
-  it('resolves a value_type short name via module wildcard using', () => {
-    const result = resolveShortName('Email', ['base.core.*'], scalars, valueTypes);
-    expect(result.kind).toBe('value_type');
-    if (result.kind === 'value_type') {
+  it('resolves a struct short name via module wildcard using', () => {
+    const result = resolveShortName('Email', ['base.core.*'], typeFqns);
+    expect(result.kind).toBe('resolved');
+    if (result.kind === 'resolved') {
       expect(result.fqn).toBe('base.core.Email');
     }
   });
 
-  it('resolves a value_type short name via precise using', () => {
-    const result = resolveShortName('Email', ['base.core.Email'], scalars, valueTypes);
-    expect(result.kind === 'value_type' && result.fqn).toBe('base.core.Email');
-    if (result.kind === 'value_type') {
-      expect(result.fqn).toBe('base.core.Email');
-    }
+  it('resolves a type short name via precise using', () => {
+    const result = resolveShortName('Email', ['base.core.Email'], typeFqns);
+    expect(result.kind === 'resolved' && result.fqn).toBe('base.core.Email');
   });
 
   it('reports ambiguous when two wildcards both match', () => {
-    const result = resolveShortName(
-      'Money',
-      ['base.core.*', 'retail.pos.types.*'],
-      scalars,
-      valueTypes,
-    );
+    const result = resolveShortName('Money', ['base.core.*', 'retail.pos.types.*'], typeFqns);
     expect(result.kind).toBe('ambiguous');
     if (result.kind === 'ambiguous') {
       expect(result.candidates).toEqual(
@@ -79,31 +81,24 @@ describe('resolveShortName', () => {
   });
 
   it('reports unknown when nothing matches', () => {
-    const result = resolveShortName('Nonexistent', ['base.core.*'], scalars, valueTypes);
+    const result = resolveShortName('Nonexistent', ['base.core.*'], typeFqns);
     expect(result.kind).toBe('unknown');
   });
 
-  it('precise using wins over wildcard (no ambiguity)', () => {
-    // Even though base.core.* would also match, an explicit precise import
-    // pins the name unambiguously.
-    const result = resolveShortName(
-      'Money',
-      ['base.core.*', 'base.core.Money'],
-      scalars,
-      valueTypes,
-    );
-    expect(result.kind).toBe('value_type');
-    if (result.kind === 'value_type') {
+  it('precise using + wildcard resolve to one fqn (no ambiguity — same target)', () => {
+    // base.core.* and base.core.Money both point at base.core.Money — a single
+    // distinct fqn, not ambiguous.
+    const result = resolveShortName('Money', ['base.core.*', 'base.core.Money'], typeFqns);
+    expect(result.kind).toBe('resolved');
+    if (result.kind === 'resolved') {
       expect(result.fqn).toBe('base.core.Money');
     }
   });
 
-  it('scalar lookup takes precedence over value_type using', () => {
-    // If a short name collides between a scalar and a value_type via using,
-    // the scalar (default namespace) wins — that matches "base_types always
-    // available" semantics.
-    const scalarsWithConflict = new Set(['Money']);
-    const result = resolveShortName('Money', ['base.core.*'], scalarsWithConflict, valueTypes);
-    expect(result.kind).toBe('scalar');
+  it('scalar and struct with the same declared name resolve identically (no precedence)', () => {
+    // Unified resolution: there is no "scalar precedence". If a short name
+    // resolves to exactly one fqn, it resolves — regardless of form.
+    const result = resolveShortName('Money', ['base.core.*'], typeFqns);
+    expect(result.kind).toBe('resolved');
   });
 });

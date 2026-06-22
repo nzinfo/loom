@@ -134,6 +134,12 @@ name: bigint
 form: scalar
 properties: []
 `,
+      'platform/base/core/string.type.yaml': `version: loom-schema/v2
+name: string
+form: scalar
+properties:
+  - { name: max_length, type: integer, required: true }
+`,
       'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
 system: base
 module: core

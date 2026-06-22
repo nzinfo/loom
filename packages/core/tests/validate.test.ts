@@ -36,9 +36,7 @@ fields:
 `,
     });
     const { diagnostics } = await runValidate(fs);
-    expect(
-      diagnostics.errors.some((e) => e.category === 'schema' && /unknown scalar/.test(e.message)),
-    ).toBe(true);
+    expect(diagnostics.errors.some((e) => /unknown type/.test(e.message))).toBe(true);
   });
 
   it('flags primary_key field that is not required', async () => {
@@ -194,7 +192,7 @@ primary_key: [id]
     expect(diag.hasErrors).toBe(true);
     expect(
       diag.errors.some(
-        (d) => d.message.includes('unknown scalar') && d.message.includes('notAScalar'),
+        (d) => d.message.includes('unknown type') && d.message.includes('notAScalar'),
       ),
     ).toBe(true);
   });
@@ -335,7 +333,9 @@ primary_key: [id]
     });
 
     expect(diag.hasErrors).toBe(true);
-    expect(diag.errors.some((d) => d.message.includes('unknown scalar type "enum"'))).toBe(true);
+    expect(
+      diag.errors.some((d) => d.message.includes('unknown type') && d.message.includes('enum"')),
+    ).toBe(true);
   });
 
   it('allows variants in a value_type file (sum type form)', async () => {

@@ -31,6 +31,6 @@ describe('load (end-to-end)', () => {
     });
     const result = await load({ fs, basePath: '', systemFilter: ['base'] });
     expect(result.diagnostics.hasErrors).toBe(false);
-    expect([...result.ir.nodes.keys()]).toEqual(['type:base.core.String', 'mixin:base.core.A']);
+    expect([...result.ir.nodes.keys()]).toEqual(['type:base.core.string', 'mixin:base.core.A']);
   });
 });
