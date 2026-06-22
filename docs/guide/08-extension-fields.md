@@ -143,10 +143,11 @@ entity:base.core.User 的扩展字段（按 group 组织）：
     credit_limit
 ```
 
-投影时，每个 group 在 ext 表里对应一行（`group_name` + `values` JSONB），在 view
-里是一个 LEFT JOIN（见下面"view 中的展开"）。同名 group 共享同一个 JOIN——上面
-platform 和 tenant:acme 的两个 `profile` 文件，字段都从同一个 `p` JOIN 提取
-（`p.values->>'nickname'`、`p.values->>'customer_no'`）。
+投影时，每个 ext 文件在 ext 表里对应一组行（`group_name` + `values` JSONB）。
+同名 group 的字段从同一个 JOIN 提取——上面 platform 和 tenant:acme 的两个
+`profile` 文件，view 里都从 `p` JOIN 取值（`p.values->>'nickname'`、
+`p.values->>'customer_no'`）。但它们是**各自独立的 JSONB 行**：platform 的 profile
+和 tenant:acme 的 profile 是不同的物理行（tenant_id 不同），不是合并成一行。
 
 唯一性约束也从"文件 identity 唯一"变成"同 entity 内字段名唯一"（同名字段才报错，
 见上面"同名字段冲突"）。
