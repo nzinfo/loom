@@ -116,13 +116,31 @@ tenant:acme 的 user_fields:    [tax_id]
 
 简单、无歧义、无 merge 算法。
 
-### 为什么不进 nodes map
+### 为什么 extension_fields 不进 nodes map
 
-extension_fields 是"针对某 entity 的附加配置"，不是节点定义。多个 owner 写相同
-identity 是正常形态（platform / ext / tenant 都给同一 entity 加字段）。所以
-extension_fields 不进入 IR 的 nodes map（避免与节点定义的 identity 唯一性规则混淆），
-而是在 link 阶段收集到一个独立 registry：`IR.extensionFields`（按 entity identity
-分桶）。详见 [11 加载管线](./11-pipeline.md)。
+loom 的 IR 有一个 `nodes` map，key 是 identity，要求**全局唯一**：一个 identity
+只能对应一个节点定义（如 `type:base.core.Money` 只有一个定义）。这条唯一性规则
+是 `$ref` 解析的前提——查表必须得到唯一答案。
+
+但 extension_fields 天然违反这条规则。多个 owner 会给**同一个 entity** 写
+extension_fields，而且可能写**同一个 group**：
+
+```
+platform/base/core/user_profile.ext.yaml      → entity:base.core.User, group: profile
+tenants/acme/base/core/user_fields.ext.yaml   → entity:base.core.User, group: profile
+```
+
+这两个文件都在给 User 的 profile 组加字段。它们的 identity 会重复（都指向同一
+entity），这在 nodes map 里是不允许的——会触发 duplicate identity 错误。
+
+所以 extension_fields 走一条不同的路：**不进 nodes map，而是单独收集到
+`IR.extensionFields` registry**。这个 registry 按 **entity identity 分桶**（不是按
+文件 identity），同一个 entity 的所有扩展字段（来自不同 owner、不同文件）叠加成
+一个数组。唯一性约束从"identity 唯一"放宽为"同 entity 内字段名唯一"（同名字段才
+报错，见上面"同名字段冲突"）。
+
+这条分离让 nodes map 保持干净的"一 identity 一节点"语义，同时允许扩展字段自由
+叠加。详见 [11 加载管线](./11-pipeline.md)。
 
 ## view 中的展开
 
