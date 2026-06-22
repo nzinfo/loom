@@ -118,21 +118,27 @@ tenant:acme 的 user_fields:    [tax_id]
 
 ### 为什么 extension_fields 不进 nodes map
 
-loom 的 IR 有一个 `nodes` map，key 是 identity，要求**全局唯一**——一个 identity
-只能对应一个节点定义（如 `type:base.core.Money` 全局只有一个）。`$ref` 解析依赖
-这一点：查表必须得到唯一答案。如果两个文件推导出同一 identity，discovery 阶段就
-报 `duplicate identity` 错误。
+loom 的 identity 是 `kind:sys.mod.Name`——**不含 owner 维度**。owner（platform /
+ext:provider / tenant:id）是节点的独立属性，从路径前缀推断，不编码进 identity
+字符串。nodes map 以 identity 为 key，要求全局唯一，`$ref` 解析依赖查表得到唯一
+答案。
 
-但 extension_fields 天然要打破这条规则。多个 owner 给同一个 entity 加扩展字段时，
-**会用相同的文件名**（这是约定，不是巧合）：
+这对 type/table/entity 成立——它们由特定 owner 权威定义，一个 identity 就是一个
+节点。但 extension_fields 不同：**多个 owner 需要给同一个 entity 各自加字段**，
+而它们的文件往往同名（约定上都用 `user_fields.ext.yaml`）：
 
 ```
-platform/base/core/user_fields.ext.yaml      → extension_fields:base.core.User_fields
-tenants/acme/base/core/user_fields.ext.yaml  → extension_fields:base.core.User_fields
+platform/base/core/user_fields.ext.yaml      → identity: extension_fields:base.core.User_fields
+tenants/acme/base/core/user_fields.ext.yaml  → identity: extension_fields:base.core.User_fields
+                                                              ↑ 完全相同（identity 不含 owner）
 ```
 
-两个文件名相同（都叫 `user_fields.ext.yaml`），推导出的 identity 完全一样。这在
-nodes map 的唯一性规则下是不允许的。
+虽然这两个文件在不同 owner 目录下（路径不同、owner 不同），但 identity 不含 owner
+维度，推导出的字符串完全一样。这违反了 nodes map 的唯一性规则。
+
+如果 identity 编码 owner（如 `extension_fields:tenant:acme/base.core.User_fields`），
+冲突就不会发生——但那会破坏 identity 的全局查询语义（`$ref` 不知道目标在哪个 owner）。
+loom 选择了另一条路：保持 identity 不含 owner，对 extension_fields 做特殊处理。
 
 所以 extension_fields 走一条独立的路：
 
