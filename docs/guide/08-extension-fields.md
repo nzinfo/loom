@@ -129,21 +129,24 @@ extension_fields 不是节点定义。它是"给某个 entity 附加什么字段
 
 按这个职责划分，ext 字段自然按**目标 entity** 组织，而不是按文件自身 identity。
 所以 link 阶段把所有 ext 文件收集到 `IR.extensionFields` registry，按 entity identity
-分桶。每个桶是一个扁平的字段数组，每个字段携带它所属的 group——一个 owner 可以给
-同一个 entity 贡献多个 group（多个 ext 文件），不同 owner 的字段混在同一桶里：
+分桶。entity 的扩展字段是**按 group 组织的**——每个 group 对应一个 ext 文件，一个
+owner 可以给同一个 entity 定义多个 group，不同 owner 的 group 混在同一 entity 下：
 
 ```
-IR.extensionFields:
-  entity:base.core.User → [
-    { name: nickname,      group: profile },   ← platform
-    { name: bio,           group: profile },   ← platform
-    { name: customer_no,   group: profile },   ← tenant:acme
-    { name: credit_limit,  group: finance },   ← platform
-  ]
+entity:base.core.User 的扩展字段（按 group 组织）：
+
+  group: profile                      ← platform 的 user_profile.ext.yaml
+    nickname, bio
+  group: profile                      ← tenant:acme 的 user_fields.ext.yaml
+    customer_no
+  group: finance                      ← platform 的 user_finance.ext.yaml
+    credit_limit
 ```
 
-投影时，views 层遍历这个数组，按 `group` 字段再分组——每个 group 生成一个 LEFT JOIN
-（见下面"view 中的展开"）。
+投影时，每个 group 在 ext 表里对应一行（`group_name` + `values` JSONB），在 view
+里是一个 LEFT JOIN（见下面"view 中的展开"）。同名 group 共享同一个 JOIN——上面
+platform 和 tenant:acme 的两个 `profile` 文件，字段都从同一个 `p` JOIN 提取
+（`p.values->>'nickname'`、`p.values->>'customer_no'`）。
 
 唯一性约束也从"文件 identity 唯一"变成"同 entity 内字段名唯一"（同名字段才报错，
 见上面"同名字段冲突"）。
