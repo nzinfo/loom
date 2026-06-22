@@ -51,7 +51,7 @@ fields:
 ```
 entity:base.core.User             ← base/core/user.entity.yaml
 table:base.core.Users             ← base/core/users.table.yaml
-mixin:base.core.Audit             ← base/core/audit.mixin.yaml
+type:base.core.Audit             ← base/core/audit.type.yaml
 type:base.core.Email        ← base/core/email.type.yaml
 ```
 
@@ -61,7 +61,7 @@ type:base.core.Email        ← base/core/email.type.yaml
 |---|---|---|
 | `primary_table:` | `primary_table: table:base.core.Users` | entity 强引用一张 table |
 | `ref_table:`（foreign_keys） | `ref_table: entity:base.core.User` | FK 引用目标表 |
-| `- include:`（mixin） | `- include: mixin:base.core.Audit` | fields 数组里展开 mixin |
+| `type:` + `column: ''` | `- name: audit\n    type: base.core.Audit\n    column: ''` | flatten 到 fields |
 | `entity:`（extension_fields） | `entity: entity:base.core.User` | extension_fields 作用于哪个 entity |
 | `exports:`（entity） | `- type:base.core.Email` | 声明对外导出的节点 |
 
@@ -69,7 +69,9 @@ type:base.core.Email        ← base/core/email.type.yaml
 fields:
   - name: id                           # field（类型引用走 type:）
     type: bigint
-  - include: mixin:base.core.Audit     # 身份引用（mixin 展开到 fields）
+  - name: audit
+    type: base.core.Audit
+    column: ''     # flatten（struct 字段插入 fields）
 ```
 
 ## 为什么分两个名字空间
@@ -79,9 +81,9 @@ fields:
 - **类型引用**回答"这个字段是什么类型"——目标必须是 type（能投影成列），
   加载器验证 `kind === 'type'`。类型引用走更窄的名字空间（三段、无 kind），
   因为"是不是类型"由被引用节点自身的 `kind` 决定，不需要引用者再标。
-- **身份引用**回答"我要指哪个节点"——目标可以是任意 kind（entity / table / mixin /
+- **身份引用**回答"我要指哪个节点"——目标可以是任意 kind（entity / table /
   type），kind 前缀让引用者和加载器都明确"我在找哪种节点"。
-  `primary_table` 必须是 table，`include` 必须是 mixin，`entity:` 必须是 entity。
+  `primary_table` 必须是 table，`entity:` 必须是 entity。
 
 两套名字空间通过"被引用节点 `kind === 'type'`"这一条规则连接，互不冲突。
 加载器内部维护两张查表：身份表（全 identity → node）、类型表（sys.mod.Name →

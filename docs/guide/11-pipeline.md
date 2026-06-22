@@ -16,7 +16,7 @@ Pass 1  Parse         YAML → typed struct，校验 version 和 kind
 
 Pass 2  Link          解析 $ref，建立 identity→IRNode 映射；从路径推断 owner；
                       聚合 extension_fields 到 IR.extensionFields（按 entity 叠加）
-                      错误：dangling_ref、kind_mismatch、cycle（mixin 环）、
+                      错误：dangling_ref、kind_mismatch、
                             duplicate extension field（同名冲突）
 
 Pass 3  Validate      语义校验
@@ -46,7 +46,7 @@ value 携带 `meta.identity`、`meta.owner`、`meta.kind`。**kind 由文件扩�
 
 读取每个 DiscoveredEntry 的字节，YAML parse + Zod schema 校验。输出两个集合：
 
-- `parsed: Map<identity, AnyFile>` — 节点定义类（type / mixin / table / entity / extension_fields
+- `parsed: Map<identity, AnyFile>` — 节点定义类（type / table / entity / extension_fields
   / type（scalar form）），identity 唯一，供 `$ref` 查表
 - `extensionFieldsFiles: Array<{ identity, file }>` — 所有 extension_fields 文件，
   identity 可重复
@@ -55,7 +55,7 @@ value 携带 `meta.identity`、`meta.owner`、`meta.kind`。**kind 由文件扩�
 
 - 用 `parsed` 解析所有 `$ref`（`dangling_ref` / `kind_mismatch` / `cycle`）
 - 从 DiscoveredEntry.meta.owner 给每个 IRNode 盖 owner 戳
-- 展开 mixin `include`（递归 + 环检测）
+- 解析 type 引用（短名 → fqn）
 - 规范化每个 field 的 `type:` 简写为 Type Descriptor 对象
 - 聚合 `extensionFieldsFiles` 到 `IR.extensionFields`（按 entity identity 分桶，
   同名字段冲突报错）

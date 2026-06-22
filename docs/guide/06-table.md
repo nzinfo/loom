@@ -17,7 +17,9 @@ table:
     view: users                         # sidecar_eav 专用
 fields:
   - { name: id, type: bigint, required: true }
-  - include: mixin:base.core.Audit      # 展开成 created_at / updated_at
+  - name: audit
+    type: base.core.Audit
+    column: ''              # flatten → created_at / updated_at
   - name: email
     type: base.core.Email
     required: true

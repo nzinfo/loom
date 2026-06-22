@@ -19,7 +19,7 @@
 | [02 快速上手](./02-quickstart.md) | 最小可运行 schema → SQL | 跑通第一个例子 |
 | [03 type](./03-base-types.md) | 类型定义 | scalar / struct / enum 三态 |
 | [04 类型引用与 using](./04-type-refs.md) | 类型引用语法、using 导入、Type Descriptor | 复用业务类型 |
-| [05 mixin](./05-mixin.md) | 字段组复用 | 抽审计字段组 |
+| [05 字段复用](./05-mixin.md) | struct 引用 + column flatten | 横切关注点（审计字段等） |
 | [06 table](./06-table.md) | 表定义、扩展策略、枚举/索引/外键 | 落物理表结构 |
 | [07 entity](./07-entity.md) | 业务身份层 + 物理归属 | ERP 业务建模 |
 | [08 extension_fields](./08-extension-fields.md) | 自定义字段模板（多 owner 叠加） | 租户/扩展字段 |

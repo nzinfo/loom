@@ -5,7 +5,7 @@ struct / enum 三态）见 [03 type](./03-base-types.md)。
 
 ## 单一 `type:` 键
 
-任何 field 元素（table / mixin / struct / extension_fields 内）都只有一个类型键：
+任何 field 元素（table / struct / extension_fields 内）都只有一个类型键：
 
 ```yaml
 fields:

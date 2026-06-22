@@ -23,8 +23,7 @@ scalars:
   - { name: boolean,  description: boolean,   properties: [] }
 ```
 
-
-## platform/base/core/audit.mixin.yaml
+## platform/base/core/audit.type.yaml
 
 ```yaml
 version: loom-schema/v2
@@ -71,7 +70,9 @@ table:
     view: users
 fields:
   - { name: id, type: bigint, required: true }
-  - include: mixin:base.core.Audit
+  - name: audit
+    type: base.core.Audit
+    column: ''
   - name: email
     type: base.core.Email
     required: true

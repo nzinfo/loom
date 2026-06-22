@@ -4,6 +4,9 @@
 
 近期完成的类型系统与布局演进（按时间倒序）：
 
+- **mixin 合并到 struct**——mixin 不再是独立 kind；原 mixin（如 Audit）现在是
+  form:struct，引用时用 `type:` + `column: ''`（空字符串=flatten，无前缀）。
+  `include:` 语法删除，FILE_KIND 5→4。`column` 字段同时支持物理列名覆盖。
 - **砍掉泛型（type_parameters）**——ERP schema 无真实泛型需求，type_parameters
   引入大量复杂度却只被一个 fixture 示例使用。删除后 args 仅用于标量值参数
 - **module_manifest 移除**——physical_schema 改为投影期派生（`<system>_<module>`）+
@@ -29,7 +32,7 @@
 | 诊断无行号 | 错误硬编码为 `1:1`，YAML 位置追踪未实现 |
 | FK 渲染原始 | `foreign_keys.ref_table` 原样输出，`entity:` refs 不解析为 `primary_table` |
 | 形态 C 重命名未实现 | using 仅支持 A（`ns.*`）与 B（`ns.Name`）；冲突时用全限定名绕开 |
-| mixin using 化未实现 | mixin include 仍用 `- include: mixin:...`（v2.1 候选） |
+
 | enum 仅简单形态 | 当前 enum 只支持 `variants`（值列表）；Rust 风格带关联数据的代数类型
   是未来方向（如需要泛型支持会以 v3 引入） |
 | 未实现的命令 | `fmt`（格式化）、`lift`（反向提炼）、`project atlas-yaml` |
@@ -39,7 +42,7 @@
 - YAML 位置追踪 → 精确 line:col 诊断
 - FK 跨 kind 解析（`entity:` → `primary_table`）
 - using 形态 C（重命名）——解决短名冲突，无需回退全限定名
-- mixin using 化——把 `- include: mixin:...` 纳入 using 体系（v2.1 候选）
+
 - enum Rust 风格演进——带关联数据的代数类型（设计记录 §3.1 已预留方向）
 - 方言插件机制——支持注册第三方 `dialects/<name>.ts`（达梦、OceanBase 等），
   而非在 schema 里描述方言映射（设计文档已否决 schema 自描述方案，坚持 projection）

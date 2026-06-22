@@ -13,10 +13,9 @@ system/module/kind/name，它们直接由文件路径推导；同样，节点归
 | `.entity.yaml` | `entity` | 实体 |
 | `.table.yaml` | `table` | 表 |
 | `.type.yaml` | `type` | 类型定义（scalar/struct/enum 三态，见 [03 type](./03-base-types.md)） |
-| `.mixin.yaml` | `mixin` | mixin |
 | `.ext.yaml` | `extension_fields` | 扩展字段（租户/扩展叠加） |
 
-例：`user.entity.yaml`、`orders.table.yaml`、`audit.mixin.yaml`、
+例：`user.entity.yaml`、`orders.table.yaml`、
 `email.type.yaml`、`string.type.yaml`、`user_fields.ext.yaml`。
 
 > `type` 是统一的类型定义 kind（scalar/struct/enum 三态，由 `form:` 字段区分），
@@ -45,7 +44,6 @@ my-schema/
 │           ├── email.type.yaml          # form: struct
 │           ├── money.type.yaml
 │           ├── status.type.yaml         # form: enum
-│           ├── audit.mixin.yaml         # kind: mixin
 │           ├── users.table.yaml         # kind: table
 │           └── user.entity.yaml         # kind: entity
 ├── ext/                                 # 第三方扩展包（独立作者）
@@ -97,7 +95,7 @@ identity 仍是 `kind:sys.mod.Name` 三段不变；owner 是节点的独立字�
 - 目录/文件名用 **kebab-case**（`user-profile.table.yaml`）
 - **身份默认从路径推导**：stem（`user-profile`）→ PascalCase（`UserProfile`）作为
   逻辑名。这是默认值，与大多数 kind 声明的 `name:` 一致
-- **声明的 `name:` 覆盖推导**：对 type/mixin/table/entity 这类在文件里声明 `name:` 的
+- **声明的 `name:` 覆盖推导**：对 type/table/entity 这类在文件里声明 `name:` 的
   kind，parse 阶段用声明的 name 修正身份（覆盖 stem 推导）。这让 scalar 能用小写名
   （`bigint.type.yaml` 声明 `name: bigint` → 身份 `type:base.core.bigint`，而非 PascalCase
   的 `Bigint`）。路径推导是默认，声明是权威

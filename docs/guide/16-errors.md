@@ -9,7 +9,7 @@
 | `identity` | 路径与文件内自指冲突、identity 重复 |
 | `dangling_ref` | `$ref` 目标不存在 |
 | `kind_mismatch` | `$ref` 目标 kind 与上下文期望不符 |
-| `cycle` | mixin 互相 include 形成环 |
+| `cycle` | 已删除（mixin 环检测随 mixin kind 移除） |
 | `schema` | field 缺 `type:`、类型解析失败、属性不在 scalar 的 properties schema 内、extension_fields 同名字段冲突 |
 | `semantic` | primary_key 字段非 required、extension_fields 目标 entity 不存在或非 sidecar_eav |
 | `project` | 投影器无法落到目标方言 |
