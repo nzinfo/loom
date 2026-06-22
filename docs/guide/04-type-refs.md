@@ -189,7 +189,3 @@ fields:
 
 ---
 
-## type_parameters：参数化类型
-
-struct/enum 类型可以声明 `type_parameters` 成为泛型，详见
-[03 type §type_parameters](./03-base-types.md#type_parameters参数化类型struct--enum)。

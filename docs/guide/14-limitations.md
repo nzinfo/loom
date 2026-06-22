@@ -4,6 +4,8 @@
 
 近期完成的类型系统与布局演进（按时间倒序）：
 
+- **砍掉泛型（type_parameters）**——ERP schema 无真实泛型需求，type_parameters
+  引入大量复杂度却只被一个 fixture 示例使用。删除后 args 仅用于标量值参数
 - **module_manifest 移除**——physical_schema 改为投影期派生（`<system>_<module>`）+
   CLI `--physical-schema` 覆盖，删除一个 kind + N 个 manifest 文件
 - **统一短名解析 + 声明名身份**——scalar/struct/enum 走同一条解析路径（查 using 命名空间，
@@ -29,7 +31,7 @@
 | 形态 C 重命名未实现 | using 仅支持 A（`ns.*`）与 B（`ns.Name`）；冲突时用全限定名绕开 |
 | mixin using 化未实现 | mixin include 仍用 `- include: mixin:...`（v2.1 候选） |
 | enum 仅简单形态 | 当前 enum 只支持 `variants`（值列表）；Rust 风格带关联数据的代数类型
-  是未来方向（`type_parameters` 已对 enum 开放，为其预留） |
+  是未来方向（如需要泛型支持会以 v3 引入） |
 | 未实现的命令 | `fmt`（格式化）、`lift`（反向提炼）、`project atlas-yaml` |
 
 ## 后续路线

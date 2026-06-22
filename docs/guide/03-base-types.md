@@ -121,19 +121,20 @@ newtype 的本质是"标量 + 语义标签"。struct 内部声明的 args（如 
 **默认约束**；引用方可以传 args **覆盖/收紧**（按 key 覆盖，引用方优先）：
 
 ```yaml
+# short-email.type.yaml
+name: ShortEmail
+form: struct
 fields:
-  - name: short_email
-    type:
-      ref: base.core.Email
-      args: { max_length: 100 }     # ← 覆盖 Email 的默认 254
-# → 物理：short_email VARCHAR(100)
+  - name: value
+    type: { ref: string, args: { max_length: 100 } }
 ```
 
 ```yaml
 fields:
-  - name: raw_email
-    type: base.core.Email           # ← 不传 args，用默认 254
-# → 物理：raw_email VARCHAR(254)
+  - name: email
+    type: base.core.Email           # 用 Email 的 254
+  - name: short
+    type: base.core.ShortEmail      # 用 ShortEmail 的 100
 ```
 
 
@@ -184,8 +185,7 @@ enum 投影成单列，底层标量是 `string`，由 `enumRef` 驱动方言（P
 MySQL `ENUM(...)`、SQLite `CHECK IN`）。
 
 > enum 是三个 form 里**最可能演进**的——未来可能变为 Rust 风格带关联数据的代数
-> 类型。当前实现只支撑 `variants`，但 `type_parameters` 对 enum 开放（为参数化 enum
-> 如 `Result<T,E>` 预留）。详见设计记录 §3.1。
+> 类型。当前实现只支撑 `variants`。
 
 ## 投影规则速查
 
@@ -196,49 +196,6 @@ MySQL `ENUM(...)`、SQLite `CHECK IN`）。
 | struct 多字段 | 任意 | N | `<引用字段名>_<子字段名>` |
 | enum | — | 1 | 引用字段名（底层 string） |
 
-## type_parameters：参数化类型（struct / enum）
-
-当一个 struct/enum 的内部字段类型本身需要由引用方决定时，用 `type_parameters`
-声明类型参数，让它成为"泛型类型"。scalar 不接受 type_parameters。
-
-```yaml
-# platform/base/core/range.type.yaml
-version: loom-schema/v2
-name: Range
-form: struct
-type_parameters:
-  - name: T
-    constraint: value              # type | value（默认 type）
-    default: base.core.bigint
-    description: element type
-fields:
-  - name: low
-    type: T                        # 引用类型参数
-  - name: high
-    type: T
-```
-
-- **`name`**：参数标识符。在 fields 里以 `type: <name>` 引用
-- **`constraint`**：
-  - `value`：实参必须是具体类型（标量短名或类型 fqn）
-  - `type`（默认）：实参可为任何类型，含另一个类型参数（用于泛型递归 `Map<K,V>`）
-- **`default`**：引用方未传该参数时使用
-
-引用方在 `type.args` 里以 `{ <ParamName>: <TypeRef> }` 传实参：
-
-```yaml
-fields:
-  - name: price_range
-    type:
-      ref: base.core.Range
-      args: { T: decimal }
-# → price_range_low NUMERIC, price_range_high NUMERIC
-```
-
-> **类型参数与值参数共享 `type.args`**：`max_length`（值参数）和 `T`（类型参数）
-> 都写在 args 里，加载器按"是否为声明的 type parameter 名"区分。
-
-详见 [04 类型引用与 using](./04-type-refs.md)。
 
 ## 校验规则（编译期）
 
@@ -249,7 +206,6 @@ fields:
 | `properties` | ✓ | ✗ | ✗ |
 | `fields` | ✗ | ✓ 必填 | ✗ |
 | `variants` | ✗ | ✗ | ✓ 必填 |
-| `type_parameters` | ✗ | ✓ 可选 | ✓ 可选 |
 | `constraints` | ✗ | ✓ 可选 | ✗ |
 | **name 大小写** | 小写 `/^[a-z]/` | PascalCase `/^[A-Z]/` | PascalCase `/^[A-Z]/` |
 

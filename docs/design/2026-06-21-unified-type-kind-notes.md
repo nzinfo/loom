@@ -382,3 +382,20 @@ fqn = 身份 body，三者统一。`typeByFqn` map、`collectTypeByFqn`、`scala
 
 这是"路径即身份"原则的细化：**路径推导是默认，声明是权威**。两者一致时无感，
 不一致时声明胜出（scalar 的小写名是主要用例）。
+
+## 12. 实施记录：砍掉泛型（type_parameters）
+
+§3 的 enum 演进预留（type_parameters 对 enum 开放）和 §9 决策 3（type_parameters 对
+struct/enum 开放）**均已作废**。评估后发现 ERP schema 场景无真实泛型需求——`Range<T>`、
+`Map<K,V>`、`Option<T>` 等候选都有更直接的替代（具体类型、JSON 列、nullable 字段）。
+
+半吊子泛型（无高阶类型、无类型约束、无协变）比没有泛型更糟——它设定预期又满足不了。
+
+**删除内容**：typeParameterSchema、TypeSchema 的 type_parameters 字段、collectTypeParameters、
+instantiateFields、validate 的 localTypeParams 跳过、resolveFieldTypes 的 typeParams 参数。
+fixture 的 Range<T> 改为具体 Range<decimal>。
+
+**args 最终语义**：仅用于标量值参数（string 的 max_length、decimal 的 precision/scale）。
+struct/enum 的约束属于类型定义，引用方不传 args。想要不同约束 → 定义新类型。
+
+**如果未来真需要泛型**，这是 v3 破坏性引入——届时由真实业务需求驱动设计。
