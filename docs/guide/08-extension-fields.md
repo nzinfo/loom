@@ -118,39 +118,34 @@ tenant:acme 的 user_fields:    [tax_id]
 
 ### 为什么 extension_fields 不进 nodes map
 
-loom 的 identity 是 `kind:sys.mod.Name`——**不含 owner 维度**。owner（platform /
-ext:provider / tenant:id）是节点的独立属性，从路径前缀推断，不编码进 identity
-字符串。nodes map 以 identity 为 key，要求全局唯一，`$ref` 解析依赖查表得到唯一
-答案。
+根本原因是**职责不同**，不是技术限制。
 
-这对 type/table/entity 成立——它们由特定 owner 权威定义，一个 identity 就是一个
-节点。但 extension_fields 不同：**多个 owner 需要给同一个 entity 各自加字段**，
-而它们的文件往往同名（约定上都用 `user_fields.ext.yaml`）：
+nodes map 存的是"系统里定义了哪些节点"——type/table/entity 是节点定义，每个有
+唯一 identity，可以被 `$ref` 引用。这是 nodes map 的语义。
+
+extension_fields 不是节点定义。它是"给某个 entity 附加什么字段"——它的归属维度
+是**指向哪个 entity**（`entity: entity:base.core.User`），不是"自己是谁"。没有任何
+地方用 `$ref` 引用一个 extension_fields 文件。把它塞进 nodes map 语义上就不对。
+
+按这个职责划分，ext 字段自然按**目标 entity** 组织，而不是按文件自身 identity。
+所以 link 阶段把所有 ext 文件收集到 `IR.extensionFields` registry，按 entity identity
+分桶，同一个 entity 的字段（不管来自哪个 owner、哪个文件）叠加成一个数组。
 
 ```
-platform/base/core/user_fields.ext.yaml      → identity: extension_fields:base.core.User_fields
-tenants/acme/base/core/user_fields.ext.yaml  → identity: extension_fields:base.core.User_fields
-                                                              ↑ 完全相同（identity 不含 owner）
+IR.extensionFields:
+  entity:base.core.User → [nickname, bio, credit_limit, customer_no, ...]
+                           ↑ platform + tenant:acme 的字段混在一起
 ```
 
-虽然这两个文件在不同 owner 目录下（路径不同、owner 不同），但 identity 不含 owner
-维度，推导出的字符串完全一样。这违反了 nodes map 的唯一性规则。
+唯一性约束也从"文件 identity 唯一"变成"同 entity 内字段名唯一"（同名字段才报错，
+见上面"同名字段冲突"）。
 
-如果 identity 编码 owner（如 `extension_fields:tenant:acme/base.core.User_fields`），
-冲突就不会发生——但那会破坏 identity 的全局查询语义（`$ref` 不知道目标在哪个 owner）。
-loom 选择了另一条路：保持 identity 不含 owner，对 extension_fields 做特殊处理。
+> **一个技术细节**：因为 ext 不需要被引用，它的 identity（从文件 stem 推导）其实
+> 不太重要。多个 owner 用相同文件名（都叫 `user_fields.ext.yaml`）会推导出相同
+> identity。discovery 阶段对此做了豁免——ext 的 identity 重复不报错，而其他 kind
+> 会。这是"ext 不进 nodes map"这个设计决定的自然后果，而非原因。
 
-所以 extension_fields 走一条独立的路：
-
-1. **discovery 阶段豁免**：extension_fields 的 identity 重复不报错（其他 kind 会）
-2. **parse 阶段分流**：ext 文件不进 `parsed` 主表（那是给 type/table/entity 的），
-   而是收集到单独的 `extensionFieldsFiles` 列表
-3. **link 阶段聚合**：所有 ext 文件按**它们指向的 entity identity** 分桶，叠加成
-   `IR.extensionFields` registry。唯一性约束从"文件 identity 唯一"放宽为"同 entity
-   内字段名唯一"（同名字段才报错，见上面"同名字段冲突"）
-
-这条分离让 nodes map 保持干净的"一 identity 一节点"语义，同时允许扩展字段跨 owner
-自由叠加。详见 [11 加载管线](./11-pipeline.md)。
+详见 [11 加载管线](./11-pipeline.md)。
 
 ## view 中的展开
 
