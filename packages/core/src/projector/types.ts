@@ -62,7 +62,7 @@ export interface PhysicalForeignKey {
 export interface PhysicalTable {
   /** Simple table name (not schema-qualified). */
   readonly name: string;
-  /** module_manifest physical_schema, e.g. "base_core". undefined if no manifest. */
+  /** Physical schema, derived from `<system>_<module>` (or CLI override). */
   readonly schema: string | undefined;
   /** Fully qualified name: `<schema>.<name>`. */
   readonly qualifiedName: string;

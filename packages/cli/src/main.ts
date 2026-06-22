@@ -19,7 +19,7 @@ function usage(): void {
 commands:
   version                                  print version info (spec §16.2)
   check <path>                             load + validate (spec §8.7)
-  project sql --dialect <d> [--out <f>] <path>   project to SQL DDL (spec §8.8)
+  project sql --dialect <d> [--out <f>] [--physical-schema <mod>=<name>]... <path>   project to SQL DDL (spec §8.8)
   fmt <path>                               reformat in place (not yet implemented)
   lift <physical.yaml>                     reverse-lift (not yet implemented)
 `);
@@ -34,6 +34,22 @@ function parseFlag(
   const value = rest[idx + 1];
   const remaining = [...rest.slice(0, idx), ...rest.slice(idx + 2)];
   return { value, remaining };
+}
+
+/** Parse all occurrences of a repeatable flag (e.g. --physical-schema a=x --physical-schema b=y). */
+function parseFlagAll(
+  rest: readonly string[],
+  name: string,
+): { values: string[]; remaining: string[] } {
+  const values: string[] = [];
+  let remaining = [...rest];
+  for (;;) {
+    const r = parseFlag(remaining, name);
+    if (r.value === undefined) break;
+    values.push(r.value);
+    remaining = r.remaining;
+  }
+  return { values, remaining };
 }
 
 async function main(argv: string[]): Promise<number> {
@@ -60,13 +76,14 @@ async function main(argv: string[]): Promise<number> {
       const tail = rest.slice(1);
       const dialect = parseFlag(tail, '--dialect').value;
       const out = parseFlag(tail, '--out').value;
+      const physicalSchemas = parseFlagAll(tail, '--physical-schema').values;
       const { remaining } = parseFlag(parseFlag(tail, '--dialect').remaining, '--out');
       const path = remaining[0];
       if (path === undefined) {
         process.stderr.write('error: project requires a path\n');
         return 64;
       }
-      return await projectCommand({ path, dialect, out });
+      return await projectCommand({ path, dialect, out, physicalSchemas });
     }
     case undefined:
     case '-h':

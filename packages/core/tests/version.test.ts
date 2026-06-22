@@ -10,14 +10,7 @@ describe('format version', () => {
   });
 
   it('covers every file kind from spec §9', () => {
-    expect(FILE_KIND).toEqual([
-      'type',
-      'mixin',
-      'table',
-      'entity',
-      'extension_fields',
-      'module_manifest',
-    ]);
+    expect(FILE_KIND).toEqual(['type', 'mixin', 'table', 'entity', 'extension_fields']);
   });
 });
 

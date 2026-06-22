@@ -271,18 +271,6 @@ export const TypeSchema = z
     }
   });
 
-export const ModuleManifestSchema = z
-  .object({
-    version: versionSchema,
-    system: z.string().min(1),
-    module: z.string().min(1),
-    physical_schema: z.string().min(1),
-    description: z.string().optional(),
-    using: usingSchema,
-    exports: z.array(z.string().min(1)).optional(),
-  })
-  .strict();
-
 export const MixinSchema = z
   .object({
     version: versionSchema,
@@ -340,7 +328,6 @@ export const ExtensionFieldsSchema = z
 // ---- inferred types ----
 
 export type TypeNode = z.infer<typeof TypeSchema>;
-export type ModuleManifest = z.infer<typeof ModuleManifestSchema>;
 export type Mixin = z.infer<typeof MixinSchema>;
 export type Table = z.infer<typeof TableSchema>;
 export type Entity = z.infer<typeof EntitySchema>;
@@ -358,7 +345,6 @@ export interface ParsedFileBase {
 
 export type AnyFile =
   | (ParsedFileBase & { kind: 'type'; data: TypeNode })
-  | (ParsedFileBase & { kind: 'module_manifest'; data: ModuleManifest })
   | (ParsedFileBase & { kind: 'mixin'; data: Mixin })
   | (ParsedFileBase & { kind: 'table'; data: Table })
   | (ParsedFileBase & { kind: 'entity'; data: Entity })
@@ -366,7 +352,6 @@ export type AnyFile =
 
 const SCHEMA_BY_KIND = {
   type: TypeSchema,
-  module_manifest: ModuleManifestSchema,
   mixin: MixinSchema,
   table: TableSchema,
   entity: EntitySchema,

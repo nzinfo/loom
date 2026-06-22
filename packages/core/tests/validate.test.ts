@@ -51,11 +51,6 @@ name: string
 form: scalar
 properties: []
 `,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
-`,
       'platform/base/core/t.table.yaml': `version: loom-schema/v2
 name: T
 table:
@@ -85,11 +80,6 @@ properties: []
 name: string
 form: scalar
 properties: []
-`,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
 `,
       'platform/base/core/t.table.yaml': `version: loom-schema/v2
 name: T
@@ -172,11 +162,6 @@ name: string
 form: scalar
 properties: []
 `,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
-`,
       'platform/base/core/users.table.yaml': `version: loom-schema/v2
 name: Users
 table:
@@ -210,11 +195,6 @@ form: scalar
 properties:
   - { name: precision, type: integer, required: true }
   - { name: scale, type: integer, required: true }
-`,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
 `,
       'platform/base/core/money.type.yaml': `version: loom-schema/v2
 name: Money
@@ -250,11 +230,6 @@ name: string
 form: scalar
 properties: []
 `,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
-`,
       'platform/base/core/email.type.yaml': `version: loom-schema/v2
 name: Email
 form: struct
@@ -285,11 +260,6 @@ name: string
 form: scalar
 properties: []
 `,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
-`,
       'platform/base/core/users.table.yaml': `version: loom-schema/v2
 name: Users
 table:
@@ -313,11 +283,6 @@ primary_key: [id]
 name: string
 form: scalar
 properties: []
-`,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
 `,
       'platform/base/core/users.table.yaml': `version: loom-schema/v2
 name: Users
@@ -344,11 +309,6 @@ primary_key: [id]
 name: string
 form: scalar
 properties: []
-`,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
 `,
       'platform/base/core/status.type.yaml': `version: loom-schema/v2
 name: Status

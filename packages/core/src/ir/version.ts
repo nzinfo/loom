@@ -21,15 +21,12 @@ export const CURRENT_VERSION = `${FORMAT_FAMILY}/${FORMAT_VERSION}` as const;
  *
  * `type` is the unified type-definition kind (scalar / struct / enum via the
  * `form` field). It replaces the former `base_types` (collection kind) and
- * `value_type`. See `docs/design/2026-06-21-unified-type-kind-notes.md`. */
-export const FILE_KIND = [
-  'type',
-  'mixin',
-  'table',
-  'entity',
-  'extension_fields',
-  'module_manifest',
-] as const;
+ * `value_type`. See `docs/design/2026-06-21-unified-type-kind-notes.md`.
+ *
+ * `module_manifest` is gone — physical_schema is now a projection-time
+ * concern (derived from `<system>_<module>`, with optional CLI overrides),
+ * not a schema declaration. See design note on module_manifest removal. */
+export const FILE_KIND = ['type', 'mixin', 'table', 'entity', 'extension_fields'] as const;
 export type FileKind = (typeof FILE_KIND)[number];
 
 /**
@@ -39,10 +36,7 @@ export type FileKind = (typeof FILE_KIND)[number];
  *
  * The kind token sits between the stem and `.yaml`:
  *   `money.type.yaml`, `audit.mixin.yaml`, `users.table.yaml`,
- *   `user.entity.yaml`, `user_fields.ext.yaml`, `manifest.module.yaml`
- *
- * `type` covers scalar/struct/enum (discriminated by the `form:` field in the
- * body); `.types.yaml` (base_types) and `.value_type.yaml` are gone.
+ *   `user.entity.yaml`, `user_fields.ext.yaml`
  *
  * Only `.yaml` is supported (not `.yml`) — kind-encoded files standardize on
  * the canonical long extension.
@@ -53,7 +47,6 @@ export const KIND_EXTENSIONS: Readonly<Record<FileKind, string>> = {
   table: '.table.yaml',
   entity: '.entity.yaml',
   extension_fields: '.ext.yaml',
-  module_manifest: '.module.yaml',
 };
 
 /** Reverse map: file suffix → kind. Suffixes are non-overlapping. */

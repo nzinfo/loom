@@ -68,11 +68,6 @@ name: bigint
 form: scalar
 properties: []
 `,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
-`,
       'platform/base/core/t.table.yaml': `version: loom-schema/v2
 name: T
 table:
@@ -100,11 +95,6 @@ primary_key: [id]
 name: bigint
 form: scalar
 properties: []
-`,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
 `,
       'platform/base/core/status.type.yaml': `version: loom-schema/v2
 name: Status
@@ -140,11 +130,6 @@ form: scalar
 properties:
   - { name: max_length, type: integer, required: true }
 `,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
-`,
       'platform/base/core/users.table.yaml': `version: loom-schema/v2
 name: Users
 table:
@@ -172,11 +157,6 @@ primary_key: [id]
 name: bigint
 form: scalar
 properties: []
-`,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
 `,
       'platform/base/core/email.type.yaml': `version: loom-schema/v2
 name: Email
@@ -212,11 +192,6 @@ primary_key: [id]
 name: bigint
 form: scalar
 properties: []
-`,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
 `,
       'platform/base/core/money.type.yaml': `version: loom-schema/v2
 name: Money
@@ -256,11 +231,6 @@ primary_key: [id]
 name: bigint
 form: scalar
 properties: []
-`,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
 `,
       'platform/base/core/status.type.yaml': `version: loom-schema/v2
 name: Status

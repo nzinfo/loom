@@ -13,8 +13,17 @@ import { buildPivotViews } from './views.js';
 
 export type Dialect = 'pg' | 'mysql' | 'sqlite';
 
-export function projectSqlFromIr(ir: IR, dialect: Dialect): string {
-  const model = expandTables(ir);
+export interface ProjectSqlOptions {
+  /**
+   * Per-module physical-schema overrides (module fqn → physical schema name).
+   * Replaces the derived `<system>_<module>` default. Typically sourced from
+   * a CLI flag. module_manifest is gone; physical_schema is projection-time.
+   */
+  readonly physicalSchemaOverrides?: ReadonlyMap<string, string>;
+}
+
+export function projectSqlFromIr(ir: IR, dialect: Dialect, opts?: ProjectSqlOptions): string {
+  const model = expandTables(ir, opts?.physicalSchemaOverrides);
   const pivotViews = buildPivotViews(model, ir);
   switch (dialect) {
     case 'pg':

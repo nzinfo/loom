@@ -11,19 +11,17 @@
  * (flat layout). See spec §9.
  *
  * Layout (relPath includes the owner prefix):
- *   platform/<sys>/<mod>/manifest.module.yaml     → module_manifest:<sys>.<mod>
  *   platform/<sys>/<mod>/<stem>.<kind>.yaml       → <kind>:<sys>.<mod>.<Stem>
- *   ext/<provider>/<sys>/<mod>/manifest.module.yaml → module_manifest:<sys>.<mod>  (owner: ext:<provider>)
  *   ext/<provider>/<sys>/<mod>/<stem>.<kind>.yaml → <kind>:<sys>.<mod>.<Stem>
  *   tenants/<id>/<sys>/<mod>/<stem>.<kind>.yaml   → <kind>:<sys>.<mod>.<Stem>  (owner: tenant:<id>)
  *
- * kind token ∈ { type, mixin, table, entity, ext, module }
- * where `ext`→extension_fields, `module`→module_manifest.
+ * kind token ∈ { type, mixin, table, entity, ext }
+ * where `ext`→extension_fields.
  *
- * There is no longer a singleton base_types file: scalars are ordinary
- * `.type.yaml` files (form: scalar) under platform/base/core/, each with its
- * own identity `type:base.core.<name>`. The `base_types:` collection identity
- * is gone. See `docs/design/2026-06-21-unified-type-kind-notes.md`.
+ * There is no longer a singleton base_types file nor a module_manifest kind:
+ * scalars are ordinary `.type.yaml` files (form: scalar) under
+ * platform/base/core/; physical_schema is derived at projection time.
+ * See `docs/design/2026-06-21-unified-type-kind-notes.md`.
  */
 import { EXT_TO_KIND, type FileKind } from './version.js';
 import type { Owner } from './version.js';
@@ -32,7 +30,7 @@ export interface DiscoveredFile {
   readonly kind: FileKind;
   readonly system: string;
   readonly module: string;
-  /** PascalCase logical name; empty for base_types and module_manifest. */
+  /** PascalCase logical name. */
   readonly name: string;
   /** Canonical identity string. */
   readonly identity: string;
@@ -54,7 +52,7 @@ export function kindFromFilename(file: string): FileKind | null {
 
 /**
  * Strip the kind-encoded suffix from a filename, returning the kebab-case
- * stem. E.g. `user.entity.yaml` → `user`, `manifest.module.yaml` → `manifest`,
+ * stem. E.g. `user.entity.yaml` → `user`, `email.value_type.yaml` → `email`,
  * `base.types.yaml` → `base`. Returns null if no known kind suffix matches.
  */
 export function stemFromFilename(file: string): string | null {
@@ -129,11 +127,10 @@ export function pathToIdentity(fullPath: string, relPath: string): DiscoveredFil
 
 /**
  * Parse the post-owner-prefix portion for platform/ext. These two share the
- * same inner layout: [<sys>/<mod>/manifest.module.yaml
- * | <sys>/<mod>/<stem>.<kind>.yaml].
+ * same inner layout: [<sys>/<mod>/<stem>.<kind>.yaml].
  *
  * Flat: no kind subdirectories. The kind comes from the filename suffix.
- * There is no singleton base_types file — scalars are ordinary .type.yaml.
+ * There is no singleton base_types file nor module_manifest kind.
  */
 function parseOwned(inner: string[], owner: Owner): DiscoveredFile | null {
   // <sys>/<mod>/<file>  (3 parts) — kind from filename suffix.
@@ -146,19 +143,6 @@ function parseOwned(inner: string[], owner: Owner): DiscoveredFile | null {
     if (kind === null) return null;
     const stem = stemFromFilename(file);
     if (stem === null) return null;
-
-    // module_manifest has no logical name and must use its canonical filename.
-    if (kind === 'module_manifest') {
-      if (file !== 'manifest.module.yaml') return null;
-      return {
-        kind,
-        system,
-        module,
-        name: '',
-        identity: `${kind}:${system}.${module}`,
-        owner,
-      };
-    }
 
     const name = kebabToPascal(stem);
     return {

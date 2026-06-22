@@ -28,7 +28,7 @@ CREATE TABLE base_core.users_ext (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE acme_retail_pos.orders (
+CREATE TABLE retail_pos.orders (
   id BIGINT NOT NULL,
   user_id BIGINT NOT NULL,
   total_amount NUMERIC(18,4),

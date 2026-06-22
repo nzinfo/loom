@@ -22,22 +22,6 @@ describe('paths — platform', () => {
     });
   });
 
-  it('recognizes platform manifest.module.yaml', () => {
-    expect(
-      pathToIdentity(
-        'platform/base/core/manifest.module.yaml',
-        'platform/base/core/manifest.module.yaml',
-      ),
-    ).toEqual<DiscoveredFile>({
-      kind: 'module_manifest',
-      system: 'base',
-      module: 'core',
-      name: '',
-      identity: 'module_manifest:base.core',
-      owner: { kind: 'platform' },
-    });
-  });
-
   it('recognizes a scalar type file (.type.yaml) as a type node', () => {
     expect(
       pathToIdentity(
@@ -107,22 +91,6 @@ describe('paths — ext', () => {
       module: 'pos',
       name: 'Orders',
       identity: 'table:retail.pos.Orders',
-      owner: { kind: 'ext', provider: 'acme-corp' },
-    });
-  });
-
-  it('recognizes ext manifest.module.yaml', () => {
-    expect(
-      pathToIdentity(
-        'ext/acme-corp/retail/pos/manifest.module.yaml',
-        'ext/acme-corp/retail/pos/manifest.module.yaml',
-      ),
-    ).toEqual<DiscoveredFile>({
-      kind: 'module_manifest',
-      system: 'retail',
-      module: 'pos',
-      name: '',
-      identity: 'module_manifest:retail.pos',
       owner: { kind: 'ext', provider: 'acme-corp' },
     });
   });
@@ -228,7 +196,8 @@ describe('paths — kind/stem helpers', () => {
     expect(kindFromFilename('audit.mixin.yaml')).toBe('mixin');
     expect(kindFromFilename('user_fields.ext.yaml')).toBe('extension_fields');
     expect(kindFromFilename('base.types.yaml')).toBeNull();
-    expect(kindFromFilename('manifest.module.yaml')).toBe('module_manifest');
+    // module_manifest kind is gone; manifest.module.yaml is now unrecognized
+    expect(kindFromFilename('manifest.module.yaml')).toBeNull();
   });
 
   it('kindFromFilename returns null for unknown extensions', () => {
@@ -238,7 +207,7 @@ describe('paths — kind/stem helpers', () => {
 
   it('stemFromFilename strips the kind token, not the name', () => {
     expect(stemFromFilename('user.entity.yaml')).toBe('user');
-    expect(stemFromFilename('manifest.module.yaml')).toBe('manifest');
+    expect(stemFromFilename('manifest.module.yaml')).toBeNull();
     expect(stemFromFilename('user_fields.ext.yaml')).toBe('user_fields');
     expect(stemFromFilename('user.yaml')).toBeNull();
   });

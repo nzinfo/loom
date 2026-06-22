@@ -4,7 +4,6 @@ import {
   EntitySchema,
   ExtensionFieldsSchema,
   MixinSchema,
-  ModuleManifestSchema,
   ParseError,
   TableSchema,
   TypeSchema,
@@ -138,16 +137,6 @@ describe('schemas', () => {
     expect(TypeSchema.parse((f as { raw: unknown }).raw)).toBeDefined();
   });
 
-  it('parses a module_manifest', () => {
-    const f = parseFile(
-      'version: loom-schema/v2\nsystem: base\nmodule: core\nphysical_schema: base_core\n',
-      'platform/base/core/manifest.module.yaml',
-      'module_manifest',
-    );
-    expect(f.kind).toBe('module_manifest');
-    expect(ModuleManifestSchema.parse((f as { raw: unknown }).raw)).toBeDefined();
-  });
-
   it('parses a single-field struct type', () => {
     const src = `version: loom-schema/v2
 name: Email
@@ -251,15 +240,8 @@ fields:
   });
 
   it('AnyFile is a discriminated union by kind (6 kinds)', () => {
-    const cases: AnyFile['kind'][] = [
-      'type',
-      'module_manifest',
-      'mixin',
-      'table',
-      'entity',
-      'extension_fields',
-    ];
-    expect(new Set(cases).size).toBe(6);
+    const cases: AnyFile['kind'][] = ['type', 'mixin', 'table', 'entity', 'extension_fields'];
+    expect(new Set(cases).size).toBe(5);
   });
 
   it('parseFile throws ParseError with the right category', () => {

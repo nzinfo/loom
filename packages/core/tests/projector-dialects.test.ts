@@ -36,8 +36,6 @@ describe('projector dialects', () => {
         'version: loom-schema/v2\nname: bigint\nform: scalar\nproperties: []\n',
       'platform/base/core/string.type.yaml':
         'version: loom-schema/v2\nname: string\nform: scalar\nproperties: []\n',
-      'platform/base/core/manifest.module.yaml':
-        'version: loom-schema/v2\nsystem: base\nmodule: core\nphysical_schema: base_core\n',
       'platform/base/core/status.type.yaml':
         'version: loom-schema/v2\nname: Status\nform: enum\nvariants: [active, inactive]\n',
       'platform/base/core/t.table.yaml':
@@ -58,8 +56,6 @@ describe('projector dialects', () => {
         'version: loom-schema/v2\nname: decimal\nform: scalar\nproperties:\n  - { {name: precision, type: integer, required: true, name: scale, type: integer, required: true} }\n',
       'platform/base/core/string.type.yaml':
         'version: loom-schema/v2\nname: string\nform: scalar\nproperties:\n  - { {name: max_length, type: integer, required: true} }\n',
-      'platform/base/core/manifest.module.yaml':
-        'version: loom-schema/v2\nsystem: base\nmodule: core\nphysical_schema: base_core\n',
       'platform/base/core/status.type.yaml':
         'version: loom-schema/v2\nname: Status\nform: enum\nvariants: [active, inactive]\n',
       'platform/base/core/money.type.yaml':
@@ -83,8 +79,6 @@ describe('projector dialects', () => {
         'version: loom-schema/v2\nname: bigint\nform: scalar\nproperties: []\n',
       'platform/base/core/decimal.type.yaml':
         'version: loom-schema/v2\nname: decimal\nform: scalar\nproperties:\n  - { {name: precision, type: integer, required: true, name: scale, type: integer, required: true} }\n',
-      'platform/base/core/manifest.module.yaml':
-        'version: loom-schema/v2\nsystem: base\nmodule: core\nphysical_schema: base_core\n',
       'platform/base/core/status.type.yaml':
         'version: loom-schema/v2\nname: Status\nform: enum\nvariants: [active, inactive]\n',
       'platform/base/core/money.type.yaml':

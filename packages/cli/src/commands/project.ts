@@ -1,7 +1,7 @@
 import { createWriteStream } from 'node:fs';
 import type { Dirent } from 'node:fs';
 import * as fs from 'node:fs/promises';
-/** `loom project sql --dialect <pg|mysql|sqlite> [--out <file>] <path>`. See spec §8.8. */
+/** `loom project sql --dialect <pg|mysql|sqlite> [--out <file>] [--physical-schema <mod>=<name>]... <path>`. See spec §8.8. */
 import process from 'node:process';
 import type { Writable } from 'node:stream';
 import { load, projectSqlFromIr } from '@loom/core';
@@ -42,6 +42,8 @@ export interface ProjectOptions {
   readonly path: string;
   readonly dialect: string | undefined;
   readonly out: string | undefined;
+  /** Repeatable `--physical-schema <mod.fqn>=<schema>` overrides. */
+  readonly physicalSchemas: readonly string[];
 }
 
 export async function projectCommand(opts: ProjectOptions): Promise<number> {
@@ -51,6 +53,19 @@ export async function projectCommand(opts: ProjectOptions): Promise<number> {
   }
   const dialect = opts.dialect as Dialect;
 
+  // Parse --physical-schema <module.fqn>=<schema> overrides into a map.
+  const physicalSchemaOverrides = new Map<string, string>();
+  for (const spec of opts.physicalSchemas) {
+    const eq = spec.indexOf('=');
+    if (eq <= 0) {
+      process.stderr.write(
+        `error: --physical-schema expects "<module.fqn>=<name>", got "${spec}"\n`,
+      );
+      return 64;
+    }
+    physicalSchemaOverrides.set(spec.slice(0, eq), spec.slice(eq + 1));
+  }
+
   const result = await load({ fs: new NodeFileSystem(), basePath: opts.path });
   if (result.diagnostics.hasErrors) {
     process.stderr.write(result.diagnostics.format());
@@ -58,7 +73,8 @@ export async function projectCommand(opts: ProjectOptions): Promise<number> {
     return 1;
   }
 
-  const sql = projectSqlFromIr(result.ir, dialect);
+  const projectOpts = physicalSchemaOverrides.size > 0 ? { physicalSchemaOverrides } : undefined;
+  const sql = projectSqlFromIr(result.ir, dialect, projectOpts);
 
   const sink: Writable = opts.out ? createWriteStream(opts.out) : process.stdout;
   await new Promise<void>((resolve, reject) => {

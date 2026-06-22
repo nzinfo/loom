@@ -93,7 +93,10 @@ function instantiateFields(
  * @param ir The validated, linked IR from the loader.
  * @returns A PhysicalModel with tables, enums, and extension_fields registries.
  */
-export function expandTables(ir: IR): PhysicalModel {
+export function expandTables(
+  ir: IR,
+  physicalSchemaOverrides?: ReadonlyMap<string, string>,
+): PhysicalModel {
   const tables: PhysicalTable[] = [];
   const enums = new Map<string, ReadonlyArray<string>>();
   // extension_fields were aggregated by the link pass into ir.extensionFields.
@@ -107,7 +110,7 @@ export function expandTables(ir: IR): PhysicalModel {
   for (const [identity, node] of ir.nodes) {
     if (node.kind !== 'table') continue;
 
-    const table = expandTable(node, ir, enums, extensionFields);
+    const table = expandTable(node, ir, enums, extensionFields, physicalSchemaOverrides);
     tables.push(table);
   }
 
@@ -125,11 +128,18 @@ function expandTable(
   ir: IR,
   enums: Map<string, ReadonlyArray<string>>,
   extensionFields: Map<string, ReadonlyArray<ExtensionFieldEntry>>,
+  physicalSchemaOverrides?: ReadonlyMap<string, string>,
 ): PhysicalTable {
   const { data } = node;
   const tableName = data.table.name;
   const strategy = data.table.extension.strategy;
-  const schema = extractPhysicalSchema(node, ir);
+  // physical_schema derives from <system>_<module>; CLI overrides may replace it.
+  const identityBody = node.identity.slice('table:'.length); // <system>.<module>.<Name>
+  const dot2 = identityBody.lastIndexOf('.');
+  const dot1 = identityBody.lastIndexOf('.', dot2 - 1);
+  const system = dot1 >= 0 ? identityBody.slice(0, dot1) : '';
+  const module = dot1 >= 0 ? identityBody.slice(dot1 + 1, dot2) : '';
+  const schema = physicalSchemaOf(system, module, physicalSchemaOverrides);
   const qualifiedName = `${schema}.${tableName}`;
 
   // Resolve all fields (including mixin includes).
@@ -176,30 +186,25 @@ function expandTable(
 }
 
 /**
- * Extract the physical_schema from the table's module_manifest.
+ * Resolve a table's physical schema name.
  *
- * The manifest is at `systems/<system>/<module>/MANIFEST.yaml`.
- * This function walks up the path to find it.
+ * Derived from the table's `<system>_<module>` by default. Callers may pass
+ * an overrides map (e.g. `{ "retail.pos": "acme_retail_pos" }`) — typically
+ * from a CLI flag — to replace the derived name per module fqn. Overrides
+ * win over derivation.
+ *
+ * (module_manifest is gone; physical_schema is a projection-time concern,
+ * not a schema declaration. See design note on module_manifest removal.)
  */
-function extractPhysicalSchema(node: IRNode & { kind: 'table' }, ir: IR): string {
-  // Identity format: table:<system>.<module>.<Name>
-  const identityParts = node.identity.split(':');
-  const qualifiedName = identityParts[1]; // <system>.<module>.<Name>
-  const parts = (qualifiedName ?? '').split('.');
-  const system = parts[0] ?? '';
-  const module = parts[1] ?? '';
-  const manifestIdentity = `module_manifest:${system}.${module}`;
-  const manifestNode = ir.nodes.get(manifestIdentity);
-
-  if (!manifestNode) {
-    throw new Error(`Missing module_manifest for table ${node.identity}`);
-  }
-
-  if (manifestNode.kind !== 'module_manifest') {
-    throw new Error(`Expected module_manifest, got ${manifestNode.kind}`);
-  }
-
-  return manifestNode.data.physical_schema;
+function physicalSchemaOf(
+  system: string,
+  module: string,
+  overrides?: ReadonlyMap<string, string>,
+): string {
+  const fqn = `${system}.${module}`;
+  const override = overrides?.get(fqn);
+  if (override !== undefined) return override;
+  return `${system}_${module}`;
 }
 
 /**

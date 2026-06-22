@@ -83,11 +83,6 @@ name: string
 form: scalar
 properties: []
 `,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
-`,
       'platform/base/core/email.type.yaml': `version: loom-schema/v2
 name: Email
 form: struct
@@ -124,21 +119,11 @@ name: string
 form: scalar
 properties: []
 `,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
-`,
       'platform/base/core/money.type.yaml': `version: loom-schema/v2
 name: Money
 form: struct
 fields:
   - { name: amount, type: string }
-`,
-      'platform/retail/types/manifest.module.yaml': `version: loom-schema/v2
-system: retail
-module: types
-physical_schema: retail_types
 `,
       'platform/retail/types/money.type.yaml': `version: loom-schema/v2
 name: Money
@@ -174,11 +159,6 @@ name: string
 form: scalar
 properties: []
 `,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
-`,
       'platform/base/core/users.table.yaml': `version: loom-schema/v2
 name: Users
 table:
@@ -202,11 +182,6 @@ name: string
 form: scalar
 properties: []
 `,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
-`,
       'platform/base/core/users.table.yaml': `version: loom-schema/v2
 name: Users
 table:
@@ -229,11 +204,6 @@ primary_key: [id]
 name: string
 form: scalar
 properties: []
-`,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
 `,
       'platform/base/core/users.table.yaml': `version: loom-schema/v2
 name: Users
@@ -264,11 +234,6 @@ name: string
 form: scalar
 properties: []
 `,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
-`,
       'platform/base/core/users.table.yaml': `version: loom-schema/v2
 name: Users
 table:
@@ -284,11 +249,6 @@ primary_key: [id]
 
   it('stamps ext owner with provider', async () => {
     const { ir } = await linkFromStringMap({
-      'ext/acme-corp/retail/pos/manifest.module.yaml': `version: loom-schema/v2
-system: retail
-module: pos
-physical_schema: acme_retail_pos
-`,
       'ext/acme-corp/retail/pos/orders.table.yaml': `version: loom-schema/v2
 name: Orders
 table:
@@ -313,11 +273,6 @@ describe('v2 link — extension_fields aggregation', () => {
 name: string
 form: scalar
 properties: []
-`,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
 `,
       'platform/base/core/users.table.yaml': `version: loom-schema/v2
 name: Users
@@ -356,11 +311,6 @@ fields:
 name: string
 form: scalar
 properties: []
-`,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
 `,
       'platform/base/core/users.table.yaml': `version: loom-schema/v2
 name: Users
@@ -402,11 +352,6 @@ fields:
 name: string
 form: scalar
 properties: []
-`,
-      'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
 `,
       'platform/base/core/users.table.yaml': `version: loom-schema/v2
 name: Users

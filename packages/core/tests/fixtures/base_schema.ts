@@ -52,12 +52,6 @@ properties: []
 `,
 
     // ── struct / enum types (form: struct / enum) ──
-    'platform/base/core/manifest.module.yaml': `version: loom-schema/v2
-system: base
-module: core
-physical_schema: base_core
-description: core module
-`,
     'platform/base/core/audit.mixin.yaml': `version: loom-schema/v2
 name: Audit
 fields:
@@ -164,12 +158,6 @@ fields:
 `,
 
     // ── ext:acme-corp — independent module with its own physical schema ──
-    'ext/acme-corp/retail/pos/manifest.module.yaml': `version: loom-schema/v2
-system: retail
-module: pos
-physical_schema: acme_retail_pos
-description: acme-corp retail POS extension
-`,
     'ext/acme-corp/retail/pos/orders.table.yaml': `version: loom-schema/v2
 name: Orders
 table:

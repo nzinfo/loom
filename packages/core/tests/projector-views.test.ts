@@ -21,8 +21,6 @@ describe('projector views (spec §7.4)', () => {
     const fs = new MemoryFileSystem({
       'platform/base/core/bigint.type.yaml':
         'version: loom-schema/v2\nname: bigint\nform: scalar\nproperties: []\n',
-      'platform/base/core/manifest.module.yaml':
-        'version: loom-schema/v2\nsystem: base\nmodule: core\nphysical_schema: base_core\n',
       'platform/base/core/t.table.yaml':
         'version: loom-schema/v2\nname: T\ntable:\n  name: t\n  extension:\n    strategy: none\nfields:\n  - name: id\n    type: bigint\n    required: true\nprimary_key: [id]\n',
     });
@@ -41,8 +39,6 @@ describe('projector views (spec §7.4)', () => {
         'version: loom-schema/v2\nname: decimal\nform: scalar\nproperties:\n  - { name: precision, type: integer, required: true }\n  - { name: scale, type: integer, required: true }\n',
       'platform/base/core/string.type.yaml':
         'version: loom-schema/v2\nname: string\nform: scalar\nproperties:\n  - { name: max_length, type: integer, required: true }\n',
-      'platform/base/core/manifest.module.yaml':
-        'version: loom-schema/v2\nsystem: base\nmodule: core\nphysical_schema: base_core\n',
       'platform/base/core/money.type.yaml':
         'version: loom-schema/v2\nname: Money\nform: struct\nfields:\n  - name: amount\n    type:\n      ref: decimal\n      args: { precision: 18, scale: 4 }\n  - name: currency_code\n    type:\n      ref: string\n      args: { max_length: 3 }\n',
       'platform/base/core/users.table.yaml':

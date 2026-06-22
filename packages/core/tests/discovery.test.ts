@@ -27,7 +27,6 @@ describe('discovery (Pass 0) — platform', () => {
     const ids = new Set([...result.files.values()].map((e) => e.identity));
     expect(diag.hasErrors).toBe(false);
     expect(ids.has('type:base.core.String')).toBe(true);
-    expect(ids.has('module_manifest:base.core')).toBe(true);
     expect(ids.has('type:base.core.Email')).toBe(true);
     expect(ids.has('type:base.core.Money')).toBe(true);
     expect(ids.has('mixin:base.core.Audit')).toBe(true);
@@ -94,7 +93,6 @@ describe('discovery (Pass 0) — platform', () => {
     });
     expect(diag.hasErrors).toBe(false);
     expect(findByIdentity(result.files, 'type:base.core.String')).toBeDefined();
-    expect(findByIdentity(result.files, 'module_manifest:base.core')).toBeDefined();
     expect(findByIdentity(result.files, 'type:base.core.Email')).toBeDefined();
   });
 });
@@ -102,18 +100,12 @@ describe('discovery (Pass 0) — platform', () => {
 describe('discovery (Pass 0) — ext / tenant owners', () => {
   it('stamps ext owner with provider', async () => {
     const fs = new MemoryFileSystem({
-      'ext/acme-corp/retail/pos/manifest.module.yaml':
-        'version: loom-schema/v2\nsystem: retail\nmodule: pos\n',
       'ext/acme-corp/retail/pos/orders.table.yaml': 'version: loom-schema/v2\nname: Orders\n',
     });
     const diag = new Diagnostics();
     const result = await discover({ fs, basePath: '', diagnostics: diag });
     expect(diag.hasErrors).toBe(false);
     expect(findByIdentity(result.files, 'table:retail.pos.Orders')?.meta.owner).toEqual({
-      kind: 'ext',
-      provider: 'acme-corp',
-    });
-    expect(findByIdentity(result.files, 'module_manifest:retail.pos')?.meta.owner).toEqual({
       kind: 'ext',
       provider: 'acme-corp',
     });
