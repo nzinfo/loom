@@ -86,17 +86,30 @@ table:
 │ (主表)              │ 1 ──── N │ (JSONB 扩展组表)                 │
 ├─────────────────────┤         ├──────────────────────────────────┤
 │ id BIGINT PK        │ ◀────── │ base_id BIGINT  FK→users_base.id │
-│ email               │         │ tenant_id BIGINT                  │
+│ email               │         │ tenant_id BIGINT  (NULL=全局)     │
 │ created_at          │         │ group_name VARCHAR(50)            │
 │ ...                 │         │ values JSONB                      │
 └─────────────────────┘         │ created_at TIMESTAMPTZ           │
                                 └──────────────────────────────────┘
 ```
 
-每个扩展字段属于一个 **group**（在 `.ext.yaml` 的 `group:` 字段声明）。同组的字段
-打包成一行，是该行 `values` JSONB 文档的独立 key。100 个字段分成 5 组 → 每 entity
-每 tenant 仅 5 行（而非每字段一行）。分组与扩展字段声明详见
-[08 extension_fields](./08-extension-fields.md)。
+行的维度是 `(base_id, tenant_id, group_name)`：
+
+- **`tenant_id`** 表达数据可见性 scope，**不区分数据来源**。platform 和 ext provider
+  的扩展字段都是全局的（`tenant_id = NULL`，所有租户可见）；只有 tenant owner 的扩展
+  字段是租户专属（`tenant_id = <租户id>`）。所以 ext 表不需要额外的 vendor/provider
+  列——从可见性看，platform 和 ext provider 等价，都是全局
+- **`group_name`** 是扩展组名（来自 `.ext.yaml` 的 `group:` 或文件 stem）。一个 ext
+  文件 = 一组 = 运行时一组行
+
+```
+base_id=1, tenant_id=NULL, group_name='profile',  values='{"nickname":"Alice"}'      ← platform 定义的字段
+base_id=1, tenant_id=NULL, group_name='finance',  values='{"credit_limit_amount":5000}' ← platform 定义的字段
+base_id=1, tenant_id=1,   group_name='profile',  values='{"customer_no":"C001"}'    ← tenant:acme 定义的字段
+```
+
+如果想审计"某行数据是哪个 ext provider 写的"，用 `group_name` 承载来源（如 `acme_tax`
+而非 `tax`），或在运行时加审计列——这是应用的决策，loom 编译期不关心。
 
 > 策略名保留为 `sidecar_eav`（向下兼容），但物理模型已是 JSONB 扩展组，不再是旧的
 > typed-column EAV。背景与权衡见
