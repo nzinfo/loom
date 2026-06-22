@@ -26,7 +26,7 @@ export const CURRENT_VERSION = `${FORMAT_FAMILY}/${FORMAT_VERSION}` as const;
  * `module_manifest` is gone — physical_schema is now a projection-time
  * concern (derived from `<system>_<module>`, with optional CLI overrides),
  * not a schema declaration. See design note on module_manifest removal. */
-export const FILE_KIND = ['type', 'mixin', 'table', 'entity', 'extension_fields'] as const;
+export const FILE_KIND = ['type', 'table', 'entity', 'extension_fields'] as const;
 export type FileKind = (typeof FILE_KIND)[number];
 
 /**
@@ -35,7 +35,7 @@ export type FileKind = (typeof FILE_KIND)[number];
  * subdirectories). See spec §9.
  *
  * The kind token sits between the stem and `.yaml`:
- *   `money.type.yaml`, `audit.mixin.yaml`, `users.table.yaml`,
+ *   `money.type.yaml`, `users.table.yaml`,
  *   `user.entity.yaml`, `user_fields.ext.yaml`
  *
  * Only `.yaml` is supported (not `.yml`) — kind-encoded files standardize on
@@ -43,7 +43,6 @@ export type FileKind = (typeof FILE_KIND)[number];
  */
 export const KIND_EXTENSIONS: Readonly<Record<FileKind, string>> = {
   type: '.type.yaml',
-  mixin: '.mixin.yaml',
   table: '.table.yaml',
   entity: '.entity.yaml',
   extension_fields: '.ext.yaml',

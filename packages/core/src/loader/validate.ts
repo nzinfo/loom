@@ -42,13 +42,6 @@ export function validate(opts: ValidateOptions): ValidateResult {
         }
         break;
       }
-      case 'mixin': {
-        const data = node.data as { fields?: FieldLike[] };
-        for (const f of data.fields ?? []) {
-          checkTypedField(identity, node.kind, f, scalarReqProps, opts.diagnostics);
-        }
-        break;
-      }
       case 'table': {
         checkTable(identity, node.data as Table, scalarReqProps, opts.diagnostics);
         break;

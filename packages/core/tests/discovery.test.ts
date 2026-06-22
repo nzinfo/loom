@@ -29,7 +29,7 @@ describe('discovery (Pass 0) — platform', () => {
     expect(ids.has('type:base.core.String')).toBe(true);
     expect(ids.has('type:base.core.Email')).toBe(true);
     expect(ids.has('type:base.core.Money')).toBe(true);
-    expect(ids.has('mixin:base.core.Audit')).toBe(true);
+    expect(ids.has('type:base.core.Audit')).toBe(true);
     expect(ids.has('table:base.core.Users')).toBe(true);
     expect(ids.has('entity:base.core.User')).toBe(true);
     expect(ids.has('extension_fields:base.core.User_fields')).toBe(true);
@@ -46,8 +46,8 @@ describe('discovery (Pass 0) — platform', () => {
 
   it('reports duplicate identities (case collision on case‑sensitive fs)', async () => {
     const fs = new MemoryFileSystem({
-      'platform/base/core/a.mixin.yaml': '',
-      'platform/base/core/A.mixin.yaml': '',
+      'platform/base/core/a.type.yaml': '',
+      'platform/base/core/A.type.yaml': '',
     });
     const diag = new Diagnostics();
     await discover({ fs, basePath: '', diagnostics: diag });

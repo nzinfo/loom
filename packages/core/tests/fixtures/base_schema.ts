@@ -52,8 +52,9 @@ properties: []
 `,
 
     // ── struct / enum types (form: struct / enum) ──
-    'platform/base/core/audit.mixin.yaml': `version: loom-schema/v2
+    'platform/base/core/audit.type.yaml': `version: loom-schema/v2
 name: Audit
+form: struct
 fields:
   - name: created_at
     type: datetime
@@ -121,7 +122,9 @@ fields:
   - name: id
     type: bigint
     required: true
-  - include: mixin:base.core.Audit
+  - name: audit
+    type: base.core.Audit
+    column: ''
   - name: email
     type: base.core.Email
     required: true

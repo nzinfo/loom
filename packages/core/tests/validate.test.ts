@@ -28,8 +28,9 @@ name: string
 form: scalar
 properties: []
 `,
-      'platform/base/core/a.mixin.yaml': `version: loom-schema/v2
+      'platform/base/core/a.type.yaml': `version: loom-schema/v2
 name: A
+form: struct
 fields:
   - name: x
     type: not_a_scalar
@@ -121,8 +122,9 @@ properties:
   - { name: precision, type: integer, required: true }
   - { name: scale, type: integer, required: true }
 `,
-      'platform/base/core/a.mixin.yaml': `version: loom-schema/v2
+      'platform/base/core/a.type.yaml': `version: loom-schema/v2
 name: A
+form: struct
 fields:
   - name: x
     type: decimal

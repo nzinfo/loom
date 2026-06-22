@@ -43,7 +43,7 @@ export interface ParseResult {
 
 /** Kinds whose file declares an authoritative `name:` that overrides the
  * stem-derived provisional identity. */
-const NAME_BEARING_KINDS = new Set(['type', 'mixin', 'table', 'entity']);
+const NAME_BEARING_KINDS = new Set(['type', 'table', 'entity']);
 
 /**
  * Rebuild a name-bearing node's identity from its declared `name:`.

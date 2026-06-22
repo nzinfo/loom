@@ -37,5 +37,9 @@ export function expandValueColumns(prefix: string, vt: ValueTypeNode): ExpandedC
   if (isSingleFieldValueType(vt)) {
     return [{ name: prefix }];
   }
+  // Empty prefix = flatten: use subfield names directly (no underscore).
+  if (prefix === '') {
+    return vt.fields.map((f) => ({ name: f.name }));
+  }
   return vt.fields.map((f) => ({ name: `${prefix}_${f.name}` }));
 }

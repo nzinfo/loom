@@ -3,7 +3,6 @@ import {
   type AnyFile,
   EntitySchema,
   ExtensionFieldsSchema,
-  MixinSchema,
   ParseError,
   TableSchema,
   TypeSchema,
@@ -14,12 +13,13 @@ describe('v2 field schema', () => {
   it('accepts a field with type: <single-segment>', () => {
     const yaml = `version: loom-schema/v2
 name: M
+form: struct
 fields:
   - name: age
     type: integer
 `;
-    const f = parseFile(yaml, 'm.mixin.yaml', 'mixin');
-    expect(f.kind).toBe('mixin');
+    const f = parseFile(yaml, 'm.type.yaml', 'type');
+    expect(f.kind).toBe('type');
     const fields = (f.data as { fields: Array<Record<string, unknown>> }).fields;
     expect(fields[0]?.type).toBe('integer');
   });
@@ -27,11 +27,12 @@ fields:
   it('accepts a field with type: <three-segment>', () => {
     const yaml = `version: loom-schema/v2
 name: M
+form: struct
 fields:
   - name: email
     type: base.core.Email
 `;
-    const f = parseFile(yaml, 'm.mixin.yaml', 'mixin');
+    const f = parseFile(yaml, 'm.type.yaml', 'type');
     const fields = (f.data as { fields: Array<Record<string, unknown>> }).fields;
     expect(fields[0]?.type).toBe('base.core.Email');
   });
@@ -39,6 +40,7 @@ fields:
   it('accepts a field with type as a descriptor object', () => {
     const yaml = `version: loom-schema/v2
 name: M
+form: struct
 fields:
   - name: email
     type:
@@ -46,7 +48,7 @@ fields:
       args: { max_length: 254 }
       meta: { since: v0.2.0 }
 `;
-    const f = parseFile(yaml, 'm.mixin.yaml', 'mixin');
+    const f = parseFile(yaml, 'm.type.yaml', 'type');
     const fields = (f.data as { fields: Array<Record<string, unknown>> }).fields;
     const t = fields[0]?.type as {
       ref: string;
@@ -61,21 +63,23 @@ fields:
   it('rejects a field with the v1 base: key', () => {
     const yaml = `version: loom-schema/v2
 name: M
+form: struct
 fields:
   - name: age
     base: integer
 `;
-    expect(() => parseFile(yaml, 'm.mixin.yaml', 'mixin')).toThrow();
+    expect(() => parseFile(yaml, 'm.type.yaml', 'type')).toThrow();
   });
 
   it('rejects a field with the v1 ref: key', () => {
     const yaml = `version: loom-schema/v2
 name: M
+form: struct
 fields:
   - name: email
     ref: type:base.core.Email
 `;
-    expect(() => parseFile(yaml, 'm.mixin.yaml', 'mixin')).toThrow();
+    expect(() => parseFile(yaml, 'm.type.yaml', 'type')).toThrow();
   });
 
   it('accepts an optional using: list on a type file', () => {
@@ -114,13 +118,14 @@ fields:
   it('accepts using: with a single precise name', () => {
     const yaml = `version: loom-schema/v2
 name: M
+form: struct
 using:
   - base.core.Email
 fields:
   - name: x
     type: Email
 `;
-    const f = parseFile(yaml, 'm.mixin.yaml', 'mixin');
+    const f = parseFile(yaml, 'm.type.yaml', 'type');
     const data = f.data as { using?: string[] };
     expect(data.using).toEqual(['base.core.Email']);
   });
@@ -176,19 +181,6 @@ constraints:
     expect(() => TypeSchema.parse((f as { raw: unknown }).raw)).not.toThrow();
   });
 
-  it('parses a mixin', () => {
-    const src = `version: loom-schema/v2
-name: Audit
-fields:
-  - name: created_at
-    type: datetime
-    required: true
-`;
-    expect(() =>
-      MixinSchema.parse((parseFile(src, 'audit.mixin.yaml', 'mixin') as { raw: unknown }).raw),
-    ).not.toThrow();
-  });
-
   it('parses a table with extension strategy sidecar_eav', () => {
     const src = `version: loom-schema/v2
 name: Users
@@ -234,27 +226,27 @@ fields:
   });
 
   it('parseFile rejects wrong version', () => {
-    expect(() => parseFile('version: loom-schema/v9\nname: X\n', 'm.mixin.yaml', 'mixin')).toThrow(
+    expect(() => parseFile('version: loom-schema/v9\nname: X\n', 'm.type.yaml', 'type')).toThrow(
       /version/,
     );
   });
 
   it('AnyFile is a discriminated union by kind (6 kinds)', () => {
-    const cases: AnyFile['kind'][] = ['type', 'mixin', 'table', 'entity', 'extension_fields'];
-    expect(new Set(cases).size).toBe(5);
+    const cases: AnyFile['kind'][] = ['type', 'type', 'table', 'entity', 'extension_fields'];
+    expect(new Set(cases).size).toBe(4);
   });
 
   it('parseFile throws ParseError with the right category', () => {
     try {
-      parseFile('version: loom-schema/v9\nname: X\n', 'm.mixin.yaml', 'mixin');
+      parseFile('version: loom-schema/v9\nname: X\n', 'm.type.yaml', 'type');
       expect.unreachable('should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(ParseError);
       expect((e as ParseError).category).toBe('version');
-      expect((e as ParseError).file).toBe('m.mixin.yaml');
+      expect((e as ParseError).file).toBe('m.type.yaml');
     }
     try {
-      parseFile(':\n  - :\n  : bad', 'm.mixin.yaml', 'mixin');
+      parseFile(':\n  - :\n  : bad', 'm.type.yaml', 'type');
       expect.unreachable('should have thrown');
     } catch (e) {
       expect(e).toBeInstanceOf(ParseError);

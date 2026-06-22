@@ -193,7 +193,7 @@ describe('paths — kind/stem helpers', () => {
     expect(kindFromFilename('user.entity.yaml')).toBe('entity');
     expect(kindFromFilename('orders.table.yaml')).toBe('table');
     expect(kindFromFilename('email.type.yaml')).toBe('type');
-    expect(kindFromFilename('audit.mixin.yaml')).toBe('mixin');
+    expect(kindFromFilename('audit.type.yaml')).toBe('type');
     expect(kindFromFilename('user_fields.ext.yaml')).toBe('extension_fields');
     expect(kindFromFilename('base.types.yaml')).toBeNull();
     // module_manifest kind is gone; manifest.module.yaml is now unrecognized

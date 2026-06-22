@@ -34,13 +34,13 @@ describe('link (Pass 2)', () => {
     const deps = ir.deps.get('table:base.core.Users');
     expect(deps?.has('type:base.core.Email')).toBe(true);
     expect(deps?.has('type:base.core.Money')).toBe(true);
-    expect(deps?.has('mixin:base.core.Audit')).toBe(true);
+    expect(deps?.has('type:base.core.Audit')).toBe(true);
   });
 
   it('reports dangling refs', async () => {
     const fs = new MemoryFileSystem({
-      'platform/base/core/a.mixin.yaml':
-        'version: loom-schema/v2\nname: A\nfields:\n  - name: x\n    type: base.core.DoesNotExist\n',
+      'platform/base/core/a.type.yaml':
+        'version: loom-schema/v2\nname: A\nform: struct\nfields:\n  - name: x\n    type: base.core.DoesNotExist\n',
     });
     const { diagnostics } = await runLink(fs);
     expect(diagnostics.hasErrors).toBe(true);
@@ -49,24 +49,13 @@ describe('link (Pass 2)', () => {
 
   it('reports kind_mismatch when ref points at wrong kind', async () => {
     const fs = new MemoryFileSystem({
-      'platform/base/core/a.mixin.yaml':
-        'version: loom-schema/v2\nname: A\nfields:\n  - name: x\n    type: base.core.Users\n',
+      'platform/base/core/a.type.yaml':
+        'version: loom-schema/v2\nname: A\nform: struct\nfields:\n  - name: x\n    type: base.core.Users\n',
       'platform/base/core/users.table.yaml':
         'version: loom-schema/v2\nname: Users\ntable:\n  name: users\n  extension:\n    strategy: none\nfields:\n  - name: id\n    type: string\n    required: true\nprimary_key: [id]\n',
     });
     const { diagnostics } = await runLink(fs);
     expect(diagnostics.errors.some((e) => e.category === 'kind_mismatch')).toBe(true);
-  });
-
-  it('reports mixin cycles', async () => {
-    const fs = new MemoryFileSystem({
-      'platform/base/core/a.mixin.yaml':
-        'version: loom-schema/v2\nname: A\nfields:\n  - include: mixin:base.core.B\n  - name: xa\n    type: string\n',
-      'platform/base/core/b.mixin.yaml':
-        'version: loom-schema/v2\nname: B\nfields:\n  - include: mixin:base.core.A\n  - name: xb\n    type: string\n',
-    });
-    const { diagnostics } = await runLink(fs);
-    expect(diagnostics.errors.some((e) => e.category === 'cycle')).toBe(true);
   });
 });
 

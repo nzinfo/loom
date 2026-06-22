@@ -101,12 +101,12 @@ const typeField = z
     unique: z.boolean().optional(),
     default: z.unknown().optional(),
     default_scope: z.string().min(1).optional(),
+    /** Physical column name / prefix override. Default = name. Empty string
+     * ('') = flatten: target's fields are inserted without a prefix (the
+     * mixin-flatten behavior, now expressed via a struct ref with column: ''). */
+    column: z.string().optional(),
   })
   .strict();
-
-const includeEntry = z.object({ include: z.string().min(1) }).strict();
-
-const fieldOrInclude = z.union([typeField, includeEntry]);
 
 /**
  * A variant entry — element of an `enum` form type's `variants:` list (spec v2 §6).
@@ -175,7 +175,7 @@ export const TypeSchema = z
     using: usingSchema,
     // Form-specific fields (all optional; superRefine enforces the mutex).
     properties: z.array(scalarPropertySchema).optional(), // scalar
-    fields: z.array(fieldOrInclude).optional(), // struct
+    fields: z.array(typeField).optional(), // struct
     variants: z.array(variantSchema).min(1).optional(), // enum (current shape)
     constraints: z.array(constraintSchema).optional(), // struct only
   })
@@ -245,17 +245,6 @@ export const TypeSchema = z
     }
   });
 
-export const MixinSchema = z
-  .object({
-    version: versionSchema,
-    name: z.string().min(1),
-    display_name: z.string().optional(),
-    description: z.string().optional(),
-    using: usingSchema,
-    fields: z.array(fieldOrInclude).min(1),
-  })
-  .strict();
-
 export const TableSchema = z
   .object({
     version: versionSchema,
@@ -269,7 +258,7 @@ export const TableSchema = z
         extension: extensionSchema,
       })
       .strict(),
-    fields: z.array(fieldOrInclude).min(1),
+    fields: z.array(typeField).min(1),
     primary_key: z.array(z.string().min(1)).min(1),
     foreign_keys: z.array(foreignKeySchema).optional(),
     indexes: z.array(indexSchema).optional(),
@@ -295,14 +284,13 @@ export const ExtensionFieldsSchema = z
     version: versionSchema,
     entity: z.string().min(1),
     using: usingSchema,
-    fields: z.array(fieldOrInclude).min(1),
+    fields: z.array(typeField).min(1),
   })
   .strict();
 
 // ---- inferred types ----
 
 export type TypeNode = z.infer<typeof TypeSchema>;
-export type Mixin = z.infer<typeof MixinSchema>;
 export type Table = z.infer<typeof TableSchema>;
 export type Entity = z.infer<typeof EntitySchema>;
 export type ExtensionFields = z.infer<typeof ExtensionFieldsSchema>;
@@ -319,14 +307,12 @@ export interface ParsedFileBase {
 
 export type AnyFile =
   | (ParsedFileBase & { kind: 'type'; data: TypeNode })
-  | (ParsedFileBase & { kind: 'mixin'; data: Mixin })
   | (ParsedFileBase & { kind: 'table'; data: Table })
   | (ParsedFileBase & { kind: 'entity'; data: Entity })
   | (ParsedFileBase & { kind: 'extension_fields'; data: ExtensionFields });
 
 const SCHEMA_BY_KIND = {
   type: TypeSchema,
-  mixin: MixinSchema,
   table: TableSchema,
   entity: EntitySchema,
   extension_fields: ExtensionFieldsSchema,

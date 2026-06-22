@@ -13,7 +13,6 @@ import type { ParsedExtensionFields } from './parse.js';
  *
  * For every parsed file:
  *   - resolves $refs against the parsed map (dangling_ref / kind_mismatch)
- *   - expands mixin includes in-place (recursive, with cycle detection)
  *   - records dependency edges into the IR's dep graph
  *
  * Output: an immutable IR with fully resolved nodes.
@@ -40,9 +39,6 @@ export interface LinkResult {
   readonly diagnostics: Diagnostics;
 }
 
-/** Ref kinds legal as a mixin include target. */
-const INCLUDE_REF_KINDS: ReadonlySet<FileKind> = new Set<FileKind>(['mixin']);
-
 export async function link(opts: LinkOptions): Promise<LinkResult> {
   const nodes = new Map<Identity, IRNode>();
   const deps = new Map<Identity, Set<Identity>>();
@@ -61,18 +57,21 @@ export async function link(opts: LinkOptions): Promise<LinkResult> {
   // includes the implicit default base.core.*). No scalar special-case.
   const typeFqns = collectTypeFqns(opts.parsed);
 
-  // Resolve type refs + expand mixins per file.
+  // Resolve type refs per file.
   for (const [identity, node] of nodes) {
     const fieldsHost = fieldsOf(node);
     if (fieldsHost === null) continue;
 
-    const expanded = expandIncludes(fieldsHost, identity, opts.parsed, opts.diagnostics, deps);
-    if (expanded === null) continue;
-
     const fileUsing = collectUsing(node);
-    resolveFieldTypes(expanded, identity, fileUsing, typeFqns, opts.parsed, opts.diagnostics, deps);
-
-    nodes.set(identity, withFields(node, expanded));
+    resolveFieldTypes(
+      fieldsHost,
+      identity,
+      fileUsing,
+      typeFqns,
+      opts.parsed,
+      opts.diagnostics,
+      deps,
+    );
   }
 
   // Aggregate extension_fields across owners into the registry keyed by
@@ -99,11 +98,6 @@ function fieldsOf(node: IRNode): FieldsHost | null {
   const data = node.data as { fields?: unknown[] };
   if (Array.isArray(data.fields)) return data as FieldsHost;
   return null;
-}
-
-function withFields(node: IRNode, fields: FieldsHost): IRNode {
-  const updated = { ...node, data: { ...(node.data as object), fields: fields.fields } };
-  return updated as IRNode;
 }
 
 /** Collect ALL type-node fully-qualified names (sys.mod.declaredName).
@@ -162,7 +156,6 @@ function collectExtensionFields(
     }
 
     for (const f of ef.fields as ReadonlyArray<Record<string, unknown>>) {
-      if ('include' in f) continue;
       const desc = normalizeType((f.type as string | TypeDescriptor | undefined) ?? '');
       const fieldName = String(f.name ?? '');
       const key = `${entityRef}::${fieldName}`;
@@ -208,83 +201,6 @@ function collectUsing(node: IRNode): readonly string[] {
   if (Array.isArray(data.using))
     return data.using.filter((s): s is string => typeof s === 'string');
   return [];
-}
-
-interface IncludeEntry {
-  readonly include: string;
-}
-
-function isInclude(x: unknown): x is IncludeEntry {
-  return typeof x === 'object' && x !== null && 'include' in x && !('base' in x) && !('ref' in x);
-}
-
-/**
- * Expand mixin includes in place. Returns the mutated host or null if a
- * fatal cycle aborted expansion for this node.
- */
-function expandIncludes(
-  host: FieldsHost,
-  identity: Identity,
-  parsed: ReadonlyMap<string, AnyFile>,
-  diag: Diagnostics,
-  deps: Map<Identity, Set<Identity>>,
-): FieldsHost | null {
-  const out: unknown[] = [];
-  const visiting = new Set<Identity>([identity]);
-
-  const walk = (entries: unknown[]): boolean => {
-    for (const e of entries) {
-      if (!isInclude(e)) {
-        out.push(e);
-        continue;
-      }
-      const refStr = e.include;
-      const ref = safeParseRef(refStr, identity, diag);
-      if (ref === null) continue;
-      if (!INCLUDE_REF_KINDS.has(ref.kind)) {
-        diag.add({
-          category: 'kind_mismatch',
-          file: identity,
-          line: 1,
-          column: 1,
-          message: `include target must be mixin, got ${refStr}`,
-        });
-        continue;
-      }
-      const targetId = refToIdentity(ref);
-      const target = parsed.get(targetId);
-      if (!target) {
-        diag.add({
-          category: 'dangling_ref',
-          file: identity,
-          line: 1,
-          column: 1,
-          message: `dangling $ref "${refStr}" (no node with that id)`,
-        });
-        continue;
-      }
-      deps.get(identity)?.add(targetId);
-      if (visiting.has(targetId)) {
-        diag.add({
-          category: 'cycle',
-          file: identity,
-          line: 1,
-          column: 1,
-          message: `mixin cycle detected: ${[...visiting, targetId].join(' → ')}`,
-        });
-        return false;
-      }
-      visiting.add(targetId);
-      const targetFields = (target.data as { fields?: unknown[] }).fields ?? [];
-      if (!walk(targetFields)) return false;
-      visiting.delete(targetId);
-    }
-    return true;
-  };
-
-  if (!walk(host.fields)) return null;
-  (host.fields as unknown[]) = out;
-  return host;
 }
 
 /**

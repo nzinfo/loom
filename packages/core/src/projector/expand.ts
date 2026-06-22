@@ -106,7 +106,7 @@ function expandTable(
   const qualifiedName = `${schema}.${tableName}`;
 
   // Resolve all fields (including mixin includes).
-  const fields = resolveFields(data.fields, ir);
+  const fields = data.fields;
 
   // Expand fields into columns.
   const columns = expandFields(fields, ir, enums);
@@ -171,44 +171,6 @@ function physicalSchemaOf(
 }
 
 /**
- * Resolve mixin includes to their constituent fields.
- *
- * Recursively expands include entries into the mixin's fields.
- * The result is a flat list of field objects (no include entries).
- */
-function resolveFields(
-  fields: ReadonlyArray<Record<string, unknown>>,
-  ir: IR,
-): ReadonlyArray<Record<string, unknown>> {
-  const resolved: Record<string, unknown>[] = [];
-
-  for (const f of fields) {
-    const fRec = f as Record<string, unknown>;
-    if ('include' in fRec) {
-      // Resolve mixin reference.
-      const mixinRef = String(fRec.include);
-      const mixinNode = ir.nodes.get(mixinRef);
-      if (!mixinNode) {
-        throw new Error(`Mixin not found: ${mixinRef}`);
-      }
-      if (mixinNode.kind !== 'mixin') {
-        throw new Error(`Expected mixin, got ${mixinNode.kind}`);
-      }
-      // Recursively resolve the mixin's fields.
-      const mixinFields = resolveFields(
-        mixinNode.data.fields as ReadonlyArray<Record<string, unknown>>,
-        ir,
-      );
-      resolved.push(...mixinFields);
-    } else {
-      resolved.push(fRec);
-    }
-  }
-
-  return resolved;
-}
-
-/**
  * Expand multiple fields into columns (handles multi-field value_types).
  *
  * This is a wrapper around expandField that flattens multi-field expansions.
@@ -234,6 +196,9 @@ function expandField(
   const fName = String(f.name);
   const desc = descriptorOf(f);
   const ref = desc.ref;
+  // column: default = field name; '' (empty) = flatten (no prefix); other = override.
+  const fColumn = typeof f.column === 'string' ? f.column : fName;
+  const isFlatten = fColumn === '';
 
   // After link, every ref is a fully-qualified name (sys.mod.declaredName) —
   // short names were resolved against the using namespace and rewritten.
@@ -254,7 +219,7 @@ function expandField(
   // form: scalar → one column, dialect keyed by the scalar's declared name.
   if (vt.form === 'scalar') {
     const result: PhysicalColumn = {
-      name: fName,
+      name: fColumn,
       scalar: vt.name,
       required: f.required === true,
       unique: f.unique === true,
@@ -268,7 +233,7 @@ function expandField(
   // MySQL ENUM / SQLite CHECK.
   if (vt.form === 'enum') {
     const result: PhysicalColumn = {
-      name: fName,
+      name: fColumn,
       scalar: 'string',
       required: f.required === true,
       unique: f.unique === true,
@@ -299,7 +264,7 @@ function expandField(
       enumRef = targetId;
     }
     const result: PhysicalColumn = {
-      name: fName,
+      name: fColumn,
       scalar,
       required: f.required === true,
       unique: f.unique === true,
@@ -310,17 +275,24 @@ function expandField(
   }
 
   // Multi-field struct: one column per subfield.
-  const expanded = expandValueColumns(fName, vtNodeForField);
+  // fColumn is the prefix (default = field name); '' = flatten (use subfield names directly).
+  const prefix = isFlatten ? '' : fColumn;
+  const expanded = expandValueColumns(prefix, vtNodeForField);
   return expanded.map((col, idx) => {
     const subField = fields[idx] as Record<string, unknown>;
     const subDesc = descriptorOf(subField);
     const subType = scalarNameOf(subDesc.ref, ir);
     const subProps = subDesc.args ?? {};
+    // For flatten (column: ''), each subfield's own required/unique wins
+    // (mixin semantics: the struct's fields are inserted as-is). For
+    // prefix mode, the outer field's required/unique applies to all sub-columns.
+    const required = isFlatten ? subField.required === true : f.required === true;
+    const unique = isFlatten ? subField.unique === true : f.unique === true;
     const result: PhysicalColumn = {
       name: col.name,
       scalar: subType,
-      required: f.required === true,
-      unique: f.unique === true,
+      required,
+      unique,
       props: subProps,
       ...(subType === 'enum' && Array.isArray(subProps.values) ? { enumRef: targetId } : {}),
     };

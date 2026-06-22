@@ -14,7 +14,7 @@ describe('load (end-to-end)', () => {
   it('surfaces discovery errors via diagnostics', async () => {
     const fs = new MemoryFileSystem({
       'platform/base/core/garbage/x.yaml':
-        'version: loom-schema/v2\nname: X\nfields:\n  - name: a\n    type: string\n',
+        'version: loom-schema/v2\nname: X\nform: struct\nfields:\n  - name: a\n    type: string\n',
     });
     const result = await load({ fs, basePath: '' });
     expect(result.diagnostics.hasErrors).toBe(true);
@@ -24,13 +24,13 @@ describe('load (end-to-end)', () => {
     const fs = new MemoryFileSystem({
       'platform/base/core/string.type.yaml':
         'version: loom-schema/v2\nname: string\nform: scalar\nproperties: []\n',
-      'platform/base/core/a.mixin.yaml':
-        'version: loom-schema/v2\nname: A\nfields:\n  - name: x\n    type: string\n',
-      'platform/retail/core/b.mixin.yaml':
-        'version: loom-schema/v2\nname: B\nfields:\n  - name: y\n    type: string\n',
+      'platform/base/core/a.type.yaml':
+        'version: loom-schema/v2\nname: A\nform: struct\nfields:\n  - name: x\n    type: string\n',
+      'platform/retail/core/b.type.yaml':
+        'version: loom-schema/v2\nname: B\nform: struct\nfields:\n  - name: y\n    type: string\n',
     });
     const result = await load({ fs, basePath: '', systemFilter: ['base'] });
     expect(result.diagnostics.hasErrors).toBe(false);
-    expect([...result.ir.nodes.keys()]).toEqual(['type:base.core.string', 'mixin:base.core.A']);
+    expect([...result.ir.nodes.keys()]).toEqual(['type:base.core.string', 'type:base.core.A']);
   });
 });
