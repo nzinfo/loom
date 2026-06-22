@@ -168,37 +168,69 @@ const TypeSchema = z.object({
 这意味着 enum 是三个 form 里**最有可能变化**的一个。当前实现只需支撑 `variants`，
 但留好扩展空间。
 
-## 4. 解析规则变更
+## 4. 解析规则：统一短名解析（无特殊化）
 
-短名解析（typespace.ts）的判据从"kind"改为"form + 命名约定"：
+> **修订**：本节取代早期的"scalar 优先解析"方案。早期实现给 base.core 的 scalar
+> form 一个解析特权（短名先查 scalar 注册表，命中即返回、不走 using）。这产生了两个
+> 问题：(a) ext 定义的 scalar form 类型掉进解析夹缝——既不在 base.core scalar 集里，
+> 又被 valueTypes 集合排除；(b) "基底性"靠位置（base.core）硬编码判别，是特殊化。
+> 统一短名解析消除了这个特殊化。
 
-1. **短名小写**（`decimal`、`bigint`）→ 查 `form: scalar` 类型（全局基底，**不走 using**）
-2. **短名 PascalCase**（`Money`、`Status`）→ 经 using 查 `form: struct|enum` 类型
-3. **三段全限定**（`base.core.Money`）→ 直接查 type 节点，校验 `form !== 'scalar'`（标量不允许三段引用——它们是基底，用短名即可）
+**所有类型地位平等，短名解析只有一条路径——查 using 命名空间。** scalar/struct/enum
+的区分只存在于**投影形态**，不存在于**解析路径**。
 
-**关键：标量仍是基底**。解析规则按 form 分叉，不按 kind 分叉。当前的 `ResolutionResult.scalar | value_type` 二分变成 `scalar | struct_or_enum`，语义不变，只是来源从"两个 kind 的 registry"变成"一个 type registry 里筛 form"。
-
-### 4.1 link pass 的 registry 构建
-
-当前（两个 registry）：
-```ts
-const scalars = collectScalars(parsed);      // from kind === 'base_types'
-const valueTypes = collectValueTypeFqns(parsed);  // from kind === 'value_type'
+```
+type: string    → 经 base.core.* 找到 base.core.string（form: scalar）
+type: Email     → 经 base.core.* 找到 base.core.Email（form: struct）
+type: Money     → 经 retail.pos.types.* 找到（显式 using）
+type: vector    → 经 geo.core.* 找到 geo.core.vector（ext scalar，经 using 正常工作）
 ```
 
-统一后（一个 registry，按 form 切分）：
+### 4.1 关键变化：base.core 是默认命名空间，而非 scalar 专属特权
+
+base.core 的 scalar 全局可用——因为 base.core 是**默认导入命名空间**（每个文件隐含
+`using: [base.core.*]`），**不是因为它是 scalar**。类比 Java 的 `java.lang.*`：`int`
+全局可用不是因为它特殊，而是因为 `java.lang` 默认导入且 `int` 恰好在里面。
+
+**连带变化**：base.core 的 struct/enum 也默认全局可用（如 `type: Email` 不需要显式
+using）。这是合理的——base.core 是系统基座，它的类型（scalar + struct）都是基础词汇。
+
+### 4.2 link pass 的 registry 构建（单一集合）
+
 ```ts
-const typesByForm = collectTypes(parsed);    // from kind === 'type'
-const scalars = typesByForm.scalar;          // form === 'scalar', 且 owner === platform/base.core
-const valueTypes = typesByForm.struct_enum;  // form !== 'scalar' fqns
+// 一个集合：所有 type 节点的 fqn（不分 form）
+const typeFqns = collectTypeFqns(parsed);    // from kind === 'type'
 ```
 
-resolveShortName 的签名与逻辑不变，只是两个集合的来源换了。
+不再有 `collectScalars`（scalar 注册表整个删除）和 `collectValueTypeFqns`。短名解析只
+用 `typeFqns` + using 列表。
 
-**标量基底性边界（决策）**：scalar 集合**只收集 base.core 模块**的 scalar form 节点。
-标量是系统基座，只由 platform/base/core 定义——ext/tenant 不定义标量（与现状一致）。
-即 collectTypes 筛选 scalar 时附加条件 `identity.startsWith('type:base.core.')`。
-struct/enum 集合不受此限，收集所有模块。
+### 4.3 resolveShortName（单一路径）
+
+```ts
+resolveShortName(shortName, using, typeFqns):
+  // 只查 using（含隐含的 base.core.*），命中即返回 fqn
+  // 多命中 → ambiguous；无命中 → unknown
+```
+
+不再有 `scalar` 分支。`ResolutionResult` 从 `scalar | value_type | ambiguous | unknown`
+简化为 `resolved(fqn) | ambiguous | unknown`。
+
+### 4.4 投影分叉判据：form，而非引用语法
+
+link 把所有短名重写为 fqn 后，expand 统一查节点看 form：
+- `form: scalar` → 1 列，用 `data.name` 查 dialect 类型映射
+- `form: struct` → N 列展开（或 newtype pass-through）
+- `form: enum` → 1 列 + enumRef
+
+expand 不再按"ref 有没有点"分叉——所有 ref 都是 fqn，按**目标节点的 form** 分叉。这更
+诚实，因为区分投影形态的本来就是 form，不是引用语法。
+
+### 4.5 ext scalar 的解析
+
+ext 定义的 scalar-form 类型（如 `geo.core.vector`）现在能经 `using: [geo.core.*]` +
+短名 `vector` 正常引用——与 ext 的 struct/enum 完全对称。它不进全局基底（因为它不在
+默认导入的 base.core 里），但经显式 using 可用。**夹缝缺口消失**。
 
 ## 5. 身份与 $ref 变更
 
@@ -312,7 +344,7 @@ exports:
 
 3. **type_parameters 是否 struct-only**：✅ **struct 与 enum 都开放，scalar 禁止**。enum 开放 type_parameters 是为 Rust 风格参数化 enum（如 `Result<T,E>`、`Option<T>`）预留——这些正是带 type_parameters 的 enum。superRefine 只禁止 scalar 带 type_parameters。
 
-4. **标量基底性边界**：✅ **scalar 集合只收集 base.core 模块**。标量是系统基座，只由 platform/base/core 定义；ext/tenant 不定义标量。collectTypes 筛选 scalar 时附加 `identity.startsWith('type:base.core.')`。struct/enum 不受此限。
+4. **标量基底性边界**：~~scalar 集合只收集 base.core 模块~~ **已被统一短名解析取代（见 §4）**。base.core 的 scalar 全局可用是"base.core 是默认命名空间"的自然结果，而非 scalar 专属特权。ext 的 scalar 经 using 正常引用，与 ext 的 struct/enum 对称。
 
 ## 10. 结论
 
@@ -323,3 +355,30 @@ exports:
 - enum 不在 schema 层过度约束（决策 2）——只支撑当前 variants，留扩展空间
 - type_parameters 对 struct/enum 开放（决策 3）
 - collectTypes 的 scalar 切分加 base.core 边界过滤（决策 4）
+
+## 11. 实施记录：统一短名解析 + 声明名身份
+
+§4 的"统一短名解析"已实施，并带出一个配套规则——**身份用声明名**：
+
+**问题**：scalar 的 `name:` 是小写（`bigint`），但路径推导的身份是 PascalCase
+（`bigint.type.yaml` → `type:base.core.Bigint`）。两者不一致，导致解析 fqn 与身份错位，
+最初用 `typeByFqn` map 桥接（ad-hoc 补丁）。
+
+**规则解法**：身份默认从路径 stem 推导（kebab→PascalCase），但 type/mixin/table/entity
+这类声明 `name:` 的 kind，parse 阶段用声明名**修正身份**（覆盖 stem 推导）。于是：
+- `bigint.type.yaml`（name: bigint）→ 身份 `type:base.core.bigint`
+- `email.type.yaml`（name: Email）→ 身份 `type:base.core.Email`
+
+fqn = 身份 body，三者统一。`typeByFqn` map、`collectTypeByFqn`、`scalarNameOf` 的桥接
+逻辑全部删除——`ir.nodes.get(`type:${ref}`)` 直接命中，`vt.name` 就是 dialect 要的名字。
+
+**实施影响**：
+- `parse.ts`：`correctedIdentity()` 对 name-bearing kinds 用声明名重建身份
+- `link.ts`：`ownerOfFile()` 改用路径匹配 owner（身份已变，不能用身份匹配 discovery entry）
+- `typespace.ts`：`resolveShortName` 三参数（shortName, using, typeFqns），返回
+  `resolved | ambiguous | unknown`（无 scalar 分支）
+- `expand.ts`：expandField 按目标节点 form 分叉；struct 子字段的 scalar 名经节点查找取 `data.name`
+- golden 输出**未变**（投影列定义与解析路径无关）
+
+这是"路径即身份"原则的细化：**路径推导是默认，声明是权威**。两者一致时无感，
+不一致时声明胜出（scalar 的小写名是主要用例）。

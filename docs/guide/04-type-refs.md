@@ -19,12 +19,13 @@ fields:
 
 | 形态 | 形式 | 含义 | 解析路径 |
 |---|---|---|---|
-| 短名 | `integer` / `string`（无点） | scalar 标量 | 查 scalar 注册表（base.core） |
-| 全限定 | `base.core.Email`（两个点） | struct/enum 类型节点 | 查节点表，验证 `kind === 'type'` |
+| 短名 | `integer` / `Email`（无点） | 任意类型（scalar/struct/enum） | 查 using 命名空间（含默认 `base.core.*`） |
+| 全限定 | `base.core.Email`（两个点） | 任意类型节点 | 直接查节点表，验证 `kind === 'type'` |
 
 **为什么这么设计**：`integer`（内置标量）和 `base.core.Email`（用户定义的复合类型）
-从类型论看是同类东西——都是"类型"。"是不是类型"由被引用节点自身的 `kind` 决定，
-引用者只需说"我的类型是 X"，不需要再标 kind 前缀。
+从类型论看是同类东西——都是"类型"，地位平等。"是不是类型"由被引用节点自身的 `kind`
+决定，引用者只需说"我的类型是 X"，不需要再标 kind 前缀。scalar/struct/enum 的区分只
+存在于**投影形态**（列怎么展开），不存在于**解析路径**——所有短名都走同一条 using 解析。
 
 ### Type Descriptor：详写形式
 
@@ -53,7 +54,7 @@ fields:
 - `type: foo.bar.Baz` 节点不存在 → `unknown type "foo.bar.Baz"`
 - `type: foo.bar.Baz` 目标 kind 不是 type →
   `type reference "foo.bar.Baz" resolves to kind=entity, expected type`
-- `type: integer` scalar 注册表里没有 → `unknown scalar "integer"`
+- `type: integer` 解析不到（不在任何 using 命名空间）→ `unknown type "integer"`
 - 在 field 顶层写 `max_length`、`precision` 等参数键 → `Unrecognized key(s) in object`
   （v2 要求参数走 `type.args`）
 
@@ -99,13 +100,14 @@ using 列表为空时可省略 `using:` 键。
 
 ### 默认导入：`base.core.*`
 
-每个文件**隐含** `using: [base.core.*]`，scalar 标量在任何文件里都可以直接用
-短名（`integer`、`string`、`decimal`、`datetime`...），无需显式声明。
+每个文件**隐含** `using: [base.core.*]`，base.core 下的所有类型（scalar + struct/enum）
+在任何文件里都可以直接用短名（`integer`、`string`、`Email`...），无需显式声明。
 
 类比 Java 默认 `java.lang.*`、C# 默认 `System`、Go 的 builtins。
 
-> 注意：scalar 短名解析**不走 using 列表**——它直接查 base.core 的 scalar 注册表，
-> 这是隐含默认。`using:` 只影响 struct/enum 类型的短名解析。
+> 注意：scalar 与 struct/enum 走**同一条**短名解析路径——都查 using 命名空间。
+> scalar 的"全局可用"是"base.core 是默认命名空间"的自然结果，不是 scalar 专属特权。
+> ext 模块定义的 scalar 经 `using: [geo.core.*]` 同样可用。
 
 ### A 与 B 统一语法
 
@@ -136,19 +138,22 @@ using:
 加载器看到 `type: X`，按以下顺序解析（详见 spec §4.6）：
 
 1. **形态分流**：单段（无点）走短名解析；三段（两个点）走全限定解析。
-2. **短名解析**：
-   - 先查 scalar 注册表（base.core 的 scalar form 节点）→ 命中即标量
-   - 再查当前文件 using 列表：
-     - 遍历每条 using，若为 `<ns>.*` 则在 `<ns>.X` 处查节点；若为精确名则直接匹配
-     - 若短名在多个 using 命名空间命中 → 报
-       `ambiguous type reference "X", candidates: ...`
-     - 若都没命中 → 报 `unknown type "X"`
+2. **短名解析**（scalar/struct/enum 统一，不分流）：
+   - 当前文件的 using 列表**总是隐含 `base.core.*`**（默认命名空间）
+   - 遍历每条 using：若为 `<ns>.*` 则在 `<ns>.X` 处查类型节点；若为精确名则直接匹配
+   - 收集所有命中的 fqn：
+     - 唯一命中 → 解析为该 fqn
+     - 多个不同 fqn 命中 → 报 `ambiguous type reference "X", candidates: ...`
+     - 无命中 → 报 `unknown type "X"`
 3. **全限定解析**：
-   - 直接按 `sys.mod.Name` 查节点表
+   - 直接按 `sys.mod.declaredName` 查节点表
    - 验证目标节点 `kind === 'type'`，否则报
      `resolves to kind=..., expected type`
-   - 不存在 → 报 `unknown type "sys.mod.Name"`
+   - 不存在 → 报 `unknown type "sys.mod.declaredName"`
    - **全限定引用不走 using**（已经全限定了）
+
+> link 把所有短名重写为 fqn 后写入字段，下游 pass（validate / expand）看到的都是 fqn。
+> expand 按目标节点的 **form**（scalar/struct/enum）决定投影形态——不再按引用语法分叉。
 
 ### 歧义检测
 

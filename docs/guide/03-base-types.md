@@ -54,10 +54,16 @@ properties: []
 `string.type.yaml` 唯一合法位置在 `platform/base/core/` 下——它是全局共享的，ext 和
 tenant 都不能定义自己的标量（详见 [01 目录与身份](./01-layout-and-identity.md)）。
 
-### 标量的基底性
+### 标量的"基底性"= base.core 是默认命名空间
 
-标量短名（`decimal`、`string`）**不走 using 导入**——它们全局可用，类似编程语言的
-builtins。标量解析只收集 `base.core` 模块的 scalar form 节点（决策 4，详见设计记录）。
+标量短名（`decimal`、`string`）全局可用，**不是**因为标量"特殊"——而是因为
+`base.core` 是每个文件隐含的默认导入命名空间（`using: [base.core.*]`）。标量恰好
+定义在 `base.core` 下，所以全局可见。这跟 struct/enum 完全对称：base.core 的 struct
+（如 `Email`）也默认全局可用。
+
+类比 Java 的 `java.lang.*`：`int` 全局可用不是因为 `int` 特殊，而是因为
+`java.lang` 默认导入且 `int` 恰好在里面。短名解析**只有一条路径**——查 using 命名空间，
+不分 scalar/struct/enum。详见 [04 类型引用 §短名解析规则](./04-type-refs.md#短名解析规则)。
 
 ### 推荐内置标量
 

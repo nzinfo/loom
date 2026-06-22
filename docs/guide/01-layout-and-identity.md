@@ -6,9 +6,7 @@ system/module/kind/name，它们直接由文件路径推导；同样，节点归
 
 ## kind 由文件扩展名编码
 
-**文件的 kind 唯一来源是扩展名**——YAML 正文里不再写 `kind:`，也没有
-`entity/` `table/` 这类 kind 子目录（布局是**扁平**的）。kind token 夹在
-文件名主干与 `.yaml` 之间：
+**文件的 kind 唯一来源是扩展名**，kind token 在文件名主干与 `.yaml` 之间：
 
 | 扩展名 | kind | 说明 |
 |---|---|---|
@@ -101,7 +99,12 @@ identity 仍是 `kind:sys.mod.Name` 三段不变；owner 是节点的独立字�
 ## 关键规则
 
 - 目录/文件名用 **kebab-case**（`user-profile.table.yaml`）
-- 推导出的逻辑名转 **PascalCase**（`user` → `User`，`user-profile` → `UserProfile`）
+- **身份默认从路径推导**：stem（`user-profile`）→ PascalCase（`UserProfile`）作为
+  逻辑名。这是默认值，与大多数 kind 声明的 `name:` 一致
+- **声明的 `name:` 覆盖推导**：对 type/mixin/table/entity 这类在文件里声明 `name:` 的
+  kind，parse 阶段用声明的 name 修正身份（覆盖 stem 推导）。这让 scalar 能用小写名
+  （`bigint.type.yaml` 声明 `name: bigint` → 身份 `type:base.core.bigint`，而非 PascalCase
+  的 `Bigint`）。路径推导是默认，声明是权威
 - **kind 由扩展名决定**——扩展名 token 必须在已知集合内，否则 discovery 报
   `identity` 诊断。文件正文不再写 `kind:`
 - 物理表名在 `table.name` 字段显式声明（不依赖推导）
