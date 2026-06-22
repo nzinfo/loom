@@ -129,13 +129,21 @@ extension_fields 不是节点定义。它是"给某个 entity 附加什么字段
 
 按这个职责划分，ext 字段自然按**目标 entity** 组织，而不是按文件自身 identity。
 所以 link 阶段把所有 ext 文件收集到 `IR.extensionFields` registry，按 entity identity
-分桶，同一个 entity 的字段（不管来自哪个 owner、哪个文件）叠加成一个数组。
+分桶。每个桶是一个扁平的字段数组，每个字段携带它所属的 group——一个 owner 可以给
+同一个 entity 贡献多个 group（多个 ext 文件），不同 owner 的字段混在同一桶里：
 
 ```
 IR.extensionFields:
-  entity:base.core.User → [nickname, bio, credit_limit, customer_no, ...]
-                           ↑ platform + tenant:acme 的字段混在一起
+  entity:base.core.User → [
+    { name: nickname,      group: profile },   ← platform
+    { name: bio,           group: profile },   ← platform
+    { name: customer_no,   group: profile },   ← tenant:acme
+    { name: credit_limit,  group: finance },   ← platform
+  ]
 ```
+
+投影时，views 层遍历这个数组，按 `group` 字段再分组——每个 group 生成一个 LEFT JOIN
+（见下面"view 中的展开"）。
 
 唯一性约束也从"文件 identity 唯一"变成"同 entity 内字段名唯一"（同名字段才报错，
 见上面"同名字段冲突"）。
