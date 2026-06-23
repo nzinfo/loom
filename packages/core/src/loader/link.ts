@@ -69,6 +69,7 @@ export async function link(opts: LinkOptions): Promise<LinkResult> {
       fileUsing,
       typeFqns,
       opts.parsed,
+      node.sourceText,
       opts.diagnostics,
       deps,
     );
@@ -247,14 +248,17 @@ function resolveFieldTypes(
   using: readonly string[],
   typeFqns: ReadonlySet<string>,
   parsed: ReadonlyMap<string, AnyFile>,
+  sourceText: string | undefined,
   diag: Diagnostics,
   deps: Map<Identity, Set<Identity>>,
 ): void {
   // The implicit default base.core.* is always available — every type in
   // base.core (scalar AND struct/enum) is globally resolvable by short name.
   const usingWithDefault = using.includes('base.core.*') ? using : [...using, 'base.core.*'];
+  let fieldIdx = -1;
   for (const e of host.fields) {
     if (typeof e !== 'object' || e === null) continue;
+    fieldIdx++;
     if (!('type' in e)) continue;
     const rawType = (e as { type: unknown }).type;
     // Normalize shorthand string → {ref, args?, meta?}; downstream sees object only.
@@ -262,9 +266,13 @@ function resolveFieldTypes(
     // Write back the normalized form so consumers (validate, expand) see object.
     (e as Record<string, unknown>).type = descriptor;
 
+    const pos = sourceText
+      ? findPosition(sourceText, `fields.${fieldIdx}.type`) ?? { line: 1, column: 1 }
+      : { line: 1, column: 1 };
+
     const threeSeg = parseTypeRef(descriptor.ref);
     if (threeSeg !== null) {
-      resolveThreeSegment(e as Record<string, unknown>, threeSeg, identity, parsed, diag, deps);
+      resolveThreeSegment(e as Record<string, unknown>, threeSeg, identity, parsed, diag, deps, pos);
     } else {
       resolveSingleSegment(
         e as Record<string, unknown>,
@@ -274,6 +282,7 @@ function resolveFieldTypes(
         typeFqns,
         diag,
         deps,
+        pos,
       );
     }
   }
@@ -286,6 +295,7 @@ function resolveThreeSegment(
   parsed: ReadonlyMap<string, AnyFile>,
   diag: Diagnostics,
   deps: Map<Identity, Set<Identity>>,
+  pos: { line: number; column: number },
 ): void {
   const fqn = `${ref.system}.${ref.module}.${ref.name}`;
   const targetId = `type:${fqn}`;
@@ -303,8 +313,8 @@ function resolveThreeSegment(
     diag.add({
       category: 'kind_mismatch',
       file: identity,
-      line: 1,
-      column: 1,
+      line: pos.line,
+      column: pos.column,
       message: `type reference "${fqn}" resolves to kind=${anyNode[1].kind}, expected type`,
     });
     return;
@@ -312,8 +322,8 @@ function resolveThreeSegment(
   diag.add({
     category: 'dangling_ref',
     file: identity,
-    line: 1,
-    column: 1,
+    line: pos.line,
+    column: pos.column,
     message: `unknown type "${fqn}"`,
   });
 }
@@ -326,6 +336,7 @@ function resolveSingleSegment(
   typeFqns: ReadonlySet<string>,
   diag: Diagnostics,
   deps: Map<Identity, Set<Identity>>,
+  pos: { line: number; column: number },
 ): void {
   // Form validation: single-segment means "no dots". If the caller passed
   // something with dots that parseTypeRef rejected (e.g. 2 or 4 segments),
@@ -334,8 +345,8 @@ function resolveSingleSegment(
     diag.add({
       category: 'parse',
       file: identity,
-      line: 1,
-      column: 1,
+      line: pos.line,
+      column: pos.column,
       message: `invalid type reference "${shortName}"`,
     });
     return;
@@ -360,8 +371,8 @@ function resolveSingleSegment(
       diag.add({
         category: 'schema',
         file: identity,
-        line: 1,
-        column: 1,
+        line: pos.line,
+        column: pos.column,
         message: `ambiguous type reference "${shortName}", candidates: ${result.candidates.join(', ')}`,
       });
       return;
@@ -369,8 +380,8 @@ function resolveSingleSegment(
       diag.add({
         category: 'schema',
         file: identity,
-        line: 1,
-        column: 1,
+        line: pos.line,
+        column: pos.column,
         message: `unknown type "${shortName}"`,
       });
       return;

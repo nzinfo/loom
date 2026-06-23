@@ -4,18 +4,16 @@
  * Categories are kept distinct so callers (CI, editors) can react
  * differently. `loom check` fails on any error category.
  */
-export const ERROR_CATEGORY = [
-  'parse',
-  'version',
-  'identity',
-  'dangling_ref',
-  'kind_mismatch',
-  'cycle',
-  'schema',
-  'semantic',
-  'project',
-] as const;
-export type ErrorCategory = (typeof ERROR_CATEGORY)[number];
+export type ErrorCategory =
+  | 'parse'
+  | 'version'
+  | 'identity'
+  | 'dangling_ref'
+  | 'kind_mismatch'
+  | 'cycle'
+  | 'schema'
+  | 'semantic'
+  | 'project';
 
 /** Single diagnostic. File path + line + col are required for actionable errors. */
 export interface Diagnostic {
