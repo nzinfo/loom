@@ -363,4 +363,3 @@ export function parseFile(text: string, file: string, kind: FileKind): AnyFile {
 
 // FILE_KIND is re-exported through version.ts; keep the import used so tree-shaking
 // and future kind-enum derivations stay consistent.
-void FILE_KIND;

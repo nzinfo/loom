@@ -1,8 +1,6 @@
+import { formatOnDelete, scalarToSql } from '../scalars.js';
 /**
- * MySQL dialect. See spec §8.4, §6.2, §11, §7.4.
- *
- * enum → inline ENUM('a','b') in the column definition. No CREATE TYPE.
- * pivot views use the same correlated-subquery shape as PG.
+ * MySQL dialect.
  */
 import type { PhysicalColumn, PhysicalModel, PhysicalTable } from '../types.js';
 import type { PivotView } from '../views.js';
@@ -40,7 +38,7 @@ function tableBlock(t: PhysicalTable, ctx: MysqlEmitContext): string {
   }
   for (const fk of t.foreignKeys) {
     body.push(
-      `  CONSTRAINT ${fk.name} FOREIGN KEY (${fk.columns.join(', ')}) REFERENCES ${fk.refTable} (${fk.refColumns.join(', ')})${fk.onDelete ? ` ON DELETE ${onDelete(fk.onDelete)}` : ''}`,
+      `  CONSTRAINT ${fk.name} FOREIGN KEY (${fk.columns.join(', ')}) REFERENCES ${fk.refTable} (${fk.refColumns.join(', ')})${fk.onDelete ? ` ON DELETE ${formatOnDelete(fk.onDelete)}` : ''}`,
     );
   }
   lines.push(body.join(',\n'));
@@ -86,60 +84,5 @@ function mysqlType(c: PhysicalColumn, ctx: MysqlEmitContext): string {
       return `ENUM(${values.map((v) => `'${v}'`).join(', ')})`;
     }
   }
-  switch (c.scalar) {
-    case 'boolean':
-      return 'BOOLEAN';
-    case 'uint8':
-      return 'TINYINT';
-    case 'int16':
-      return 'SMALLINT';
-    case 'integer':
-      return 'INT';
-    case 'bigint':
-      return 'BIGINT';
-    case 'decimal': {
-      const p = c.props.precision;
-      const s = c.props.scale;
-      return `DECIMAL(${p ?? 18},${s ?? 4})`;
-    }
-    case 'double':
-      return 'DOUBLE';
-    case 'string':
-      return `VARCHAR(${c.props.max_length ?? 255})`;
-    case 'largestring':
-      return 'LONGTEXT';
-    case 'date':
-      return 'DATE';
-    case 'time':
-      return 'TIME(6)';
-    case 'datetime':
-      return 'DATETIME(6)';
-    case 'timestamp':
-      return 'TIMESTAMP(6)';
-    case 'uuid':
-      return 'CHAR(36)';
-    case 'binary':
-      return `VARBINARY(${c.props.max_length ?? 255})`;
-    case 'largebinary':
-      return 'LONGBLOB';
-    case 'vector':
-      return 'LONGBLOB';
-    case 'map':
-      return 'JSON';
-    default:
-      return 'TEXT';
-  }
-}
-
-function onDelete(o: 'cascade' | 'restrict' | 'set_null' | 'no_action'): string {
-  switch (o) {
-    case 'cascade':
-      return 'CASCADE';
-    case 'restrict':
-      return 'RESTRICT';
-    case 'set_null':
-      return 'SET NULL';
-    case 'no_action':
-      return 'NO ACTION';
-  }
+  return scalarToSql(c.scalar, c.props as Record<string, unknown>, 'mysql');
 }

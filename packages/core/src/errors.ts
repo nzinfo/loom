@@ -37,7 +37,7 @@ export class Diagnostics {
   }
 
   get errors(): readonly Diagnostic[] {
-    return this.items;
+    return [...this.items];
   }
 
   get hasErrors(): boolean {

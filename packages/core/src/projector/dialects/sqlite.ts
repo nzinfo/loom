@@ -1,8 +1,6 @@
+import { formatOnDelete, scalarToSql } from '../scalars.js';
 /**
- * SQLite dialect. See spec §8.4, §6.2, §11, §7.4.
- *
- * enum → TEXT + CHECK (value IN (...)). pivot views use the same
- * correlated-subquery shape as PG/MySQL.
+ * SQLite dialect.
  */
 import type { PhysicalColumn, PhysicalModel, PhysicalTable } from '../types.js';
 import type { PivotView } from '../views.js';
@@ -46,7 +44,7 @@ function tableBlock(t: PhysicalTable, ctx: SqliteEmitContext): string {
   }
   for (const fk of t.foreignKeys) {
     body.push(
-      `  FOREIGN KEY (${fk.columns.join(', ')}) REFERENCES ${fk.refTable} (${fk.refColumns.join(', ')})${fk.onDelete ? ` ON DELETE ${onDelete(fk.onDelete)}` : ''}`,
+      `  FOREIGN KEY (${fk.columns.join(', ')}) REFERENCES ${fk.refTable} (${fk.refColumns.join(', ')})${fk.onDelete ? ` ON DELETE ${formatOnDelete(fk.onDelete)}` : ''}`,
     );
   }
   lines.push(body.join(',\n'));
@@ -86,47 +84,5 @@ function viewBlock(v: PivotView): string {
 }
 
 function sqliteType(c: PhysicalColumn): string {
-  switch (c.scalar) {
-    case 'boolean':
-    case 'uint8':
-    case 'int16':
-    case 'integer':
-    case 'bigint':
-      return 'INTEGER';
-    case 'decimal':
-      return 'NUMERIC';
-    case 'double':
-      return 'REAL';
-    case 'string':
-    case 'largestring':
-    case 'uuid':
-    case 'enum':
-    case 'date':
-    case 'time':
-    case 'datetime':
-    case 'timestamp':
-      return 'TEXT';
-    case 'binary':
-    case 'largebinary':
-      return 'BLOB';
-    case 'vector':
-      return 'vec';
-    case 'map':
-      return 'TEXT';
-    default:
-      return 'TEXT';
-  }
-}
-
-function onDelete(o: 'cascade' | 'restrict' | 'set_null' | 'no_action'): string {
-  switch (o) {
-    case 'cascade':
-      return 'CASCADE';
-    case 'restrict':
-      return 'RESTRICT';
-    case 'set_null':
-      return 'SET NULL';
-    case 'no_action':
-      return 'NO ACTION';
-  }
+  return scalarToSql(c.scalar, c.props as Record<string, unknown>, 'sqlite');
 }

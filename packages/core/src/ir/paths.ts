@@ -88,8 +88,6 @@ export function pascalToKebab(pascal: string): string {
  */
 export function pathToIdentity(fullPath: string, relPath: string): DiscoveredFile | null {
   // Reserved for future diagnostics; surfaced up front so it doesn't look dead.
-  void fullPath;
-
   const norm = relPath.replace(/\\/g, '/');
   const parts = norm.split('/').filter((p) => p.length > 0);
 

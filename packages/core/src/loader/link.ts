@@ -1,5 +1,4 @@
 import type { Diagnostics } from '../errors.js';
-import { parseRef } from '../ir/refs.js';
 import type { AnyFile, ExtensionFields, TypeDescriptor, TypeNode } from '../ir/schemas.js';
 import { type TypeRef, normalizeType, parseTypeRef, resolveShortName } from '../ir/typespace.js';
 import type { ExtensionFieldEntry, IR, IRNode, Identity, Owner } from '../ir/version.js';
@@ -362,32 +361,4 @@ function resolveSingleSegment(
       });
       return;
   }
-}
-
-function safeParseRef(
-  s: string,
-  file: string,
-  diag: Diagnostics,
-): { kind: FileKind; system: string; module: string; name: string } | null {
-  try {
-    return parseRef(s);
-  } catch {
-    diag.add({
-      category: 'parse',
-      file,
-      line: 1,
-      column: 1,
-      message: `malformed $ref "${s}"`,
-    });
-    return null;
-  }
-}
-
-function refToIdentity(r: {
-  kind: FileKind;
-  system: string;
-  module: string;
-  name: string;
-}): string {
-  return `${r.kind}:${r.system}.${r.module}.${r.name}`;
 }

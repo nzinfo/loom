@@ -18,6 +18,7 @@ export * from './loader/parse.js';
 export * from './loader/link.js';
 export * from './loader/validate.js';
 export * from './projector/types.js';
+export * from './projector/scalars.js';
 export * from './projector/expand.js';
 export * from './projector/views.js';
 export * from './projector/sql.js';

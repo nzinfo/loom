@@ -31,6 +31,9 @@ export function validate(opts: ValidateOptions): ValidateResult {
   // fqns, so we look up by fqn.
   const scalarReqProps = collectScalarRequiredProps(opts.ir);
 
+  // Detect dependency cycles before other checks.
+  checkCycles(opts.ir.deps, opts.diagnostics);
+
   for (const [identity, node] of opts.ir.nodes) {
     switch (node.kind) {
       case 'type': {
@@ -73,6 +76,7 @@ export function validate(opts: ValidateOptions): ValidateResult {
  * resolveFieldTypes), so checkExtensionEntry looks up by short name. */
 function collectScalarRequiredProps(ir: IR): Map<string, Set<string>> {
   const m = new Map<string, Set<string>>();
+
   for (const [identity, node] of ir.nodes) {
     if (node.kind !== 'type') continue;
     const data = node.data as TypeNode;
@@ -146,6 +150,53 @@ function checkTable(
         column: 1,
         message: `primary_key field "${pk}" must be required:true`,
       });
+    }
+  }
+
+  // Reject unimplemented strategies.
+  if (t.table.extension.strategy === 'json_column') {
+    diag.add({
+      category: 'semantic',
+      file: identity,
+      line: 1,
+      column: 1,
+      message: `json_column strategy is not yet implemented; use sidecar_eav or none`,
+    });
+  }
+
+  // #7: Validate column existence for primary_key, indexes, foreign_keys.
+  const columnNames = new Set<string>();
+  for (const f of t.fields) {
+    const fn = (f as FieldLike).name;
+    if (typeof fn === 'string') columnNames.add(fn);
+  }
+  // Note: multi-field struct refs expand to prefixed names not present as
+  // top-level fields, so we only check single-name references here.
+
+  for (const idx of t.indexes ?? []) {
+    for (const col of idx.fields) {
+      if (!columnNames.has(col)) {
+        diag.add({
+          category: 'semantic',
+          file: identity,
+          line: 1,
+          column: 1,
+          message: `index "${idx.name}" references unknown field "${col}"`,
+        });
+      }
+    }
+  }
+  for (const fk of t.foreign_keys ?? []) {
+    for (const col of fk.fields) {
+      if (!columnNames.has(col)) {
+        diag.add({
+          category: 'semantic',
+          file: identity,
+          line: 1,
+          column: 1,
+          message: `foreign key "${fk.name}" references unknown field "${col}"`,
+        });
+      }
     }
   }
 }
@@ -224,5 +275,49 @@ function checkExtensionTarget(entityId: string, ir: IR, diag: Diagnostics): void
       column: 1,
       message: `extension_fields requires sidecar_eav strategy on entity "${entityId}"`,
     });
+  }
+}
+
+/**
+ * Detect cycles in the dependency graph using DFS.
+ * Reports a 'cycle' diagnostic for each cycle found.
+ */
+function checkCycles(deps: ReadonlyMap<string, ReadonlySet<string>>, diag: Diagnostics): void {
+  const WHITE = 0,
+    GRAY = 1,
+    BLACK = 2;
+  const color = new Map<string, number>();
+
+  function dfs(node: string, path: string[]): boolean {
+    color.set(node, GRAY);
+    const neighbors = deps.get(node);
+    if (neighbors) {
+      for (const dep of neighbors) {
+        const c = color.get(dep) ?? WHITE;
+        if (c === GRAY) {
+          const cycle = [...path, dep];
+          const idx = cycle.indexOf(dep);
+          diag.add({
+            category: 'cycle',
+            file: node,
+            line: 1,
+            column: 1,
+            message: `dependency cycle: ${cycle.slice(idx).join(' → ')}`,
+          });
+          return true;
+        }
+        if (c === WHITE) {
+          if (dfs(dep, [...path, dep])) return true;
+        }
+      }
+    }
+    color.set(node, BLACK);
+    return false;
+  }
+
+  for (const [node] of deps) {
+    if ((color.get(node) ?? WHITE) === WHITE) {
+      dfs(node, [node]);
+    }
   }
 }

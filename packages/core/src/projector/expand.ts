@@ -45,6 +45,12 @@ function scalarNameOf(ref: string, ir: IR): string {
   return ref;
 }
 
+/** True if the ref points to an enum-form type node. */
+function isEnumRef(ref: string, ir: IR): boolean {
+  const node = ir.nodes.get(`type:${ref}`);
+  return node?.kind === 'type' && (node.data as TypeNode).form === 'enum';
+}
+
 /**
  * Main entry point: project a design IR to a physical model.
  *
@@ -229,11 +235,10 @@ function expandField(
   // (scalar/struct/enum). This is the unified projection rule (design note §4.4).
   const targetId = `type:${ref}`;
   const vtNode = ir.nodes.get(targetId);
-  if (!vtNode) {
-    throw new Error(`Type node not found: ${targetId}`);
-  }
-  if (vtNode.kind !== 'type') {
-    throw new Error(`Expected type, got ${vtNode.kind} for ${targetId}`);
+  if (!vtNode || vtNode.kind !== 'type') {
+    // This should have been caught by validate. Return empty rather
+    // than crashing — the missing type will show as absent columns.
+    return [];
   }
 
   const vt = vtNode.data as TypeNode;
@@ -282,8 +287,8 @@ function expandField(
     // field's declared args verbatim (caller args on a struct ref are ignored).
     const props = innerDesc.args ?? {};
     let enumRef: string | undefined;
-    if (scalar === 'enum' && Array.isArray(props.values)) {
-      enumRef = targetId;
+    if (isEnumRef(innerDesc.ref, ir)) {
+      enumRef = `type:${innerDesc.ref}`;
     }
     const result: PhysicalColumn = {
       name: fColumn,
@@ -316,7 +321,7 @@ function expandField(
       required,
       unique,
       props: subProps,
-      ...(subType === 'enum' && Array.isArray(subProps.values) ? { enumRef: targetId } : {}),
+      ...(isEnumRef(subDesc.ref, ir) ? { enumRef: `type:${subDesc.ref}` } : {}),
     };
     return result;
   });
