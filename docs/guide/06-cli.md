@@ -105,7 +105,8 @@ loom project model [--dialect <d>] <path>
 ```
 
 输出物理模型（JSON 格式），不走 SQL。展示表、列、索引、外键、扩展字段的完整物理
-结构。供工具链（如 atlas 桥接、ORM 生成）消费。
+结构。供工具链（如 atlas 桥接、ORM 生成）消费。JSON schema 详见
+[`project-model-schema.md`](../project-model-schema.md)。
 
 ```sh
 loom project model --json my-shop/
