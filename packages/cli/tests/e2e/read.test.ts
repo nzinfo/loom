@@ -161,4 +161,28 @@ describe('e2e: read commands', () => {
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toContain('acme_shop.products_base');
   });
+
+  it('project atlas-yaml outputs valid atlas-yaml/v2 structure', async () => {
+    const r = await runLoom(['project', 'atlas-yaml', '--dialect', 'pg', productDir]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain('version: atlas-yaml/v2');
+    expect(r.stdout).toContain('realm:');
+    expect(r.stdout).toContain('schemas:');
+    expect(r.stdout).toContain('name: shop_core');
+    expect(r.stdout).toContain('name: products_base');
+    // Column with type.kind
+    expect(r.stdout).toContain('kind: schema:integer');
+    expect(r.stdout).toContain('kind: schema:string');
+    // Primary key with column_ref
+    expect(r.stdout).toContain('column_ref: column:shop_core.products_base.id');
+    // null field
+    expect(r.stdout).toContain('"null": false');
+  });
+
+  it('project atlas-yaml --dialect sqlite uses sqlite types', async () => {
+    const r = await runLoom(['project', 'atlas-yaml', '--dialect', 'sqlite', productDir]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain('kind: schema:integer');
+    expect(r.stdout).toContain('t: INTEGER');
+  });
 });

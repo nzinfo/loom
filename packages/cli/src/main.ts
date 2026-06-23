@@ -30,6 +30,7 @@ import {
 import { projectModelCommand, projectSqlCommand } from './commands/project.js';
 import { rmExtensionCommand, rmNodeCommand } from './commands/rm.js';
 import { updateTableCommand } from './commands/update.js';
+import { projectAtlasCommand } from './commands/project_atlas.js';
 import {
   showEntityCommand,
   showGraphCommand,
@@ -52,6 +53,7 @@ commands:
   show graph <path> [--json]                        dependency graph
   project sql --dialect <d> [--out <f>] [--physical-schema <m>=<n>]... <path>
   project model [--dialect <d>] [--json] <path>
+  project atlas-yaml [--dialect <d>] <path>
   init <path> --system <s> [--module core] [--no-example] [--force]
   new type <path> <sys.mod.Name> [--form scalar|struct|enum]
   new table <path> <sys.mod.Name>
@@ -146,8 +148,8 @@ async function main(argv: string[]): Promise<number> {
 
     case 'project': {
       const sub = rest[0];
-      if (sub !== 'sql' && sub !== 'model') {
-        writeError(`project target must be sql|model, got "${sub ?? ''}"`);
+      if (sub !== 'sql' && sub !== 'model' && sub !== 'atlas-yaml') {
+        writeError(`project target must be sql|model|atlas-yaml, got "${sub ?? ''}"`);
         return 64;
       }
       const { values, repeated, positionals } = extractFlags(rest.slice(1), {
@@ -166,6 +168,13 @@ async function main(argv: string[]): Promise<number> {
           path,
           dialect: values['--dialect'],
           out: values['--out'],
+          physicalSchemas: repeated['--physical-schema'] ?? [],
+        });
+      }
+      if (sub === 'atlas-yaml') {
+        return await projectAtlasCommand({
+          path,
+          dialect: values['--dialect'],
           physicalSchemas: repeated['--physical-schema'] ?? [],
         });
       }

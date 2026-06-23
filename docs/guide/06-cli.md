@@ -112,6 +112,24 @@ loom project model [--dialect <d>] <path>
 loom project model --json my-shop/
 ```
 
+### project atlas-yaml
+
+```sh
+loom project atlas-yaml --dialect <d> <path>
+```
+
+输出 [atlas-yaml/v2](https://atlasgo.io) 格式的 YAML，供 atlas 工具消费。
+仅包含物理 base 表（列、主键、索引、外键）——不含扩展字段、view、entity
+（这些是 loom 的概念，atlas 不需要）。
+
+```sh
+loom project atlas-yaml --dialect pg my-shop/
+```
+
+atlas 拿到此 YAML 后可以 `schemayaml.Unmarshal` 加载，再 diff、apply、inspect。
+
+方言名映射：loom `pg` → atlas `postgres`；`mysql` → `mysql`；`sqlite` → `sqlite`。
+
 ## 初始化项目
 
 ### init
