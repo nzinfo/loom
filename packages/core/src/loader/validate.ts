@@ -1,5 +1,5 @@
 import type { Diagnostics } from '../errors.js';
-import type { Entity, Table, TypeDescriptor, TypeNode } from '../ir/schemas.js';
+import type { Entity, Table, TypeDescriptor, TypeField, TypeNode } from '../ir/schemas.js';
 import type { ExtensionFieldEntry, FileKind, IR } from '../ir/version.js';
 import { findPosition } from './yaml_position.js';
 
@@ -24,7 +24,7 @@ export interface ValidateResult {
   readonly diagnostics: Diagnostics;
 }
 
-type FieldLike = Record<string, unknown>;
+type FieldLike = TypeField;
 
 /** Look up position from a node's sourceText and a YAML path. */
 function pos(

@@ -104,7 +104,7 @@ export type TypeDescriptor = z.infer<typeof TypeDescriptorSchema>;
  * so downstream passes always see an object. Scalar arguments live in
  * `type.args`, not at field top level.
  */
-const typeField = z
+export const typeField = z
   .object({
     name: z.string().min(1),
     type: z.union([z.string().min(1), TypeDescriptorSchema]),
@@ -127,6 +127,9 @@ const typeField = z
  *
  * Reader normalizes the shorthand to `{ value: <str> }`.
  */
+/** Inferred type for a field (from typeField schema). */
+export type TypeField = z.infer<typeof typeField>;
+
 const variantSchema = z.union([
   z.string().min(1),
   z
