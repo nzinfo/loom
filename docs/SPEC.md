@@ -325,10 +325,27 @@ core 包环境无关——文件系统通过 `FileSystem` 接口注入（支持 
 | `schema` | 类型解析失败、属性不匹配、ext 同名字段冲突 |
 | `semantic` | primary_key 非 required、ext 目标不存在或非 sidecar_eav |
 
-## 13. 已知局限
+## 13. 路线图
 
-- 诊断无行号（硬编码 `1:1`，YAML 位置追踪未实现）
-- FK 渲染原始（`entity:` refs 不解析为 `primary_table`）
-- using 形态 C（重命名）未实现（冲突时用全限定名绕开）
-- enum 仅简单形态（值列表；Rust 风格关联数据是未来方向）
-- `fmt` / `lift` / `project atlas-yaml` 未实现
+### 已完成
+
+- YAML 位置追踪——诊断报告精确 line:column（parse/link/validate 层）
+- 代码审计修复——scalarToSql 统一、enumRef bug、循环检测、列存在性校验等
+
+### 短期待办
+
+- **FK 跨 kind 解析**——`foreign_keys.ref_table` 支持 `entity:` refs，解析为
+  `primary_table` 的物理表名。同时保留 `table:` refs 的直接引用行为（两种并存）
+- **using 形态 C（重命名）**——`using base.core.Money as M` 解决短名冲突
+
+### 中期计划
+
+- **`loom fmt`**——格式化 schema 文件（字段排序、key 顺序、缩进统一）
+- **`loom project atlas-yaml`**——桥接到 atlas 生态
+- **enum 关联数据**——Rust 风格 variants 带关联类型
+
+### 不做
+
+- ~~`loom lift`（反向提炼）~~——如需反向工程，应与 atlas 项目配合实现，不在 loom 内
+- ~~方言插件机制~~——不需要
+- ~~`json_column` 策略~~——暂时不需要
