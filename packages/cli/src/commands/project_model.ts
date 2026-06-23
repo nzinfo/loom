@@ -96,13 +96,13 @@ export function projectModelJson(ir: IR, model: PhysicalModel, dialect: Dialect)
   return {
     version: 'loom-schema/v2',
     dialect,
-    tables: model.tables.map((t) => serializeTable(t)),
+    tables: model.tables.map((t) => serializeTable(t, dialect)),
     enums: serializeEnums(model),
     extensions: serializeExtensions(ir, model, dialect),
   };
 }
 
-function serializeTable(t: PhysicalModel['tables'][number]): TableJson {
+function serializeTable(t: PhysicalModel['tables'][number], dialect: Dialect): TableJson {
   const extension =
     t.strategy !== 'none'
       ? {
@@ -116,7 +116,7 @@ function serializeTable(t: PhysicalModel['tables'][number]): TableJson {
     name: t.name,
     schema: t.schema ?? '',
     qualifiedName: t.qualifiedName,
-    columns: t.columns.map((c) => serializeColumn(c)),
+    columns: t.columns.map((c) => serializeColumn(c, dialect)),
     primaryKey: t.primaryKey,
     indexes: t.indexes.map((i) => ({
       name: i.name,
@@ -134,10 +134,10 @@ function serializeTable(t: PhysicalModel['tables'][number]): TableJson {
   };
 }
 
-function serializeColumn(c: PhysicalColumn): ColumnJson {
+function serializeColumn(c: PhysicalColumn, dialect: Dialect): ColumnJson {
   return {
     name: c.name,
-    sqlType: c.enumRef ?? scalarToSql(c.scalar, c.props, 'pg'),
+    sqlType: c.enumRef ?? scalarToSql(c.scalar, c.props, dialect),
     scalar: c.scalar,
     props: c.props as Record<string, unknown>,
     required: c.required,

@@ -101,4 +101,64 @@ describe('e2e: read commands', () => {
     const r = await runLoom(['project', 'sql', productDir]);
     expect(r.exitCode).toBe(64);
   });
+
+  it('list tables shows Products', async () => {
+    const r = await runLoom(['list', 'tables', productDir]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain('table:shop.core.Products');
+  });
+
+  it('list types (human-readable) shows forms', async () => {
+    const r = await runLoom(['list', 'types', productDir]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain('scalar');
+    expect(r.stdout).toContain('struct');
+  });
+
+  it('show table displays columns + primary key', async () => {
+    const r = await runLoom(['show', 'table', productDir, 'table:shop.core.Products']);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain('columns:');
+    expect(r.stdout).toContain('primary key:');
+    expect(r.stdout).toContain('id');
+  });
+
+  it('show table --json returns physical table structure', async () => {
+    const { json } = await runLoomJson(['show', 'table', productDir, 'table:shop.core.Products']);
+    const data = json as { physicalTable: { columns: unknown[]; primaryKey: string[] } };
+    expect(data.physicalTable.columns.length).toBeGreaterThan(0);
+    expect(data.physicalTable.primaryKey).toContain('id');
+  });
+
+  it('project model --dialect sqlite uses sqlite types', async () => {
+    const r = await runLoom(['project', 'model', '--dialect', 'sqlite', productDir]);
+    expect(r.exitCode).toBe(0);
+    const data = JSON.parse(r.stdout);
+    expect(data.dialect).toBe('sqlite');
+    // sqlite uses INTEGER for bigint
+    const col = data.tables[0].columns.find((c: { name: string }) => c.name === 'id');
+    expect(col.sqlType).toBe('INTEGER');
+  });
+
+  it('project sql --out writes to file', async () => {
+    const outPath = `${productDir}/../../_test_output.sql`;
+    const r = await runLoom(['project', 'sql', '--dialect', 'pg', '--out', outPath, productDir]);
+    expect(r.exitCode).toBe(0);
+    // The file should exist and contain DDL
+    const { readFileSync, existsSync, unlinkSync } = await import('node:fs');
+    expect(existsSync(outPath)).toBe(true);
+    const content = readFileSync(outPath, 'utf-8');
+    expect(content).toContain('CREATE TABLE');
+    unlinkSync(outPath);
+  });
+
+  it('project sql --physical-schema overrides schema name', async () => {
+    const r = await runLoom([
+      'project', 'sql', '--dialect', 'pg',
+      '--physical-schema', 'shop.core=acme_shop',
+      productDir,
+    ]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain('acme_shop.products_base');
+  });
 });
