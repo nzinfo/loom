@@ -99,8 +99,12 @@ variants:
 | `timestamp` | Timestamp | — | TIMESTAMPTZ | TIMESTAMP(6) | TEXT |
 | `binary` | Binary | max_length | BYTEA | VARBINARY(n) | BLOB |
 | `largebinary` | LargeBinary | — | BYTEA | LONGBLOB | BLOB |
-| `vector` | Vector | length | JSONB | JSON | TEXT |
+| `vector` | Vector | length | vector(n)¹ | LONGBLOB | vec² |
 | `map` | Map | — | JSONB | JSON | TEXT |
+
+> ¹ pg vector 依赖 pgvector 扩展，按需启用——schema 中有 vector 列时自动生成
+>   `CREATE EXTENSION IF NOT EXISTS vector;`，无则不生成。
+> ² sqlite vec 依赖 sqlite-vec 扩展（运行时加载，DDL 仅声明类型）。
 
 字段 `type:` 支持简写（裸字符串）和详写（对象 `{ ref, args, meta }`）：
 

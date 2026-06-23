@@ -88,7 +88,7 @@ loom 不预置标量目录——由 platform schema 自己声明。推荐 18 种
 | `timestamp` | Timestamp | — | 高精度时间戳（微秒） |
 | `binary` | Binary | `max_length` (req) | 定长二进制 |
 | `largebinary` | LargeBinary | — | 无限长二进制 |
-| `vector` | Vector | `length` (req) | 向量嵌入 |
+| `vector` | Vector | `length` (req) | 向量嵌入（pg 原生 pgvector，sqlite sqlite-vec，mysql LONGBLOB） |
 | `map` | Map | — | 键值映射 |
 
 ## form: struct —— 复合类型

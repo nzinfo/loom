@@ -13,6 +13,12 @@ export interface PgEmitContext {
 export function projectPg(ctx: PgEmitContext): string {
   const blocks: string[] = [];
 
+  // 0. Extensions — only emitted when a column actually uses the type
+  //    (on-demand activation, not unconditional).
+  if (usesVector(ctx.model)) {
+    blocks.push('CREATE EXTENSION IF NOT EXISTS vector;');
+  }
+
   // 1. Enum types (spec §11) — PG requires them declared before use.
   for (const [id, values] of ctx.model.enums) {
     const pgName = pgEnumName(id);
@@ -33,6 +39,11 @@ export function projectPg(ctx: PgEmitContext): string {
   }
 
   return blocks.join('\n\n');
+}
+
+/** True if any column in the model uses the vector scalar. */
+function usesVector(model: PhysicalModel): boolean {
+  return model.tables.some((t) => t.columns.some((c) => c.scalar === 'vector'));
 }
 
 function tableBlock(t: PhysicalTable, ctx: PgEmitContext): string {
@@ -129,7 +140,7 @@ function pgType(c: PhysicalColumn, ctx: PgEmitContext): string {
     case 'largebinary':
       return 'BYTEA';
     case 'vector':
-      return 'JSONB';
+      return `vector(${c.props.length ?? 1})`;
     case 'map':
       return 'JSONB';
     default:

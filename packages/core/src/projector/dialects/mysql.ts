@@ -123,7 +123,7 @@ function mysqlType(c: PhysicalColumn, ctx: MysqlEmitContext): string {
     case 'largebinary':
       return 'LONGBLOB';
     case 'vector':
-      return 'JSON';
+      return 'LONGBLOB';
     case 'map':
       return 'JSON';
     default:

@@ -110,6 +110,7 @@ function sqliteType(c: PhysicalColumn): string {
     case 'largebinary':
       return 'BLOB';
     case 'vector':
+      return 'vec';
     case 'map':
       return 'TEXT';
     default:
