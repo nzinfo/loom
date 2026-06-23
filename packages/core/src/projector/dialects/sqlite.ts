@@ -88,24 +88,29 @@ function viewBlock(v: PivotView): string {
 function sqliteType(c: PhysicalColumn): string {
   switch (c.scalar) {
     case 'boolean':
-      return 'INTEGER';
+    case 'uint8':
+    case 'int16':
     case 'integer':
     case 'bigint':
       return 'INTEGER';
     case 'decimal':
       return 'NUMERIC';
+    case 'double':
+      return 'REAL';
     case 'string':
-    case 'text':
+    case 'largestring':
     case 'uuid':
     case 'enum':
-      return 'TEXT';
-    case 'datetime':
-      return 'TEXT';
     case 'date':
+    case 'time':
+    case 'datetime':
+    case 'timestamp':
       return 'TEXT';
-    case 'bytes':
+    case 'binary':
+    case 'largebinary':
       return 'BLOB';
-    case 'json':
+    case 'vector':
+    case 'map':
       return 'TEXT';
     default:
       return 'TEXT';

@@ -79,7 +79,28 @@ variants:
 `form` ↔ 专属字段互斥（`properties` 仅 scalar，`fields` 仅 struct，`variants` 仅 enum）。
 命名大小写编译期强制：scalar 小写，struct/enum PascalCase。
 
-### type descriptor
+### 内置标量（18 种，对齐 CDS）
+
+| scalar | CDS | properties | pg | mysql | sqlite |
+|---|---|---|---|---|---|
+| `uuid` | UUID | — | UUID | CHAR(36) | TEXT |
+| `boolean` | Boolean | — | BOOLEAN | BOOLEAN | INTEGER |
+| `uint8` | UInt8 | — | SMALLINT | TINYINT | INTEGER |
+| `int16` | Int16 | — | SMALLINT | SMALLINT | INTEGER |
+| `integer` | Integer | — | INTEGER | INT | INTEGER |
+| `bigint` | Int64 | — | BIGINT | BIGINT | INTEGER |
+| `decimal` | Decimal | precision, scale | NUMERIC(p,s) | DECIMAL(p,s) | NUMERIC |
+| `double` | Double | — | DOUBLE PRECISION | DOUBLE | REAL |
+| `string` | String | max_length, pattern | VARCHAR(n) | VARCHAR(n) | TEXT |
+| `largestring` | LargeString | — | TEXT | LONGTEXT | TEXT |
+| `date` | Date | — | DATE | DATE | TEXT |
+| `time` | Time | — | TIME | TIME(6) | TEXT |
+| `datetime` | DateTime | — | TIMESTAMPTZ | DATETIME(6) | TEXT |
+| `timestamp` | Timestamp | — | TIMESTAMPTZ | TIMESTAMP(6) | TEXT |
+| `binary` | Binary | max_length | BYTEA | VARBINARY(n) | BLOB |
+| `largebinary` | LargeBinary | — | BYTEA | LONGBLOB | BLOB |
+| `vector` | Vector | length | JSONB | JSON | TEXT |
+| `map` | Map | — | JSONB | JSON | TEXT |
 
 字段 `type:` 支持简写（裸字符串）和详写（对象 `{ ref, args, meta }`）：
 

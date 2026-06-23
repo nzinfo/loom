@@ -95,6 +95,10 @@ function pgType(c: PhysicalColumn, ctx: PgEmitContext): string {
   switch (c.scalar) {
     case 'boolean':
       return 'BOOLEAN';
+    case 'uint8':
+      return 'SMALLINT';
+    case 'int16':
+      return 'SMALLINT';
     case 'integer':
       return 'INTEGER';
     case 'bigint':
@@ -104,19 +108,29 @@ function pgType(c: PhysicalColumn, ctx: PgEmitContext): string {
       const s = c.props.scale;
       return `NUMERIC(${p ?? 18},${s ?? 4})`;
     }
+    case 'double':
+      return 'DOUBLE PRECISION';
     case 'string':
       return `VARCHAR(${c.props.max_length ?? 255})`;
-    case 'text':
+    case 'largestring':
       return 'TEXT';
-    case 'datetime':
-      return 'TIMESTAMPTZ';
     case 'date':
       return 'DATE';
+    case 'time':
+      return 'TIME';
+    case 'datetime':
+      return 'TIMESTAMPTZ';
+    case 'timestamp':
+      return 'TIMESTAMPTZ';
     case 'uuid':
       return 'UUID';
-    case 'bytes':
+    case 'binary':
       return 'BYTEA';
-    case 'json':
+    case 'largebinary':
+      return 'BYTEA';
+    case 'vector':
+      return 'JSONB';
+    case 'map':
       return 'JSONB';
     default:
       return 'TEXT';

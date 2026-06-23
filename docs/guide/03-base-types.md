@@ -65,21 +65,31 @@ tenant 都不能定义自己的标量（详见 [01 目录与身份](./01-layout-
 `java.lang` 默认导入且 `int` 恰好在里面。短名解析**只有一条路径**——查 using 命名空间，
 不分 scalar/struct/enum。详见 [04 类型引用 §短名解析规则](./04-type-refs.md#短名解析规则)。
 
-### 推荐内置标量
+### 内置标量（对齐 CDS）
 
-loom 不预置标量目录——由 platform schema 自己声明。常见推荐：
+loom 不预置标量目录——由 platform schema 自己声明。推荐 18 种，对齐 CDS
+（CAP）内建类型，小写命名：
 
-| scalar | properties | 说明 |
-|---|---|---|
-| `bigint` | — | 64-bit 整数 |
-| `integer` | — | 32-bit 整数 |
-| `decimal` | `precision` (req), `scale` (req) | 定点数 |
-| `string` | `max_length` (req), `pattern` | 变长字符串 |
-| `text` | — | 长文本 |
-| `boolean` | — | 布尔 |
-| `date` | — | 日期 |
-| `datetime` | — | 时间戳 |
-| `bytes` | `max_length` (req) | 二进制 |
+| scalar | CDS | properties | 说明 |
+|---|---|---|---|
+| `uuid` | UUID | — | RFC 4122 UUID |
+| `boolean` | Boolean | — | 布尔 |
+| `uint8` | UInt8 | — | 无符号 8-bit 整数 |
+| `int16` | Int16 | — | 16-bit 整数 |
+| `integer` | Integer | — | 32-bit 整数 |
+| `bigint` | Int64 | — | 64-bit 整数 |
+| `decimal` | Decimal | `precision` (req), `scale` (req) | 定点数 |
+| `double` | Double | — | 双精度浮点 |
+| `string` | String | `max_length` (req), `pattern` | 变长字符串 |
+| `largestring` | LargeString | — | 无限长字符串 |
+| `date` | Date | — | 日期 |
+| `time` | Time | — | 一天内时间 |
+| `datetime` | DateTime | — | 时间戳（秒精度） |
+| `timestamp` | Timestamp | — | 高精度时间戳（微秒） |
+| `binary` | Binary | `max_length` (req) | 定长二进制 |
+| `largebinary` | LargeBinary | — | 无限长二进制 |
+| `vector` | Vector | `length` (req) | 向量嵌入 |
+| `map` | Map | — | 键值映射 |
 
 ## form: struct —— 复合类型
 

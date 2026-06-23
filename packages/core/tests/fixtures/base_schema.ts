@@ -15,7 +15,37 @@ import { MemoryFileSystem } from './memory_fs.js';
  */
 export function buildBaseSchemaFs(): FileSystem {
   return new MemoryFileSystem({
-    // ── scalars (form: scalar) — the system base vocabulary ──
+    // ── scalars (form: scalar) — CDS-aligned base vocabulary (18 types) ──
+    'platform/base/core/uuid.type.yaml': `version: loom-schema/v2
+name: uuid
+form: scalar
+description: RFC 4122 UUID
+properties: []
+`,
+    'platform/base/core/boolean.type.yaml': `version: loom-schema/v2
+name: boolean
+form: scalar
+description: boolean
+properties: []
+`,
+    'platform/base/core/uint8.type.yaml': `version: loom-schema/v2
+name: uint8
+form: scalar
+description: unsigned 8-bit integer
+properties: []
+`,
+    'platform/base/core/int16.type.yaml': `version: loom-schema/v2
+name: int16
+form: scalar
+description: 16-bit integer
+properties: []
+`,
+    'platform/base/core/integer.type.yaml': `version: loom-schema/v2
+name: integer
+form: scalar
+description: 32-bit integer
+properties: []
+`,
     'platform/base/core/bigint.type.yaml': `version: loom-schema/v2
 name: bigint
 form: scalar
@@ -30,6 +60,12 @@ properties:
   - { name: precision, type: integer, required: true }
   - { name: scale, type: integer, required: true }
 `,
+    'platform/base/core/double.type.yaml': `version: loom-schema/v2
+name: double
+form: scalar
+description: double-precision float
+properties: []
+`,
     'platform/base/core/string.type.yaml': `version: loom-schema/v2
 name: string
 form: scalar
@@ -38,16 +74,60 @@ properties:
   - { name: max_length, type: integer, required: true }
   - { name: pattern, type: string }
 `,
+    'platform/base/core/largestring.type.yaml': `version: loom-schema/v2
+name: largestring
+form: scalar
+description: unlimited-length string
+properties: []
+`,
+    'platform/base/core/date.type.yaml': `version: loom-schema/v2
+name: date
+form: scalar
+description: calendar date
+properties: []
+`,
+    'platform/base/core/time.type.yaml': `version: loom-schema/v2
+name: time
+form: scalar
+description: time of day
+properties: []
+`,
     'platform/base/core/datetime.type.yaml': `version: loom-schema/v2
 name: datetime
 form: scalar
 description: timestamp
 properties: []
 `,
-    'platform/base/core/boolean.type.yaml': `version: loom-schema/v2
-name: boolean
+    'platform/base/core/timestamp.type.yaml': `version: loom-schema/v2
+name: timestamp
 form: scalar
-description: boolean
+description: high-precision timestamp
+properties: []
+`,
+    'platform/base/core/binary.type.yaml': `version: loom-schema/v2
+name: binary
+form: scalar
+description: fixed-length binary
+properties:
+  - { name: max_length, type: integer, required: true }
+`,
+    'platform/base/core/largebinary.type.yaml': `version: loom-schema/v2
+name: largebinary
+form: scalar
+description: unlimited-length binary
+properties: []
+`,
+    'platform/base/core/vector.type.yaml': `version: loom-schema/v2
+name: vector
+form: scalar
+description: vector embedding
+properties:
+  - { name: length, type: integer, required: true }
+`,
+    'platform/base/core/map.type.yaml': `version: loom-schema/v2
+name: map
+form: scalar
+description: key-value map
 properties: []
 `,
 

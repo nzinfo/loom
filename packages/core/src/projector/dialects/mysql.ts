@@ -89,6 +89,10 @@ function mysqlType(c: PhysicalColumn, ctx: MysqlEmitContext): string {
   switch (c.scalar) {
     case 'boolean':
       return 'BOOLEAN';
+    case 'uint8':
+      return 'TINYINT';
+    case 'int16':
+      return 'SMALLINT';
     case 'integer':
       return 'INT';
     case 'bigint':
@@ -98,19 +102,29 @@ function mysqlType(c: PhysicalColumn, ctx: MysqlEmitContext): string {
       const s = c.props.scale;
       return `DECIMAL(${p ?? 18},${s ?? 4})`;
     }
+    case 'double':
+      return 'DOUBLE';
     case 'string':
       return `VARCHAR(${c.props.max_length ?? 255})`;
-    case 'text':
-      return 'TEXT';
-    case 'datetime':
-      return 'DATETIME(6)';
+    case 'largestring':
+      return 'LONGTEXT';
     case 'date':
       return 'DATE';
+    case 'time':
+      return 'TIME(6)';
+    case 'datetime':
+      return 'DATETIME(6)';
+    case 'timestamp':
+      return 'TIMESTAMP(6)';
     case 'uuid':
       return 'CHAR(36)';
-    case 'bytes':
-      return 'BLOB';
-    case 'json':
+    case 'binary':
+      return `VARBINARY(${c.props.max_length ?? 255})`;
+    case 'largebinary':
+      return 'LONGBLOB';
+    case 'vector':
+      return 'JSON';
+    case 'map':
       return 'JSON';
     default:
       return 'TEXT';
