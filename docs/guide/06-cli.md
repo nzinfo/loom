@@ -189,7 +189,7 @@ loom rm field <path> <target> <name>
 ```
 
 `<target>` 是节点身份引用（如 `table:shop.core.Orders`、`type:shop.core.Money`、
-`extension:entity:shop.core.Order::billing`）。
+`ext:entity:shop.core.Order::billing`）。
 
 ```sh
 # 给表加字段
@@ -199,7 +199,7 @@ loom add field my-shop/ table:shop.core.Orders total shop.core.Money --required
 loom add field my-shop/ type:shop.core.Address city string --args max_length=64
 
 # 给扩展组加字段
-loom add field my-shop/ extension:entity:shop.core.Order::billing tax_id string
+loom add field my-shop/ ext:entity:shop.core.Order::billing tax_id string
 
 # 删字段
 loom rm field my-shop/ table:shop.core.Orders total

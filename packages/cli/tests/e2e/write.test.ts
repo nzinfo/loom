@@ -192,15 +192,34 @@ describe('e2e: new entity + extension', () => {
     expect(ext2.exitCode).toBe(0);
     expect(fs.existsSync(path.join(dir, 'ext/vendor-x/shop/core/pricing.ext.yaml'))).toBe(true);
 
-    // Add field to extension
+    // Add field to extension via ext: target
     const addExt = await runLoom([
       'add', 'field', dir,
-      'extension:entity:shop.core.Product::inventory',
+      'ext:entity:shop.core.Product::inventory',
       'sku', 'string', '--args', 'max_length=64',
     ]);
-    // Note: extension target resolution may need a file path; verify it works or
-    // at least doesn't crash on the identity form.
-    expect(addExt.exitCode).toBeLessThanOrEqual(64);
+    expect(addExt.exitCode).toBe(0);
+    const extContent = fs.readFileSync(
+      path.join(dir, 'platform/shop/core/inventory.ext.yaml'), 'utf-8',
+    );
+    expect(extContent).toContain('sku');
+
+    // rm extension (specific group)
+    const rmExt = await runLoom([
+      'rm', 'extension', dir,
+      '--entity', 'entity:shop.core.Product',
+      '--group', 'inventory',
+    ]);
+    expect(rmExt.exitCode).toBe(0);
+    expect(fs.existsSync(path.join(dir, 'platform/shop/core/inventory.ext.yaml'))).toBe(false);
+
+    // rm extension (all remaining)
+    const rmAll = await runLoom([
+      'rm', 'extension', dir,
+      '--entity', 'entity:shop.core.Product',
+    ]);
+    expect(rmAll.exitCode).toBe(0);
+    expect(fs.existsSync(path.join(dir, 'ext/vendor-x/shop/core/pricing.ext.yaml'))).toBe(false);
   });
 });
 

@@ -10,8 +10,10 @@
  */
 import process from 'node:process';
 import { YAMLMap } from 'yaml';
-import { identityToPath } from '../shared/identity.js';
-import { loadOrError } from '../shared/load.js';
+import type { Owner } from '@loom/core';
+import { extensionToPath, identityToPath } from '../shared/identity.js';
+import { load } from '@loom/core';
+import { NodeFileSystem } from '../shared/fs.js';
 import { writeError, writeText } from '../shared/output.js';
 import {
   createFieldNode,
@@ -235,8 +237,12 @@ export async function orderFieldsCommand(opts: OrderFieldsOptions): Promise<numb
 // ── helpers ──────────────────────────────────────────────────
 
 /**
- * Resolve a target identity (e.g. type:shop.core.Money) to a file path.
- * If target looks like a path already (contains /), use it directly.
+ * Resolve a target to a file path.
+ *
+ * Accepted forms:
+ *   - File path (contains / and ends with .yaml) — used directly
+ *   - Node identity (type:..., table:..., entity:...) — resolved via IR
+ *   - Extension target (extension:entity:...::group) — resolved via IR.extensionFields
  */
 async function resolveTargetFile(basePath: string, target: string): Promise<string | null> {
   // If it looks like a file path, use directly.
@@ -244,12 +250,39 @@ async function resolveTargetFile(basePath: string, target: string): Promise<stri
     return target;
   }
 
-  // If it's an identity, convert to path.
+  // Extension target: ext:<entity_identity>::<group_name>
+  if (target.startsWith('ext:')) {
+    const rest = target.slice('ext:'.length);
+    const sep = rest.indexOf('::');
+    if (sep < 0) {
+      writeError(`extension target must be "ext:<entity>::<group>", got: ${target}`);
+      return null;
+    }
+    const entityIdentity = rest.slice(0, sep);
+    const groupName = rest.slice(sep + 2);
+
+    const result = await load({ fs: new NodeFileSystem(), basePath });
+    const ir = result.ir;
+
+    // Find the owner from extensionFields registry.
+    const entries = ir.extensionFields.get(entityIdentity);
+    if (entries === undefined) {
+      writeError(`no extension fields for entity "${entityIdentity}"`);
+      return null;
+    }
+    const entry = entries.find((e) => e.group === groupName);
+    if (entry === undefined) {
+      writeError(`no extension group "${groupName}" on entity "${entityIdentity}"`);
+      return null;
+    }
+    const owner: Owner = entry.owner;
+    return extensionToPath(entityIdentity, groupName, owner, basePath);
+  }
+
+  // Node identity (type:..., table:..., entity:...)
   if (target.includes(':')) {
-    // Need to load IR to find the owner (identity doesn't encode owner).
-    const { ir, code } = await loadOrError(basePath);
-    if (ir === undefined) return null;
-    void code;
+    const result = await load({ fs: new NodeFileSystem(), basePath });
+    const ir = result.ir;
 
     const node = ir.nodes.get(target);
     const owner = node?.owner ?? { kind: 'platform' as const };
@@ -261,7 +294,7 @@ async function resolveTargetFile(basePath: string, target: string): Promise<stri
     return filePath;
   }
 
-  writeError(`target must be an identity (type:...) or a .yaml file path, got: ${target}`);
+  writeError(`target must be an identity (type:...), extension target (ext:...::...), or a .yaml file path, got: ${target}`);
   return null;
 }
 

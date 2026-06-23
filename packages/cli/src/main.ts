@@ -28,7 +28,7 @@ import {
   newTypeCommand,
 } from './commands/new.js';
 import { projectModelCommand, projectSqlCommand } from './commands/project.js';
-import { rmNodeCommand } from './commands/rm.js';
+import { rmExtensionCommand, rmNodeCommand } from './commands/rm.js';
 import {
   showEntityCommand,
   showGraphCommand,
@@ -335,7 +335,27 @@ async function main(argv: string[]): Promise<number> {
         return await rmNodeCommand({ path, identity: `${sub}:${identity}`, force });
       }
 
-      writeError(`rm requires field|type|table|entity, got "${sub ?? ''}"`);
+      if (sub === 'extension') {
+        const entityFlag = parseFlag(tail, '--entity').value;
+        const groupFlag = parseFlag(tail, '--group').value;
+        if (entityFlag === undefined) {
+          writeError('rm extension requires --entity <entity:...>');
+          return 64;
+        }
+        const path = tail.find((a) => !a.startsWith('--') && a !== entityFlag && a !== groupFlag);
+        if (path === undefined) {
+          writeError('rm extension requires <path>');
+          return 64;
+        }
+        return await rmExtensionCommand({
+          path,
+          entity: entityFlag,
+          group: groupFlag,
+          force,
+        });
+      }
+
+      writeError(`rm requires field|type|table|entity|extension, got "${sub ?? ''}"`);
       return 64;
     }
 
