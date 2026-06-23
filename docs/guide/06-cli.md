@@ -119,7 +119,7 @@ loom project model --json my-shop/
 loom init <path> --system <sys> --module <mod>
 ```
 
-创建一个新的 loom schema 项目骨架：目录结构 + 基础标量 + 一个示例表/实体。
+创建一个新的 loom schema 项目骨架：目录结构 + 全部 18 种内置标量 + 一个示例表/实体。
 
 ```sh
 loom init my-shop/ --system shop --module core
@@ -132,7 +132,7 @@ my-shop/
 └── platform/
     └── shop/
         └── core/
-            ├── bigint.type.yaml          ← 18 种内置标量
+            ├── bigint.type.yaml          ← 全部 18 种内置标量
             ├── string.type.yaml
             ├── decimal.type.yaml
             ├── ...（全部标量）
@@ -144,11 +144,11 @@ my-shop/
 |---|---|
 | `--system <name>` | 系统名（如 `shop`） |
 | `--module <name>` | 模块名（如 `core`），默认 `core` |
-| `--scalars minimal` | 只生成项目用到的标量（bigint/string/decimal），而非全部 18 种 |
 | `--no-example` | 不生成示例表/实体 |
 | `--force` | 目录已存在时覆盖 |
 
-初始化后可以直接 `loom check my-shop/` 验证，或删掉示例文件开始自定义。
+初始化后所有内置标量立即可用，可以直接 `loom check my-shop/` 验证，或删掉示例
+文件开始自定义。
 
 ## 创建节点
 
