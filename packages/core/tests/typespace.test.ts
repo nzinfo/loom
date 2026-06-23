@@ -101,4 +101,35 @@ describe('resolveShortName', () => {
     const result = resolveShortName('Money', ['base.core.*'], typeFqns);
     expect(result.kind).toBe('resolved');
   });
+
+  it('resolves a renamed import (form C: "ns.Name as Alias")', () => {
+    // base.core.Money as Cash → short name "Cash" resolves to base.core.Money
+    const result = resolveShortName(
+      'Cash',
+      ['base.core.Money as Cash', 'base.core.*'],
+      typeFqns,
+    );
+    expect(result.kind).toBe('resolved');
+    if (result.kind === 'resolved') {
+      expect(result.fqn).toBe('base.core.Money');
+    }
+  });
+
+  it('rename disambiguates two same-name types from different namespaces', () => {
+    // Two namespaces both have Money; import one with an alias
+    const fqns = new Set([...typeFqns, 'shop.billing.Money']);
+    // Without rename: ambiguous
+    const ambiguous = resolveShortName('Money', ['base.core.*', 'shop.billing.*'], fqns);
+    expect(ambiguous.kind).toBe('ambiguous');
+    // With rename: resolves to the aliased one
+    const resolved = resolveShortName(
+      'BillingMoney',
+      ['shop.billing.Money as BillingMoney', 'base.core.*'],
+      fqns,
+    );
+    expect(resolved.kind).toBe('resolved');
+    if (resolved.kind === 'resolved') {
+      expect(resolved.fqn).toBe('shop.billing.Money');
+    }
+  });
 });

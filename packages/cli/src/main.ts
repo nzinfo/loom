@@ -31,6 +31,7 @@ import { projectModelCommand, projectSqlCommand } from './commands/project.js';
 import { rmExtensionCommand, rmNodeCommand } from './commands/rm.js';
 import { updateTableCommand } from './commands/update.js';
 import { projectAtlasCommand } from './commands/project_atlas.js';
+import { fmtCommand } from './commands/fmt.js';
 import {
   showEntityCommand,
   showGraphCommand,
@@ -64,6 +65,7 @@ commands:
   move field <path> <target> <field> <--after|--before|--first|--last <ref>
   order fields <path> <target> <f1> <f2> ...
   rm <type|table|entity|extension> <path> [--entity <e>] [--group <g>] [--force]
+  fmt [--check] <path>                              format schema files in place
   update table <path> <identity> --strategy <none|sidecar_eav|json_column>
 `);
 }
@@ -417,6 +419,17 @@ async function main(argv: string[]): Promise<number> {
         return 64;
       }
       return await orderFieldsCommand({ path, target, order: fieldOrder });
+    }
+
+    case 'fmt': {
+      const tail = rest;
+      const checkFmt = tail.includes('--check');
+      const pathArg = tail.find((a) => !a.startsWith('--'));
+      if (pathArg === undefined) {
+        writeError('fmt requires a path');
+        return 64;
+      }
+      return await fmtCommand({ path: pathArg, ...(checkFmt ? { check: true } : {}) });
     }
 
     case 'update': {

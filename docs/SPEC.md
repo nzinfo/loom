@@ -331,10 +331,9 @@ core 包环境无关——文件系统通过 `FileSystem` 接口注入（支持 
 
 - YAML 位置追踪——诊断报告精确 line:column（parse/link/validate 层）
 - 代码审计修复——scalarToSql 统一、enumRef bug、循环检测、列存在性校验等
-
-### 短期待办
-
-- **using 形态 C（重命名）**——`using base.core.Money as M` 解决短名冲突
+- using 形态 C（重命名）——`using base.core.Money as M` 解决短名冲突
+- `loom fmt`——格式化 schema 文件（key 顺序、缩进统一）
+- `loom project atlas-yaml`——atlas-yaml/v2 格式桥接
 
 ### 设计说明：FK 引用层级
 
@@ -344,8 +343,7 @@ FK 定义在 table 层面，`ref_table` 直接写物理表名是正确行为—�
 
 ### 中期计划
 
-- **`loom fmt`**——格式化 schema 文件（字段排序、key 顺序、缩进统一）
-- **`loom project atlas-yaml`**——桥接到 atlas 生态
+（路线图已全部完成）
 
 ### 不做
 

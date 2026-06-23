@@ -1,8 +1,8 @@
 version: loom-schema/v2
 entity: entity:shop.core.Product
+group: pricing
 using:
   - shop.core.*
-group: pricing
 fields:
   - name: discount_rate
     type:

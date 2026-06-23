@@ -80,38 +80,50 @@ export type ResolutionResult =
 /**
  * Resolve a single-segment short name against the type namespace.
  *
- * @param shortName  the bare name (e.g. "integer", "Email", "Money")
- * @param using      the file's using list (wildcards `ns.*` and precise names
- *                   `ns.Name`). The default `base.core.*` is injected by the
- *                   caller before calling — all types in base.core (scalar AND
- *                   struct/enum) are globally available that way.
- * @param typeFqns   fully-qualified names of ALL type nodes in the IR
- *                   (scalar + struct + enum,不分 form)
+ * Supports three using forms:
+ *   - Wildcard:   `base.core.*`       — all types in the namespace
+ *   - Precise:    `base.core.Email`   — import by fqn, short name = last segment
+ *   - Rename (C): `base.core.Money as M` — import by fqn, bound to alias M
  *
- * Resolution order (spec §4.6, unified):
- *   1. precise using entries (direct fqn match)
- *   2. wildcard using entries (ns.* → ns.shortName if it exists in typeFqns)
- *   3. ambiguity if >1 distinct fqn
- *   4. unknown
+ * @param shortName  the bare name used in the field's type: (e.g. "M", "Email")
+ * @param using      the file's using list
+ * @param typeFqns   fully-qualified names of ALL type nodes in the IR
+ *
+ * Resolution order:
+ *   1. rename entries (fqn ... as shortName) — exact alias match
+ *   2. precise entries (last segment === shortName)
+ *   3. wildcard entries (ns.* → ns.shortName if exists)
+ *   4. ambiguity if >1 distinct fqn
+ *   5. unknown
  */
 export function resolveShortName(
   shortName: string,
   using: readonly string[],
   typeFqns: ReadonlySet<string>,
 ): ResolutionResult {
-  // Collect candidate fqns from using entries.
   const candidates = new Set<string>();
   for (const entry of using) {
     if (entry.endsWith('.*')) {
+      // Wildcard: ns.* → ns.shortName
       const ns = entry.slice(0, -2);
       const fqn = `${ns}.${shortName}`;
       if (typeFqns.has(fqn)) candidates.add(fqn);
     } else {
-      // Precise name: matches only if its last segment equals shortName.
-      const lastDot = entry.lastIndexOf('.');
-      const lastName = lastDot < 0 ? entry : entry.slice(lastDot + 1);
-      if (lastName === shortName && typeFqns.has(entry)) {
-        candidates.add(entry);
+      // Check for rename form: "ns.Name as Alias"
+      const asIdx = entry.indexOf(' as ');
+      if (asIdx > 0) {
+        const fqn = entry.slice(0, asIdx).trim();
+        const alias = entry.slice(asIdx + 4).trim();
+        if (alias === shortName && typeFqns.has(fqn)) {
+          candidates.add(fqn);
+        }
+      } else {
+        // Precise: last segment must equal shortName
+        const lastDot = entry.lastIndexOf('.');
+        const lastName = lastDot < 0 ? entry : entry.slice(lastDot + 1);
+        if (lastName === shortName && typeFqns.has(entry)) {
+          candidates.add(entry);
+        }
       }
     }
   }

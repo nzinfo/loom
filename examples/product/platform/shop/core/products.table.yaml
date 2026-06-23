@@ -1,12 +1,12 @@
 version: loom-schema/v2
 name: Products
+using:
+  - shop.core.*
 table:
   name: products_base
   extension:
     strategy: sidecar_eav
     ext_table: products_ext
-using:
-  - shop.core.*
 fields:
   - name: id
     type: bigint
@@ -18,4 +18,4 @@ fields:
     required: true
   - name: base_price
     type: shop.core.Money
-primary_key: [id]
+primary_key: [ id ]

@@ -130,6 +130,24 @@ atlas 拿到此 YAML 后可以 `schemayaml.Unmarshal` 加载，再 diff、apply�
 
 方言名映射：loom `pg` → atlas `postgres`；`mysql` → `mysql`；`sqlite` → `sqlite`。
 
+## 格式化
+
+### fmt
+
+```sh
+loom fmt [--check] <path>
+```
+
+格式化 schema YAML 文件：规范化 key 顺序、缩进。字段数组内顺序保持不变
+（字段顺序有语义意义）。
+
+`--check` 模式不修改文件，只报告哪些需要格式化（用于 CI）。
+
+```sh
+loom fmt my-shop/           # 格式化
+loom fmt --check my-shop/   # CI 检查（需要格式化时退出码 1）
+```
+
 ## 初始化项目
 
 ### init

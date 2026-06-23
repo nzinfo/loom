@@ -1,5 +1,5 @@
 version: loom-schema/v2
 name: Product
 primary_table: table:shop.core.Products
-business_keys: [name]
+business_keys: [ name ]
 view: products
