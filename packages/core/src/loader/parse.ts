@@ -97,8 +97,8 @@ export async function parseAll(opts: ParseOptions): Promise<ParseResult> {
       opts.diagnostics.add({
         category,
         file: entry.path,
-        line: 1,
-        column: 1,
+        line: e instanceof ParseError && e.line ? e.line : 1,
+        column: e instanceof ParseError && e.column ? e.column : 1,
         message: e instanceof Error ? e.message : String(e),
       });
     }

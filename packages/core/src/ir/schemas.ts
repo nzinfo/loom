@@ -22,6 +22,7 @@
 // ────────────────────────────────────────────────────────────────────
 import { parse as yamlParse } from 'yaml';
 import { z } from 'zod';
+import { findPosition, zodPathToString } from '../loader/yaml_position.js';
 import { CURRENT_VERSION, FILE_KIND, type FileKind, TYPE_FORMS, type TypeForm } from './version.js';
 
 /** Category of failure surfaced by {@link parseFile}. */
@@ -35,11 +36,21 @@ export type ParseErrorCategory = 'parse' | 'version';
 export class ParseError extends Error {
   readonly category: ParseErrorCategory;
   readonly file: string;
-  constructor(category: ParseErrorCategory, file: string, message: string) {
+  readonly line?: number;
+  readonly column?: number;
+  constructor(
+    category: ParseErrorCategory,
+    file: string,
+    message: string,
+    line?: number,
+    column?: number,
+  ) {
     super(`${category}: ${file}: ${message}`);
     this.name = 'ParseError';
     this.category = category;
     this.file = file;
+    if (line !== undefined) this.line = line;
+    if (column !== undefined) this.column = column;
   }
 }
 
@@ -309,6 +320,8 @@ export interface ParsedFileBase {
   readonly file: string;
   readonly line: number;
   readonly column: number;
+  /** Original YAML source text (for position tracking in diagnostics). */
+  readonly sourceText?: string;
 }
 
 export type AnyFile =
@@ -339,7 +352,11 @@ export function parseFile(text: string, file: string, kind: FileKind): AnyFile {
   try {
     raw = yamlParse(text);
   } catch (e) {
-    throw new ParseError('parse', file, `YAML syntax: ${e instanceof Error ? e.message : String(e)}`);
+    throw new ParseError(
+      'parse',
+      file,
+      `YAML syntax: ${e instanceof Error ? e.message : String(e)}`,
+    );
   }
   if (typeof raw !== 'object' || raw === null) {
     throw new ParseError('parse', file, 'not a YAML mapping');
@@ -354,11 +371,17 @@ export function parseFile(text: string, file: string, kind: FileKind): AnyFile {
     data = schema.parse(raw);
   } catch (e) {
     // Zod errors carry full path information; surface the first issue.
-    const zodErr = e as { errors?: Array<{ message: string }> };
-    const first = zodErr.errors?.[0]?.message ?? (e instanceof Error ? e.message : String(e));
-    throw new ParseError('parse', file, `schema: ${first}`);
+    const zodErr = e as { errors?: Array<{ message: string; path?: (string | number)[] }> };
+    const firstErr = zodErr.errors?.[0];
+    const first = firstErr?.message ?? (e instanceof Error ? e.message : String(e));
+    // Try to get position from the Zod error path.
+    let pos: { line: number; column: number } | undefined;
+    if (firstErr?.path) {
+      pos = findPosition(text, zodPathToString(firstErr.path));
+    }
+    throw new ParseError('parse', file, `schema: ${first}`, pos?.line, pos?.column);
   }
-  return { kind, raw, file, line: 1, column: 1, data } as AnyFile;
+  return { kind, raw, file, line: 1, column: 1, data, sourceText: text } as AnyFile;
 }
 
 // FILE_KIND is re-exported through version.ts; keep the import used so tree-shaking

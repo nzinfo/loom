@@ -6,6 +6,7 @@ import type { FileKind } from '../ir/version.js';
 import { CURRENT_VERSION } from '../ir/version.js';
 import type { DiscoveredEntry } from './discovery.js';
 import type { ParsedExtensionFields } from './parse.js';
+import { findPosition } from './yaml_position.js';
 
 /**
  * Pass 2 — link. See spec §13.1, §12.
@@ -124,6 +125,19 @@ function collectTypeFqns(parsed: ReadonlyMap<string, AnyFile>): Set<string> {
  * Identity can't be used because parse corrects it (declared name overrides
  * the stem-derived provisional identity), so discovery's identity no longer
  * matches the node's. Path is stable. */
+
+/** Look up the position of a field's type ref in the source text. */
+function fieldPos(
+  node: { sourceText?: string } | undefined,
+  fieldIndex: number,
+): { line: number; column: number } {
+  if (node?.sourceText) {
+    const p = findPosition(node.sourceText, `fields.${fieldIndex}.type`);
+    if (p) return p;
+  }
+  return { line: 1, column: 1 };
+}
+
 function ownerOfFile(filePath: string, files?: ReadonlyMap<string, DiscoveredEntry>): Owner {
   if (files !== undefined) {
     const entry = files.get(filePath);

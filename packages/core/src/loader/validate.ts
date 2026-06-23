@@ -1,6 +1,7 @@
 import type { Diagnostics } from '../errors.js';
 import type { Entity, Table, TypeDescriptor, TypeNode } from '../ir/schemas.js';
 import type { ExtensionFieldEntry, FileKind, IR } from '../ir/version.js';
+import { findPosition } from './yaml_position.js';
 
 /**
  * Pass 3 — semantic validation. See spec §13.1, §6.9, §7.5 (v2).
@@ -25,6 +26,18 @@ export interface ValidateResult {
 
 type FieldLike = Record<string, unknown>;
 
+/** Look up position from a node's sourceText and a YAML path. */
+function pos(
+  node: { sourceText?: string } | undefined,
+  path: string,
+): { line: number; column: number } {
+  if (node?.sourceText) {
+    const p = findPosition(node.sourceText, path);
+    if (p) return p;
+  }
+  return { line: 1, column: 1 };
+}
+
 export function validate(opts: ValidateOptions): ValidateResult {
   // Required-properties per scalar, keyed by the scalar's fqn (e.g.
   // "base.core.decimal"). After unified resolution all field type refs are
@@ -46,7 +59,7 @@ export function validate(opts: ValidateOptions): ValidateResult {
         break;
       }
       case 'table': {
-        checkTable(identity, node.data, scalarReqProps, opts.diagnostics);
+        checkTable(identity, node.data, scalarReqProps, node, opts.diagnostics);
         break;
       }
       case 'entity': {
@@ -135,6 +148,7 @@ function checkTable(
   identity: string,
   t: Table,
   scalarReqProps: Map<string, Set<string>>,
+  nodeSource: { sourceText?: string } | undefined,
   diag: Diagnostics,
 ): void {
   const requiredFieldNames = new Set<string>();
@@ -145,13 +159,15 @@ function checkTable(
     }
     checkTypedField(identity, 'table', fieldRec, scalarReqProps, diag);
   }
-  for (const pk of t.primary_key) {
+  for (let pki = 0; pki < t.primary_key.length; pki++) {
+    const pk = t.primary_key[pki]!;
     if (!requiredFieldNames.has(pk)) {
+      const p = pos(nodeSource, `primary_key.${pki}`);
       diag.add({
         category: 'semantic',
         file: identity,
-        line: 1,
-        column: 1,
+        line: p.line,
+        column: p.column,
         message: `primary_key field "${pk}" must be required:true`,
       });
     }
@@ -205,18 +221,12 @@ function checkTable(
   }
 }
 
-
 /**
  * Validate an entity node.
  *
  * Checks that business_keys reference real columns on the primary_table.
  */
-function checkEntity(
-  identity: string,
-  entity: Entity,
-  ir: IR,
-  diag: Diagnostics,
-): void {
+function checkEntity(identity: string, entity: Entity, ir: IR, diag: Diagnostics): void {
   if (!entity.business_keys || entity.business_keys.length === 0) return;
 
   // Resolve the primary_table to get its field names.
