@@ -342,10 +342,10 @@ core 包环境无关——文件系统通过 `FileSystem` 接口注入（支持 
 
 - **`loom fmt`**——格式化 schema 文件（字段排序、key 顺序、缩进统一）
 - **`loom project atlas-yaml`**——桥接到 atlas 生态
-- **enum 关联数据**——Rust 风格 variants 带关联类型
 
 ### 不做
 
 - ~~`loom lift`（反向提炼）~~——如需反向工程，应与 atlas 项目配合实现，不在 loom 内
 - ~~方言插件机制~~——不需要
 - ~~`json_column` 策略~~——暂时不需要
+- ~~enum 关联数据~~——Rust 风格 variants 带关联类型难以落地到关系型数据库，保持现有 C 风格值列表枚举
