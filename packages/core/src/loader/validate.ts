@@ -1,7 +1,7 @@
 import type { Diagnostics } from '../errors.js';
 import type { Entity, Table, TypeDescriptor, TypeField, TypeNode } from '../ir/schemas.js';
 import type { ExtensionFieldEntry, FileKind, IR } from '../ir/version.js';
-import { findPosition } from './yaml_position.js';
+import { findPosition, findPositionByValue } from './yaml_position.js';
 
 /**
  * Pass 3 — semantic validation. See spec §13.1, §6.9, §7.5 (v2).
@@ -269,14 +269,14 @@ function checkExtensionEntry(
   diag: Diagnostics,
 ): void {
   if (entry.refValueTypeId !== undefined) {
-    // Validate the referenced type exists and is a type node.
     const refNode = ir.nodes.get(entry.refValueTypeId);
     if (!refNode || refNode.kind !== 'type') {
+      const p = entry.sourceText ? findPositionByValue(entry.sourceText, entry.name) : undefined;
       diag.add({
         category: 'semantic',
         file: entityId,
-        line: 1,
-        column: 1,
+        line: p?.line ?? 1,
+        column: p?.column ?? 1,
         message: `extension field "${entry.name}" references unknown type "${entry.refValueTypeId}"`,
       });
     }
@@ -286,11 +286,12 @@ function checkExtensionEntry(
   if (scalarReqProps.size === 0) return;
   const req = scalarReqProps.get(entry.scalar);
   if (req === undefined) {
+    const p = entry.sourceText ? findPositionByValue(entry.sourceText, entry.name) : undefined;
     diag.add({
       category: 'schema',
       file: entityId,
-      line: 1,
-      column: 1,
+      line: p?.line ?? 1,
+      column: p?.column ?? 1,
       message: `unknown scalar type "${entry.scalar}" for extension field "${entry.name}"`,
     });
     return;

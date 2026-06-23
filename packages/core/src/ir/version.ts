@@ -111,6 +111,8 @@ export interface ExtensionFieldEntry {
   /** Owner that declared this field (platform / ext:provider / tenant:id),
    * derived from the .ext.yaml file's directory path. */
   readonly owner: Owner;
+  /** Original YAML source text of the .ext.yaml file (for position tracking). */
+  readonly sourceText?: string;
 }
 
 /** Placeholder — full IR types will be added in implementation phases. */

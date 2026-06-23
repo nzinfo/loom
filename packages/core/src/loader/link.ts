@@ -208,6 +208,7 @@ function collectExtensionFields(
           props: desc.args ?? {},
           group,
           owner,
+          ...(file.sourceText ? { sourceText: file.sourceText } : {}),
         });
       } else {
         bucket.push({
@@ -216,6 +217,7 @@ function collectExtensionFields(
           props: desc.args ?? {},
           group,
           owner,
+          ...(file.sourceText ? { sourceText: file.sourceText } : {}),
         });
       }
     }

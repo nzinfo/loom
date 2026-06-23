@@ -85,6 +85,38 @@ export function findPosition(text: string, path: string): Position | undefined {
 }
 
 /**
+ * Find the position of a field by name in a YAML document's fields array.
+ *
+ * Used for extension field errors where we know the field name but not
+ * its array index (the entry was aggregated across owners).
+ */
+export function findPositionByValue(text: string, fieldName: string): Position | undefined {
+  const doc = parseDocument(text);
+  const root = doc.contents;
+  if (!root) return undefined;
+
+  const get = (root as { get?: (key: string, keep?: boolean) => unknown }).get;
+  if (!get) return undefined;
+
+  const fieldsNode = get.call(root, 'fields', true);
+  const items = (fieldsNode as { items?: unknown[] })?.items;
+  if (!items) return undefined;
+
+  for (const item of items) {
+    const itemGet = (item as { get?: (key: string, keep?: boolean) => unknown }).get;
+    if (!itemGet) continue;
+    const nameNode = itemGet.call(item, 'name', true);
+    if (nameNode && String((nameNode as { toJSON?: () => unknown }).toJSON?.() ?? nameNode) === fieldName) {
+      const range = (item as { range?: [number, number, number] }).range;
+      if (range && range.length >= 1) {
+        return offsetToPosition(text, range[0]);
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
  * Try to extract a field name from a Zod error path.
  *
  * Zod error paths look like ['fields', 0, 'type'] or ['primary_key'].
