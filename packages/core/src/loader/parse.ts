@@ -79,7 +79,7 @@ export async function parseAll(opts: ParseOptions): Promise<ParseResult> {
         file: entry.path,
         line: 1,
         column: 1,
-        message: `failed to read: ${(e as Error).message}`,
+        message: `failed to read: ${e instanceof Error ? e.message : String(e)}`,
       });
       continue;
     }
@@ -99,7 +99,7 @@ export async function parseAll(opts: ParseOptions): Promise<ParseResult> {
         file: entry.path,
         line: 1,
         column: 1,
-        message: (e as Error).message,
+        message: e instanceof Error ? e.message : String(e),
       });
     }
   }

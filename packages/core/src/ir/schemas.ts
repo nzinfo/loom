@@ -339,7 +339,7 @@ export function parseFile(text: string, file: string, kind: FileKind): AnyFile {
   try {
     raw = yamlParse(text);
   } catch (e) {
-    throw new ParseError('parse', file, `YAML syntax: ${(e as Error).message}`);
+    throw new ParseError('parse', file, `YAML syntax: ${e instanceof Error ? e.message : String(e)}`);
   }
   if (typeof raw !== 'object' || raw === null) {
     throw new ParseError('parse', file, 'not a YAML mapping');
@@ -355,7 +355,7 @@ export function parseFile(text: string, file: string, kind: FileKind): AnyFile {
   } catch (e) {
     // Zod errors carry full path information; surface the first issue.
     const zodErr = e as { errors?: Array<{ message: string }> };
-    const first = zodErr.errors?.[0]?.message ?? (e as Error).message;
+    const first = zodErr.errors?.[0]?.message ?? (e instanceof Error ? e.message : String(e));
     throw new ParseError('parse', file, `schema: ${first}`);
   }
   return { kind, raw, file, line: 1, column: 1, data } as AnyFile;

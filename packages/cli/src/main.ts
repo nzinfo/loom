@@ -37,7 +37,7 @@ import {
   showTypeCommand,
 } from './commands/show.js';
 import { versionCommand } from './commands/version.js';
-import { parseFlag, parseFlagAll, parseGlobalFlags } from './shared/flags.js';
+import { extractFlags, parseFlag, parseFlagAll, parseGlobalFlags } from './shared/flags.js';
 import { writeError } from './shared/output.js';
 
 function usage(): void {
@@ -150,27 +150,30 @@ async function main(argv: string[]): Promise<number> {
         writeError(`project target must be sql|model, got "${sub ?? ''}"`);
         return 64;
       }
-      const tail = rest.slice(1);
-      const { flags, remaining } = parseGlobalFlags(tail);
-      const dialect = parseFlag(remaining, '--dialect').value;
-      const physicalSchemas = parseFlagAll(remaining, '--physical-schema').values;
-      const { remaining: r2 } = parseFlag(
-        parseFlag(remaining, '--dialect').remaining,
-        '--physical-schema',
-      );
-      const out = parseFlag(r2, '--out').value;
-      const { remaining: r3 } = parseFlag(parseFlag(r2, '--out').remaining, '--physical-schema');
-      const path = r3[0];
-
+      const { values, repeated, positionals } = extractFlags(rest.slice(1), {
+        valueFlags: ['--dialect', '--out'],
+        repeatFlags: ['--physical-schema'],
+        boolFlags: ['--json', '--quiet'],
+      });
+      const path = positionals[0];
       if (path === undefined) {
         writeError('project requires a path');
         return 64;
       }
 
       if (sub === 'sql') {
-        return await projectSqlCommand({ path, dialect, out, physicalSchemas });
+        return await projectSqlCommand({
+          path,
+          dialect: values['--dialect'],
+          out: values['--out'],
+          physicalSchemas: repeated['--physical-schema'] ?? [],
+        });
       }
-      return await projectModelCommand({ path, dialect, physicalSchemas });
+      return await projectModelCommand({
+        path,
+        dialect: values['--dialect'],
+        physicalSchemas: repeated['--physical-schema'] ?? [],
+      });
     }
 
     case 'init': {

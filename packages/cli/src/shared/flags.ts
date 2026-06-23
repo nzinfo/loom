@@ -70,3 +70,66 @@ export function parseEqualsFlag(
   }
   return { values, remaining };
 }
+
+/**
+ * Extract all flags (and their values) from an arg list in a single pass.
+ *
+ * Flags that take a value: `--dialect pg` → { dialect: 'pg' }
+ * Flags that are boolean: `--json` → { json: true }
+ * Repeatable value flags: `--physical-schema a=x` → { physicalSchema: ['a=x'] }
+ * Everything else is a positional arg.
+ *
+ * This replaces the fragile r2/r3 parseFlag chaining in main.ts.
+ */
+export function extractFlags(
+  args: readonly string[],
+  opts: {
+    valueFlags?: readonly string[];
+    boolFlags?: readonly string[];
+    repeatFlags?: readonly string[];
+  },
+): {
+  values: Record<string, string | undefined>;
+  bools: Record<string, boolean>;
+  repeated: Record<string, string[]>;
+  positionals: string[];
+} {
+  const valueFlags = opts.valueFlags ?? [];
+  const boolFlags = opts.boolFlags ?? [];
+  const repeatFlags = opts.repeatFlags ?? [];
+
+  const values: Record<string, string | undefined> = {};
+  const bools: Record<string, boolean> = {};
+  const repeated: Record<string, string[]> = {};
+  const positionals: string[] = [];
+
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!;
+
+    // Boolean flags (--json, --force, etc.)
+    if (boolFlags.includes(a)) {
+      bools[a] = true;
+      continue;
+    }
+
+    // Value flags (--dialect pg, --out file.sql)
+    if (valueFlags.includes(a) && i + 1 < args.length) {
+      values[a] = args[++i];
+      continue;
+    }
+
+    // Repeatable value flags (--physical-schema a=x)
+    if (repeatFlags.includes(a) && i + 1 < args.length) {
+      const key = a;
+      if (!repeated[key]) repeated[key] = [];
+      repeated[key]!.push(args[++i]!);
+      continue;
+    }
+
+    // Positional arg
+    positionals.push(a);
+  }
+
+  return { values, bools, repeated, positionals };
+}
+

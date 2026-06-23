@@ -37,7 +37,7 @@ export function validate(opts: ValidateOptions): ValidateResult {
   for (const [identity, node] of opts.ir.nodes) {
     switch (node.kind) {
       case 'type': {
-        const data = node.data as TypeNode;
+        const data = node.data;
         // enum form (variants) has no typed fields to check.
         if (data.form === 'enum') break;
         for (const f of (data.fields as FieldLike[] | undefined) ?? []) {
@@ -46,7 +46,11 @@ export function validate(opts: ValidateOptions): ValidateResult {
         break;
       }
       case 'table': {
-        checkTable(identity, node.data as Table, scalarReqProps, opts.diagnostics);
+        checkTable(identity, node.data, scalarReqProps, opts.diagnostics);
+        break;
+      }
+      case 'entity': {
+        checkEntity(identity, node.data, opts.ir, opts.diagnostics);
         break;
       }
       default:
@@ -60,7 +64,7 @@ export function validate(opts: ValidateOptions): ValidateResult {
   // primary_table (spec §7, §6.9).
   for (const [entityId, entries] of opts.ir.extensionFields) {
     for (const entry of entries) {
-      checkExtensionEntry(entityId, entry, scalarReqProps, opts.diagnostics);
+      checkExtensionEntry(entityId, entry, scalarReqProps, opts.ir, opts.diagnostics);
     }
     checkExtensionTarget(entityId, opts.ir, opts.diagnostics);
   }
@@ -79,7 +83,7 @@ function collectScalarRequiredProps(ir: IR): Map<string, Set<string>> {
 
   for (const [identity, node] of ir.nodes) {
     if (node.kind !== 'type') continue;
-    const data = node.data as TypeNode;
+    const data = node.data;
     if (data.form !== 'scalar') continue;
     if (!identity.startsWith('type:base.core.')) continue;
     const fqn = identity.slice('type:'.length);
@@ -201,6 +205,44 @@ function checkTable(
   }
 }
 
+
+/**
+ * Validate an entity node.
+ *
+ * Checks that business_keys reference real columns on the primary_table.
+ */
+function checkEntity(
+  identity: string,
+  entity: Entity,
+  ir: IR,
+  diag: Diagnostics,
+): void {
+  if (!entity.business_keys || entity.business_keys.length === 0) return;
+
+  // Resolve the primary_table to get its field names.
+  const tableNode = ir.nodes.get(entity.primary_table);
+  if (!tableNode || tableNode.kind !== 'table') return; // already checked elsewhere
+
+  const table = tableNode.data as Table;
+  const columnNames = new Set<string>();
+  for (const f of table.fields) {
+    const fn = (f as FieldLike).name;
+    if (typeof fn === 'string') columnNames.add(fn);
+  }
+
+  for (const bk of entity.business_keys) {
+    if (!columnNames.has(bk)) {
+      diag.add({
+        category: 'semantic',
+        file: identity,
+        line: 1,
+        column: 1,
+        message: `business_key "${bk}" is not a field on ${entity.primary_table}`,
+      });
+    }
+  }
+}
+
 /**
  * Validate a single extension field entry's scalar type.
  *
@@ -213,9 +255,23 @@ function checkExtensionEntry(
   entityId: string,
   entry: ExtensionFieldEntry,
   scalarReqProps: Map<string, Set<string>>,
+  ir: IR,
   diag: Diagnostics,
 ): void {
-  if (entry.refValueTypeId !== undefined) return; // type ref — checked elsewhere
+  if (entry.refValueTypeId !== undefined) {
+    // Validate the referenced type exists and is a type node.
+    const refNode = ir.nodes.get(entry.refValueTypeId);
+    if (!refNode || refNode.kind !== 'type') {
+      diag.add({
+        category: 'semantic',
+        file: entityId,
+        line: 1,
+        column: 1,
+        message: `extension field "${entry.name}" references unknown type "${entry.refValueTypeId}"`,
+      });
+    }
+    return;
+  }
   if (entry.scalar === '') return;
   if (scalarReqProps.size === 0) return;
   const req = scalarReqProps.get(entry.scalar);
