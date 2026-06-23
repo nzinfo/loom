@@ -2,114 +2,153 @@
 /**
  * loom CLI entry point.
  *
- * Exit codes (spec §16.1):
- *   0  success
- *   1  load / validation failure
- *   2  projection failure
- *   64 usage error
+ * Commands are organized as namespaces:
+ *   loom version
+ *   loom check <path>
+ *   loom list <types|tables|entities|extensions> <path>
+ *   loom show <type|table|entity|graph> <path> [<name>]
+ *   loom project <sql|model> <path> [options]
+ *
+ * Exit codes: 0 success, 1 load/validation failure, 2 projection failure, 64 usage error.
  */
 import process from 'node:process';
 import { checkCommand } from './commands/check.js';
-import { fieldsCommand } from './commands/fields.js';
-import { projectCommand } from './commands/project.js';
+import { listCommand } from './commands/list.js';
+import { projectModelCommand, projectSqlCommand } from './commands/project.js';
+import {
+  showEntityCommand,
+  showGraphCommand,
+  showTableCommand,
+  showTypeCommand,
+} from './commands/show.js';
 import { versionCommand } from './commands/version.js';
+import { parseFlag, parseFlagAll, parseGlobalFlags } from './shared/flags.js';
+import { writeError } from './shared/output.js';
 
 function usage(): void {
   process.stderr.write(`usage: loom <command> [options]
 
 commands:
-  version                                  print version info (spec §16.2)
-  check <path>                             load + validate (spec §8.7)
-  fields <path> <entity>                   inspect an entity's fields (base + ext groups)
-  project sql --dialect <d> [--out <f>] [--physical-schema <mod>=<name>]... <path>   project to SQL DDL (spec §8.8)
-  fmt <path>                               reformat in place (not yet implemented)
-  lift <physical.yaml>                     reverse-lift (not yet implemented)
+  version                                          print version info
+  check [--json] <path>                            load + validate
+  list <types|tables|entities|extensions> [--json] <path>
+  show <type|table> <path> <identity> [--json]      node details
+  show entity <path> <identity> [--json]            entity fields (base + ext groups)
+  show graph <path> [--json]                        dependency graph
+  project sql --dialect <d> [--out <f>] [--physical-schema <m>=<n>]... <path>
+  project model [--dialect <d>] [--json] <path>
 `);
-}
-
-function parseFlag(
-  rest: readonly string[],
-  name: string,
-): { value: string | undefined; remaining: string[] } {
-  const idx = rest.indexOf(name);
-  if (idx < 0) return { value: undefined, remaining: [...rest] };
-  const value = rest[idx + 1];
-  const remaining = [...rest.slice(0, idx), ...rest.slice(idx + 2)];
-  return { value, remaining };
-}
-
-/** Parse all occurrences of a repeatable flag (e.g. --physical-schema a=x --physical-schema b=y). */
-function parseFlagAll(
-  rest: readonly string[],
-  name: string,
-): { values: string[]; remaining: string[] } {
-  const values: string[] = [];
-  let remaining = [...rest];
-  for (;;) {
-    const r = parseFlag(remaining, name);
-    if (r.value === undefined) break;
-    values.push(r.value);
-    remaining = r.remaining;
-  }
-  return { values, remaining };
 }
 
 async function main(argv: string[]): Promise<number> {
   const [, , cmd, ...rest] = argv;
+  if (cmd === undefined || cmd === '-h' || cmd === '--help' || cmd === 'help') {
+    usage();
+    return cmd === undefined ? 64 : 0;
+  }
 
   switch (cmd) {
     case 'version':
       versionCommand();
       return 0;
+
     case 'check': {
-      const path = rest[0];
+      const { flags, remaining } = parseGlobalFlags(rest);
+      const path = remaining[0];
       if (path === undefined) {
-        process.stderr.write('error: check requires a path\n');
+        writeError('check requires a path');
         return 64;
       }
-      return await checkCommand({ path });
+      return await checkCommand({ path, flags });
     }
-    case 'fields': {
-      const path = rest[0];
-      const entity = rest[1];
+
+    case 'list': {
+      const { flags, remaining } = parseGlobalFlags(rest);
+      const kind = remaining[0];
+      const path = remaining[1];
       if (path === undefined) {
-        process.stderr.write('error: fields requires a path and entity identity\n');
+        writeError('list requires a kind (types|tables|entities|extensions) and a path');
         return 64;
       }
-      if (entity === undefined) {
-        process.stderr.write(
-          'error: fields requires an entity identity (e.g. entity:shop.core.Product)\n',
-        );
+      if (!['types', 'tables', 'entities', 'extensions'].includes(kind)) {
+        writeError(`list kind must be types|tables|entities|extensions, got "${kind}"`);
         return 64;
       }
-      return await fieldsCommand({ path, entity });
+      return await listCommand(kind as 'types' | 'tables' | 'entities' | 'extensions', {
+        path,
+        flags,
+      });
     }
+
+    case 'show': {
+      const { flags, remaining } = parseGlobalFlags(rest);
+      const kind = remaining[0];
+      const path = remaining[1];
+      const name = remaining[2];
+
+      if (path === undefined) {
+        writeError('show requires a kind and path');
+        return 64;
+      }
+
+      switch (kind) {
+        case 'entity':
+          if (name === undefined) {
+            writeError('show entity requires an identity (e.g. entity:shop.core.Product)');
+            return 64;
+          }
+          return await showEntityCommand({ path, entity: name, flags });
+        case 'type':
+          if (name === undefined) {
+            writeError('show type requires an identity (e.g. type:shop.core.Money)');
+            return 64;
+          }
+          return await showTypeCommand({ path, identity: name, flags });
+        case 'table':
+          if (name === undefined) {
+            writeError('show table requires an identity (e.g. table:shop.core.Products)');
+            return 64;
+          }
+          return await showTableCommand({ path, identity: name, flags });
+        case 'graph':
+          return await showGraphCommand({ path, flags });
+        default:
+          writeError(`show kind must be type|table|entity|graph, got "${kind}"`);
+          return 64;
+      }
+    }
+
     case 'project': {
       const sub = rest[0];
-      if (sub !== 'sql') {
-        process.stderr.write(`error: unknown project target "${sub ?? ''}"\n`);
+      if (sub !== 'sql' && sub !== 'model') {
+        writeError(`project target must be sql|model, got "${sub ?? ''}"`);
         return 64;
       }
       const tail = rest.slice(1);
-      const dialect = parseFlag(tail, '--dialect').value;
-      const out = parseFlag(tail, '--out').value;
-      const physicalSchemas = parseFlagAll(tail, '--physical-schema').values;
-      const { remaining } = parseFlag(parseFlag(tail, '--dialect').remaining, '--out');
-      const path = remaining[0];
+      const { flags, remaining } = parseGlobalFlags(tail);
+      const dialect = parseFlag(remaining, '--dialect').value;
+      const physicalSchemas = parseFlagAll(remaining, '--physical-schema').values;
+      const { remaining: r2 } = parseFlag(
+        parseFlag(remaining, '--dialect').remaining,
+        '--physical-schema',
+      );
+      const out = parseFlag(r2, '--out').value;
+      const { remaining: r3 } = parseFlag(parseFlag(r2, '--out').remaining, '--physical-schema');
+      const path = r3[0];
+
       if (path === undefined) {
-        process.stderr.write('error: project requires a path\n');
+        writeError('project requires a path');
         return 64;
       }
-      return await projectCommand({ path, dialect, out, physicalSchemas });
+
+      if (sub === 'sql') {
+        return await projectSqlCommand({ path, dialect, out, physicalSchemas });
+      }
+      return await projectModelCommand({ path, dialect, physicalSchemas });
     }
-    case undefined:
-    case '-h':
-    case '--help':
-    case 'help':
-      usage();
-      return 64;
+
     default:
-      process.stderr.write(`error: unknown command "${cmd}"\n\n`);
+      writeError(`unknown command "${cmd}"`);
       usage();
       return 64;
   }

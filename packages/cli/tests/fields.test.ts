@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { fieldsCommand } from '../src/commands/fields.js';
+import { describe, expect, it } from 'vitest';
+import { showEntityCommand } from '../src/commands/show.js';
 
 const exampleRoot = resolve(__dirname, '../../../examples/product');
 
@@ -13,31 +13,33 @@ function captureStdout(fn: () => Promise<number>): { code: number; output: strin
     else chunks.push(chunk as Buffer);
     return true;
   }) as typeof process.stdout.write;
-  let code = -1;
   return fn()
-    .then((c) => {
-      code = c;
-      return { code, output: Buffer.concat(chunks).toString('utf-8') };
-    })
+    .then((code) => ({
+      code,
+      output: Buffer.concat(chunks).toString('utf-8'),
+    }))
     .finally(() => {
       process.stdout.write = orig;
     });
 }
 
-describe('loom fields command', () => {
+const jsonOff = { json: false, quiet: false };
+
+describe('loom show entity', () => {
   it('shows base fields + ext groups for a valid entity', async () => {
     const { code, output } = await captureStdout(() =>
-      fieldsCommand({ path: exampleRoot, entity: 'entity:shop.core.Product' }),
+      showEntityCommand({
+        path: exampleRoot,
+        entity: 'entity:shop.core.Product',
+        flags: jsonOff,
+      }),
     );
     expect(code).toBe(0);
-    // Entity + table header
     expect(output).toContain('entity: shop.core.Product');
     expect(output).toContain('table: products_base');
-    // Base fields
     expect(output).toContain('base fields');
     expect(output).toContain('id');
     expect(output).toContain('base_price_amount');
-    // Extension groups with owner source
     expect(output).toContain('group: inventory (ext:provider-a)');
     expect(output).toContain('sku');
     expect(output).toContain('group: pricing (ext:provider-b)');
@@ -48,7 +50,11 @@ describe('loom fields command', () => {
 
   it('returns 64 for a non-existent entity', async () => {
     const { code } = await captureStdout(() =>
-      fieldsCommand({ path: exampleRoot, entity: 'entity:shop.core.Nope' }),
+      showEntityCommand({
+        path: exampleRoot,
+        entity: 'entity:shop.core.Nope',
+        flags: jsonOff,
+      }),
     );
     expect(code).toBe(64);
   });

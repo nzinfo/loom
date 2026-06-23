@@ -1,70 +1,34 @@
+/**
+ * `loom project sql` — project schema to SQL DDL.
+ * `loom project model` — output physical model as JSON.
+ */
 import { createWriteStream } from 'node:fs';
-import type { Dirent } from 'node:fs';
-import * as fs from 'node:fs/promises';
-/** `loom project sql --dialect <pg|mysql|sqlite> [--out <file>] [--physical-schema <mod>=<name>]... <path>`. See spec §8.8. */
 import process from 'node:process';
 import type { Writable } from 'node:stream';
-import { load, projectSqlFromIr } from '@loom/core';
-import type { Dialect, FileSystem } from '@loom/core';
-
-class NodeFileSystem implements FileSystem {
-  async readFile(path: string): Promise<Uint8Array> {
-    return fs.readFile(path);
-  }
-  async *listFiles(dir: string): AsyncIterable<string> {
-    const stack: string[] = [dir];
-    while (stack.length > 0) {
-      const current = stack.pop();
-      if (current === undefined) return;
-      let entries: Dirent[];
-      try {
-        entries = await fs.readdir(current, { withFileTypes: true });
-      } catch {
-        continue;
-      }
-      for (const entry of entries) {
-        const full = `${current}/${entry.name}`;
-        if (entry.isDirectory()) stack.push(full);
-        else if (entry.isFile() && (entry.name.endsWith('.yaml') || entry.name.endsWith('.yml')))
-          yield full;
-      }
-    }
-  }
-  async stat(path: string): Promise<{ mtimeMs: number; size: number }> {
-    const s = await fs.stat(path);
-    return { mtimeMs: s.mtimeMs, size: s.size };
-  }
-}
+import { expandTables, load, projectSqlFromIr } from '@loom/core';
+import type { Dialect } from '@loom/core';
+import { NodeFileSystem } from '../shared/fs.js';
+import { writeError } from '../shared/output.js';
+import { projectModelJson } from './project_model.js';
 
 const DIALECTS: readonly Dialect[] = ['pg', 'mysql', 'sqlite'];
 
-export interface ProjectOptions {
+export interface ProjectSqlOptions {
   readonly path: string;
   readonly dialect: string | undefined;
   readonly out: string | undefined;
-  /** Repeatable `--physical-schema <mod.fqn>=<schema>` overrides. */
   readonly physicalSchemas: readonly string[];
 }
 
-export async function projectCommand(opts: ProjectOptions): Promise<number> {
+export async function projectSqlCommand(opts: ProjectSqlOptions): Promise<number> {
   if (opts.dialect === undefined || !DIALECTS.includes(opts.dialect as Dialect)) {
-    process.stderr.write(`error: --dialect must be one of ${DIALECTS.join(', ')}\n`);
+    writeError(`--dialect must be one of ${DIALECTS.join(', ')}`);
     return 64;
   }
   const dialect = opts.dialect as Dialect;
 
-  // Parse --physical-schema <module.fqn>=<schema> overrides into a map.
-  const physicalSchemaOverrides = new Map<string, string>();
-  for (const spec of opts.physicalSchemas) {
-    const eq = spec.indexOf('=');
-    if (eq <= 0) {
-      process.stderr.write(
-        `error: --physical-schema expects "<module.fqn>=<name>", got "${spec}"\n`,
-      );
-      return 64;
-    }
-    physicalSchemaOverrides.set(spec.slice(0, eq), spec.slice(eq + 1));
-  }
+  const physicalSchemaOverrides = parsePhysicalSchemas(opts.physicalSchemas);
+  if (physicalSchemaOverrides === null) return 64;
 
   const result = await load({ fs: new NodeFileSystem(), basePath: opts.path });
   if (result.diagnostics.hasErrors) {
@@ -80,8 +44,49 @@ export async function projectCommand(opts: ProjectOptions): Promise<number> {
   await new Promise<void>((resolve, reject) => {
     sink.write(sql, (err) => (err ? reject(err) : resolve()));
   });
-  if (opts.out) {
-    sink.end();
-  }
+  if (opts.out) sink.end();
   return 0;
+}
+
+export interface ProjectModelOptions {
+  readonly path: string;
+  readonly dialect: string | undefined;
+  readonly physicalSchemas: readonly string[];
+}
+
+export async function projectModelCommand(opts: ProjectModelOptions): Promise<number> {
+  const dialect = (opts.dialect ?? 'pg') as Dialect;
+  if (!DIALECTS.includes(dialect)) {
+    writeError(`--dialect must be one of ${DIALECTS.join(', ')}`);
+    return 64;
+  }
+
+  const physicalSchemaOverrides = parsePhysicalSchemas(opts.physicalSchemas);
+  if (physicalSchemaOverrides === null) return 64;
+
+  const result = await load({ fs: new NodeFileSystem(), basePath: opts.path });
+  if (result.diagnostics.hasErrors) {
+    process.stderr.write(result.diagnostics.format());
+    process.stderr.write('\n');
+    return 1;
+  }
+
+  const projectOpts = physicalSchemaOverrides.size > 0 ? { physicalSchemaOverrides } : undefined;
+  const model = expandTables(result.ir, projectOpts);
+  const json = projectModelJson(result.ir, model, dialect);
+  process.stdout.write(`${JSON.stringify(json, null, 2)}\n`);
+  return 0;
+}
+
+function parsePhysicalSchemas(specs: readonly string[]): Map<string, string> | null {
+  const map = new Map<string, string>();
+  for (const spec of specs) {
+    const eq = spec.indexOf('=');
+    if (eq <= 0) {
+      writeError(`--physical-schema expects "<module.fqn>=<name>", got "${spec}"`);
+      return null;
+    }
+    map.set(spec.slice(0, eq), spec.slice(eq + 1));
+  }
+  return map;
 }

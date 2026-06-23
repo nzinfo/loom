@@ -1,70 +1,39 @@
-import type { Dirent } from 'node:fs';
-import * as fs from 'node:fs/promises';
+/** `loom check <path>` — load + validate. */
 import process from 'node:process';
-import { createInterface } from 'node:readline';
-/** `loom check` — load + validate. See spec §8.7. */
-import { type FileSystem, load } from '@loom/core';
-
-/** Node.js FileSystem adapter implementing @loom/core's FileSystem interface. */
-class NodeFileSystem implements FileSystem {
-  async readFile(path: string): Promise<Uint8Array> {
-    return fs.readFile(path);
-  }
-
-  async *listFiles(dir: string): AsyncIterable<string> {
-    const stack: string[] = [dir];
-    while (stack.length > 0) {
-      const current = stack.pop();
-      if (current === undefined) return;
-      let entries: Dirent[];
-      try {
-        entries = await fs.readdir(current, { withFileTypes: true });
-      } catch {
-        continue;
-      }
-      for (const entry of entries) {
-        const full = `${current}/${entry.name}`;
-        if (entry.isDirectory()) {
-          stack.push(full);
-        } else if (
-          entry.isFile() &&
-          (entry.name.endsWith('.yaml') || entry.name.endsWith('.yml'))
-        ) {
-          yield full;
-        }
-      }
-    }
-  }
-
-  async stat(path: string): Promise<{ mtimeMs: number; size: number }> {
-    const s = await fs.stat(path);
-    return { mtimeMs: s.mtimeMs, size: s.size };
-  }
-}
+import { load } from '@loom/core';
+import type { GlobalFlags } from '../shared/flags.js';
+import { NodeFileSystem } from '../shared/fs.js';
+import { writeError, writeJson, writeText } from '../shared/output.js';
 
 export interface CheckOptions {
   readonly path: string;
-  /** Restrict to these systems. */
-  readonly systems?: readonly string[];
+  readonly flags: GlobalFlags;
 }
 
 export async function checkCommand(opts: CheckOptions): Promise<number> {
-  const result = await load({
-    fs: new NodeFileSystem(),
-    basePath: opts.path,
-    ...(opts.systems !== undefined ? { systemFilter: opts.systems } : {}),
-  });
+  const result = await load({ fs: new NodeFileSystem(), basePath: opts.path });
 
   if (result.diagnostics.hasErrors) {
-    process.stderr.write(result.diagnostics.format());
-    process.stderr.write('\n');
+    if (opts.flags.json) {
+      const diags = [...result.diagnostics.items].map((d) => ({
+        category: d.category,
+        file: d.file,
+        line: d.line,
+        column: d.column,
+        message: d.message,
+      }));
+      writeJson({ ok: false, path: opts.path, diagnostics: diags });
+    } else {
+      process.stderr.write(result.diagnostics.format());
+      process.stderr.write('\n');
+    }
     return 1;
   }
 
-  process.stdout.write(`ok: ${opts.path}\n`);
+  if (opts.flags.json) {
+    writeJson({ ok: true, path: opts.path });
+  } else {
+    writeText(`ok: ${opts.path}`);
+  }
   return 0;
 }
-
-// Silence unused-import warning for the readline placeholder (will be used
-// when adding stdin streaming in later phases).
-void createInterface;
