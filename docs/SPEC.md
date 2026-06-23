@@ -334,9 +334,13 @@ core 包环境无关——文件系统通过 `FileSystem` 接口注入（支持 
 
 ### 短期待办
 
-- **FK 跨 kind 解析**——`foreign_keys.ref_table` 支持 `entity:` refs，解析为
-  `primary_table` 的物理表名。同时保留 `table:` refs 的直接引用行为（两种并存）
 - **using 形态 C（重命名）**——`using base.core.Money as M` 解决短名冲突
+
+### 设计说明：FK 引用层级
+
+FK 定义在 table 层面，`ref_table` 直接写物理表名是正确行为——table 是物理结构层，
+引用物理表名天然匹配。未来如引入 Model 层（比 entity 更高的抽象），`entity:` 引用
+解析才会在那个层面启用，不在当前 table 层处理。
 
 ### 中期计划
 
