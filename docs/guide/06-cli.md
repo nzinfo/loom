@@ -172,6 +172,44 @@ loom rm field my-shop/ table:shop.core.Orders total
 | `--args key=value` | 类型参数（如 `--args max_length=255 precision=18 scale=4`） |
 | `--column <name>` | 物理列名覆盖 |
 
+## 调整字段顺序
+
+字段的声明顺序决定了投影后 SQL 列的顺序（影响 `SELECT *` 列序、diff 友好性）。
+提供两种调整方式：
+
+### move field——移动单个字段
+
+```sh
+loom move field <path> <target> <field> --after <other>
+loom move field <path> <target> <field> --before <other>
+loom move field <path> <target> <field> --first
+loom move field <path> <target> <field> --last
+```
+
+```sh
+# 把 total 移到 name 后面
+loom move field my-shop/ table:shop.core.Orders total --after name
+
+# 把 created_at 移到最前
+loom move field my-shop/ type:shop.core.Audit created_at --first
+```
+
+### order fields——一次性重排全部字段
+
+给出期望的完整字段顺序，CLI 据此重排。适合 AI agent 批量调整——先 `show` 拿到
+当前顺序，调整后一次性设定：
+
+```sh
+loom order fields <path> <target> <field1> <field2> <field3> ...
+```
+
+```sh
+# 重新排列 Orders 的字段顺序
+loom order fields my-shop/ table:shop.core.Orders id name total status created_at
+```
+
+必须列出全部字段（不能遗漏或多余），否则报错——防止意外丢失字段。
+
 ## 删除节点
 
 ```sh
