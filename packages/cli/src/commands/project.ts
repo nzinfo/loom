@@ -71,8 +71,11 @@ export async function projectModelCommand(opts: ProjectModelOptions): Promise<nu
     return 1;
   }
 
-  const projectOpts = physicalSchemaOverrides.size > 0 ? { physicalSchemaOverrides } : undefined;
-  const model = expandTables(result.ir, projectOpts);
+  const projectOpts = physicalSchemaOverrides.size > 0 ? physicalSchemaOverrides : undefined;
+  const model = expandTables(
+    result.ir,
+    physicalSchemaOverrides.size > 0 ? physicalSchemaOverrides : undefined,
+  );
   const json = projectModelJson(result.ir, model, dialect);
   process.stdout.write(`${JSON.stringify(json, null, 2)}\n`);
   return 0;

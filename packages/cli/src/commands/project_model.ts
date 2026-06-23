@@ -103,7 +103,16 @@ export function projectModelJson(ir: IR, model: PhysicalModel, dialect: Dialect)
 }
 
 function serializeTable(t: PhysicalModel['tables'][number]): TableJson {
-  const table: TableJson = {
+  const extension =
+    t.strategy !== 'none'
+      ? {
+          strategy: t.strategy,
+          ...(t.extTableName ? { extTable: t.extTableName } : {}),
+          ...(t.viewName ? { view: t.viewName } : {}),
+        }
+      : undefined;
+
+  return {
     name: t.name,
     schema: t.schema ?? '',
     qualifiedName: t.qualifiedName,
@@ -121,15 +130,8 @@ function serializeTable(t: PhysicalModel['tables'][number]): TableJson {
       refColumns: fk.refColumns,
       ...(fk.onDelete ? { onDelete: fk.onDelete } : {}),
     })),
+    ...(extension ? { extension } : {}),
   };
-
-  if (t.strategy !== 'none') {
-    const ext: ExtMetaJson = { strategy: t.strategy };
-    if (t.extTableName) ext.extTable = t.extTableName;
-    if (t.viewName) ext.view = t.viewName;
-    table.extension = ext;
-  }
-  return table;
 }
 
 function serializeColumn(c: PhysicalColumn): ColumnJson {

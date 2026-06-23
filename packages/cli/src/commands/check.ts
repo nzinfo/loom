@@ -15,7 +15,7 @@ export async function checkCommand(opts: CheckOptions): Promise<number> {
 
   if (result.diagnostics.hasErrors) {
     if (opts.flags.json) {
-      const diags = [...result.diagnostics.items].map((d) => ({
+      const diags = [...result.diagnostics.errors].map((d) => ({
         category: d.category,
         file: d.file,
         line: d.line,

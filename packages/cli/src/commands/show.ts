@@ -194,7 +194,7 @@ function buildGroups(extFields: readonly ExtensionFieldEntry[] | undefined): Gro
   }
   return groupOrder.map((name) => ({
     name,
-    owner: byGroup.get(name)![0] ? formatOwner(byGroup.get(name)![0].owner) : 'unknown',
+    owner: byGroup.get(name)?.[0] ? formatOwner(byGroup.get(name)![0]!.owner) : 'unknown',
     fields: byGroup.get(name)!,
   }));
 }
