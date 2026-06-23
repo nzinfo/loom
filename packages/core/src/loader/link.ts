@@ -163,6 +163,9 @@ function collectExtensionFields(
   const byEntity = new Map<Identity, ExtensionFieldEntry[]>();
   // Track which file first contributed each (entity, fieldName) for error msgs.
   const seen = new Map<string, string>();
+  // Track (entity, group, ownerKey) → file to detect duplicate groups
+  // from the same owner on the same entity.
+  const groupOwners = new Map<string, string>();
 
   for (const { identity, file } of extensionFieldsFiles) {
     const ef = file.data as ExtensionFields;
@@ -175,6 +178,29 @@ function collectExtensionFields(
         ?.replace(/\.ext\.ya?ml$/, '') ?? 'default';
     const group = ef.group ?? fileStem;
     const owner = ownerOfFile(file.file, files);
+    const ownerKey =
+      owner.kind === 'platform'
+        ? 'platform'
+        : owner.kind === 'ext'
+          ? `ext:${owner.provider}`
+          : `tenant:${owner.id}`;
+
+    // Check for duplicate group from the same owner on the same entity.
+    // Different owners can have the same group name (different scope rows),
+    // but the same owner declaring the same group twice is ambiguous.
+    const groupKey = `${entityRef}::${group}::${ownerKey}`;
+    const prevGroupFile = groupOwners.get(groupKey);
+    if (prevGroupFile !== undefined) {
+      const p = file.sourceText ? findPosition(file.sourceText, 'group') : undefined;
+      diag.add({
+        category: 'schema',
+        file: identity,
+        line: p?.line ?? 1,
+        column: p?.column ?? 1,
+        message: `duplicate group "${group}" from ${ownerKey} on entity ${entityRef} (also declared in ${prevGroupFile})`,
+      });
+    }
+    groupOwners.set(groupKey, identity);
 
     let bucket = byEntity.get(entityRef);
     if (bucket === undefined) {

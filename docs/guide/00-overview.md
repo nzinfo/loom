@@ -25,6 +25,7 @@ loom project sql --dialect pg examples/product/
 | [03 表与实体](./03-table-entity.md) | table 物理结构、entity 业务身份、扩展策略 |
 | [04 扩展字段](./04-extension-fields.md) | JSONB 扩展组、group/scope、多 provider 叠加 |
 | [05 完整示例](./05-full-example.md) | `examples/product/` 全文解读 |
-| [06 CLI 命令](./06-cli.md) | version / check / fields / project |
+| [06 CLI 命令](./06-cli.md) | version / check / list / show / project / init / new / add / rm / fmt |
+| [07 CI 集成](./07-ci.md) | GitHub Actions、pre-commit、diff-stability |
 
 > 完整技术规范见 [`SPEC.md`](../SPEC.md)。本手册是用户向的教程，不暴露实现细节。

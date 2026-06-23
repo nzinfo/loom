@@ -80,9 +80,45 @@ export function validate(opts: ValidateOptions): ValidateResult {
       checkExtensionEntry(entityId, entry, scalarReqProps, opts.ir, opts.diagnostics);
     }
     checkExtensionTarget(entityId, opts.ir, opts.diagnostics);
+
+    // Check for struct-expansion name collisions: two extension fields that
+    // produce the same JSON key after expansion.
+    const jsonKeys = new Map<string, string>();
+    for (const entry of entries) {
+      const keys = expandEntryKeys(entry, opts.ir);
+      for (const key of keys) {
+        const prev = jsonKeys.get(key);
+        if (prev !== undefined) {
+          opts.diagnostics.add({
+            category: 'schema',
+            file: entityId,
+            line: 1,
+            column: 1,
+            message: `extension field key collision: "${key}" produced by both "${prev}" and "${entry.name}" on entity ${entityId}`,
+          });
+        } else {
+          jsonKeys.set(key, entry.name);
+        }
+      }
+    }
   }
 
   return { diagnostics: opts.diagnostics };
+}
+
+/**
+ * Expand an extension field entry into its JSON key names.
+ * Scalar fields → [name]. Struct refs → [name_subfield, ...].
+ */
+function expandEntryKeys(
+  entry: ExtensionFieldEntry,
+  ir: IR,
+): string[] {
+  if (!entry.refValueTypeId) return [entry.name];
+  const node = ir.nodes.get(entry.refValueTypeId);
+  if (node?.kind !== 'type') return [entry.name];
+  const fields = (node.data as { fields?: ReadonlyArray<{ name: string }> }).fields ?? [];
+  return fields.map((f) => `${entry.name}_${f.name}`);
 }
 
 /** Collect scalar (form: scalar) required-properties, keyed by BOTH the
