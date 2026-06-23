@@ -29,6 +29,7 @@ import {
 } from './commands/new.js';
 import { projectModelCommand, projectSqlCommand } from './commands/project.js';
 import { rmExtensionCommand, rmNodeCommand } from './commands/rm.js';
+import { updateTableCommand } from './commands/update.js';
 import {
   showEntityCommand,
   showGraphCommand,
@@ -60,7 +61,8 @@ commands:
   rm field <path> <target> <name>
   move field <path> <target> <field> <--after|--before|--first|--last <ref>
   order fields <path> <target> <f1> <f2> ...
-  rm <type|table|entity> <path> <identity> [--force]
+  rm <type|table|entity|extension> <path> [--entity <e>] [--group <g>] [--force]
+  update table <path> <identity> --strategy <none|sidecar_eav|json_column>
 `);
 }
 
@@ -403,6 +405,23 @@ async function main(argv: string[]): Promise<number> {
         return 64;
       }
       return await orderFieldsCommand({ path, target, order: fieldOrder });
+    }
+
+    case 'update': {
+      const sub = rest[0];
+      if (sub !== 'table') {
+        writeError(`update requires "table", got "${sub ?? ''}"`);
+        return 64;
+      }
+      const tail = rest.slice(1);
+      const strategyFlag = parseFlag(tail, '--strategy').value;
+      const positionals = tail.filter((a) => !a.startsWith('--') && a !== strategyFlag);
+      const [path, identity] = positionals;
+      if (path === undefined || identity === undefined) {
+        writeError('update table requires <path> <identity> --strategy <s>');
+        return 64;
+      }
+      return await updateTableCommand({ path, identity, strategy: strategyFlag });
     }
 
     default:

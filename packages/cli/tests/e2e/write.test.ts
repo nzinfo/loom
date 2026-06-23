@@ -7,7 +7,7 @@
 import * as fs from 'node:fs';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { cleanupTmpDirs, runLoom, tmpProject } from './helpers.js';
+import { cleanupTmpDirs, repoRoot, runLoom, tmpProject } from './helpers.js';
 
 afterAll(() => cleanupTmpDirs());
 
@@ -254,5 +254,28 @@ describe('e2e: move field --before', () => {
     const cityIdx = names.indexOf('city');
     const countryIdx = names.indexOf('country');
     expect(countryIdx).toBe(cityIdx - 1);
+  });
+});
+
+describe('e2e: update table strategy constraint', () => {
+  it('blocks strategy change when entity has extension fields', async () => {
+    const productDir = repoRoot('examples/product');
+    const blocked = await runLoom([
+      'update', 'table', productDir, 'table:shop.core.Products', '--strategy', 'none',
+    ]);
+    expect(blocked.exitCode).toBe(3);
+    expect(blocked.stderr).toContain('extension field');
+    expect(blocked.stderr).toContain('rm extension');
+  });
+
+  it('allows strategy change when no extensions exist', async () => {
+    const dir = tmpProject();
+    await runLoom(['init', dir, '--system', 'shop', '--module', 'core', '--no-example']);
+    await runLoom(['new', 'table', dir, 'shop.core.Items']);
+    await runLoom(['new', 'entity', dir, 'shop.core.Item', '--table', 'table:shop.core.Items']);
+    const r = await runLoom([
+      'update', 'table', dir, 'table:shop.core.Items', '--strategy', 'none',
+    ]);
+    expect(r.exitCode).toBe(0);
   });
 });
