@@ -16,6 +16,7 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0"
+    "@types/node": "^22.10.0",
+    "execa": "^9.6.1"
   }
 }

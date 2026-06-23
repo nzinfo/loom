@@ -7,5 +7,8 @@ export default defineConfig({
     globals: false,
     environment: 'node',
     include: ['packages/**/tests/**/*.test.ts'],
+    // E2E tests spawn tsx subprocesses (~1.2s each); lifecycle tests chain
+    // many commands in a single test, so they need generous timeouts.
+    testTimeout: 60000,
   },
 });
