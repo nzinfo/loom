@@ -92,9 +92,12 @@ function extTableBlock(t: PhysicalTable): string {
   const schema = t.schema !== undefined ? `${t.schema}.` : '';
   const extQual = `${schema}${t.extTableName}`;
   const pkCols = t.sidecarPkColumns ?? ['base_id'];
+  const pkScalars = t.sidecarPkScalars ?? pkCols.map(() => 'bigint');
+  const pkProps = t.sidecarPkProps ?? pkCols.map(() => ({}));
   const body: string[] = [];
   for (let i = 0; i < pkCols.length; i++) {
-    body.push(`  base_id_${i} BIGINT NOT NULL`);
+    const sqlType = scalarToSql(pkScalars[i] ?? 'bigint', pkProps[i] ?? {}, 'pg');
+    body.push(`  base_id_${i} ${sqlType} NOT NULL`);
   }
   body.push('  source CHAR(16) NOT NULL');
   body.push("  values JSONB NOT NULL DEFAULT '{}'::jsonb");
@@ -105,7 +108,16 @@ function extTableBlock(t: PhysicalTable): string {
   lines.push(body.join(',\n'));
   lines.push(');');
   // Index on base_id columns + source for efficient lookup.
-  lines.push(`CREATE INDEX idx_${t.extTableName}_source ON ${extQual} (base_id_0${pkCols.length > 1 ? ', ' + pkCols.slice(1).map((_, i) => `base_id_${i + 1}`).join(', ') : ''}, source);`);
+  const extraPkCols =
+    pkCols.length > 1
+      ? `, ${pkCols
+          .slice(1)
+          .map((_, i) => `base_id_${i + 1}`)
+          .join(', ')}`
+      : '';
+  lines.push(
+    `CREATE INDEX idx_${t.extTableName}_source ON ${extQual} (base_id_0${extraPkCols}, source);`,
+  );
   return lines.join('\n');
 }
 

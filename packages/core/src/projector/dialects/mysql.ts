@@ -67,12 +67,15 @@ function extTableBlock(t: PhysicalTable): string {
   const lines: string[] = [];
   lines.push(`CREATE TABLE ${extQual} (`);
   const pkCols = t.sidecarPkColumns ?? ['base_id'];
+  const pkScalars = t.sidecarPkScalars ?? pkCols.map(() => 'bigint');
+  const pkProps = t.sidecarPkProps ?? pkCols.map(() => ({}));
   const body: string[] = [];
   for (let i = 0; i < pkCols.length; i++) {
-    body.push(`  base_id_${i} BIGINT NOT NULL`);
+    const sqlType = scalarToSql(pkScalars[i] ?? 'bigint', pkProps[i] ?? {}, 'mysql');
+    body.push(`  base_id_${i} ${sqlType} NOT NULL`);
   }
-  body.push("  source CHAR(16) NOT NULL");
-  body.push("  values JSON NOT NULL DEFAULT (JSON_OBJECT())");
+  body.push('  source CHAR(16) NOT NULL');
+  body.push('  values JSON NOT NULL DEFAULT (JSON_OBJECT())');
   body.push('  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)');
   lines.push(body.join(',\n'));
   lines.push(');');

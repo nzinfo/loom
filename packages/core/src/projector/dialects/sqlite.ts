@@ -80,11 +80,13 @@ function extTableBlock(t: PhysicalTable): string {
   const lines: string[] = [];
   lines.push(`CREATE TABLE ${extQual} (`);
   const pkCols = t.sidecarPkColumns ?? ['base_id'];
+  const pkScalars = t.sidecarPkScalars ?? pkCols.map(() => 'bigint');
   const body: string[] = [];
   for (let i = 0; i < pkCols.length; i++) {
-    body.push(`  base_id_${i} INTEGER NOT NULL`);
+    const sqlType = scalarToSql(pkScalars[i] ?? 'bigint', {}, 'sqlite');
+    body.push(`  base_id_${i} ${sqlType} NOT NULL`);
   }
-  body.push("  source TEXT NOT NULL");
+  body.push('  source TEXT NOT NULL');
   body.push("  values TEXT NOT NULL DEFAULT '{}'");
   body.push("  created_at TEXT NOT NULL DEFAULT (datetime('now'))");
   lines.push(body.join(',\n'));

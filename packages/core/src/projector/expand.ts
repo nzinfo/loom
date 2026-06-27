@@ -170,8 +170,7 @@ function expandTable(
   });
 
   // Resolve sidecar ext table name: ext-declared > table's default_ext_table > legacy ext_table > auto-derive.
-  const defaultExtTable =
-    data.default_ext_table ?? data.extension?.ext_table ?? `${tableName}_ext`;
+  const defaultExtTable = data.default_ext_table ?? data.extension?.ext_table ?? `${tableName}_ext`;
   const view = tableToView?.get(node.identity);
 
   // Process extensions for this table's entity.
@@ -181,14 +180,7 @@ function expandTable(
 
   // Process new_table extensions — generate separate PhysicalTable entries.
   if (extEntries) {
-    const newTableExts = collectNewTableExts(
-      extEntries,
-      data,
-      ir,
-      enums,
-      schema,
-      qualifiedName,
-    );
+    const newTableExts = collectNewTableExts(extEntries, data, ir, enums, schema, qualifiedName);
     if (extTablesOutput && newTableExts.length > 0) {
       extTablesOutput.push(...newTableExts);
     }
@@ -207,6 +199,22 @@ function expandTable(
     }
   }
 
+  // Compute PK scalars/props for sidecar base_id column types.
+  // Without this, dialects hardcode BIGINT/INTEGER and produce type-mismatched
+  // JOINs when the base PK is a string (e.g. uuid stored as VARCHAR(36)).
+  let sidecarPkScalars: readonly string[] | undefined;
+  let sidecarPkProps: readonly Readonly<Record<string, unknown>>[] | undefined;
+  if (sidecarExtTable) {
+    const pkResolved = data.primary_key.map((pkName) => {
+      const field = data.fields.find((f) => String(f.name) === pkName);
+      if (!field) return { scalar: 'string', props: {} as Record<string, unknown> };
+      const desc = descriptorOf(field);
+      return { scalar: scalarNameOf(desc.ref, ir), props: desc.args ?? {} };
+    });
+    sidecarPkScalars = pkResolved.map((p) => p.scalar);
+    sidecarPkProps = pkResolved.map((p) => p.props);
+  }
+
   const base: PhysicalTable = {
     name: tableName,
     schema,
@@ -219,6 +227,8 @@ function expandTable(
     ...(sidecarExtTable ? { extTableName: sidecarExtTable } : {}),
     ...(view ? { viewName: view } : {}),
     ...(sidecarExtTable ? { sidecarPkColumns: data.primary_key } : {}),
+    ...(sidecarPkScalars ? { sidecarPkScalars } : {}),
+    ...(sidecarPkProps ? { sidecarPkProps } : {}),
   };
 
   return base;
@@ -274,7 +284,8 @@ function collectNewTableExts(
     // Auto-inject FK columns at head (reuse base PK column names).
     const fkColumns: PhysicalColumn[] = [];
     for (let i = 0; i < pkColumns.length; i++) {
-      const pkName = pkColumns[i]!;
+      const pkName = pkColumns[i];
+      if (pkName === undefined) continue;
       const pkDesc = pkTypes[i];
       // Resolve PK scalar name for dialect.
       const pkScalar = pkDesc ? scalarNameOf(pkDesc.ref, ir) : 'string';
@@ -311,8 +322,8 @@ function collectNewTableExts(
             };
             const expanded = expandValueColumns(ext.name, vtNodeForField);
             for (let idx = 0; idx < expanded.length; idx++) {
-              const col = expanded[idx]!;
-              if (injectedNames.has(col.name)) continue;
+              const col = expanded[idx];
+              if (col === undefined || injectedNames.has(col.name)) continue;
               const subField = fields[idx] as Record<string, unknown>;
               const subDesc = descriptorOf(subField);
               const subScalar = scalarNameOf(subDesc.ref, ir);

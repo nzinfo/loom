@@ -15,7 +15,12 @@ export type { EnumVariant };
 /** Strategy for storing extension_fields.
  * - 'none' / 'json_column' / 'sidecar_eav': legacy table-level strategies (backward compat)
  * - 'sidecar_jsonb' / 'new_table': ext-level strategies (ext-strategy-decoupling) */
-export type ExtensionStrategy = 'none' | 'json_column' | 'sidecar_eav' | 'sidecar_jsonb' | 'new_table';
+export type ExtensionStrategy =
+  | 'none'
+  | 'json_column'
+  | 'sidecar_eav'
+  | 'sidecar_jsonb'
+  | 'new_table';
 
 /**
  * A physical column in a database table.
@@ -89,6 +94,14 @@ export interface PhysicalTable {
   /** If strategy=sidecar_jsonb, the base PK column names (for generating
    * base_id_0..N in the ext table). Copied from primaryKey for sidecar tables. */
   readonly sidecarPkColumns?: readonly string[];
+  /** If strategy=sidecar_jsonb, the base PK column scalars (parallel to
+   * sidecarPkColumns). Drives the base_id_N column TYPE per dialect instead
+   * of hardcoding BIGINT/INTEGER. Without this, dialects emit mismatched
+   * types (e.g. BIGINT base_id for a VARCHAR base PK → JOIN type errors). */
+  readonly sidecarPkScalars?: readonly string[];
+  /** Props (max_length, precision, scale, ...) parallel to sidecarPkColumns.
+   * Needed because some scalars (string) require args to emit a SQL type. */
+  readonly sidecarPkProps?: readonly Readonly<Record<string, unknown>>[];
 }
 
 /**

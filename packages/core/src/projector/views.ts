@@ -16,14 +16,16 @@
  */
 import type { Entity } from '../ir/schemas.js';
 import type { IR } from '../ir/version.js';
-import type { ExtensionFieldEntry, PhysicalModel } from './types.js';
+import type { ExtensionFieldEntry, PhysicalModel, PhysicalTable } from './types.js';
 
 /** A LEFT JOIN on the ext table for one extension group. */
 export interface GroupJoin {
-  /** Group name (matches ext table's group_name column). */
+  /** Group name (for debugging/display). */
   readonly group: string;
   /** SQL alias for this join (e.g. 'p', 'f', 'e0'). */
   readonly alias: string;
+  /** xxHash64 source hash (16-char hex) — identifies rows in the shared ext table. */
+  readonly sourceHash: string;
 }
 
 /** A pivot column: one JSON key extracted from a group's values. */
@@ -39,96 +41,113 @@ export interface PivotView {
   readonly baseTable: string;
   readonly extTable: string;
   readonly baseColumns: readonly string[];
+  /** Base table's primary key column names (for JOIN condition generation). */
+  readonly basePkColumns: readonly string[];
   readonly columns: readonly PivotColumn[];
   readonly groupJoins: readonly GroupJoin[];
 }
 
 export function buildPivotViews(model: PhysicalModel, ir: IR): PivotView[] {
   const out: PivotView[] = [];
-  // entity identity → primary_table identity
-  const entityToTable = new Map<string, string>();
-  for (const node of ir.nodes.values()) {
-    if (node.kind !== 'entity') continue;
-    const e = node.data as Entity;
-    entityToTable.set(node.identity, e.primary_table);
+
+  // Build primary_table identity → PhysicalTable lookup.
+  // The sidecar ext table name lives on the base PhysicalTable (extTableName),
+  // and the view name comes from the entity. We iterate entities (not sidecar
+  // tables) so each entity's ext fields attach to the right view — critical
+  // when multiple entities share one sidecar table.
+  const tableByIdentity = new Map<string, PhysicalTable>();
+  for (const t of model.tables) {
+    if (t.strategy === 'none' || t.strategy === 'new_table') continue;
+    // The PhysicalTable doesn't carry its own IR identity, but the base table's
+    // identity is recoverable: the table IR node identities are in ir.nodes.
+    // Match by qualifiedName suffix against table identity.
+  }
+  // Index base tables by their identity for O(1) entity→table lookup.
+  // The identity→table map: walk ir.nodes for tables, match to model.tables
+  // by comparing schema.name against the table IR node's derived physical name.
+  const baseTableByIdentity = new Map<string, PhysicalTable>();
+  for (const [identity, node] of ir.nodes) {
+    if (node.kind !== 'table') continue;
+    const t = node.data as { table: { name: string } };
+    const match = model.tables.find(
+      (mt) => mt.name === t.table.name && mt.strategy !== 'new_table',
+    );
+    if (match) baseTableByIdentity.set(identity, match);
   }
 
-  for (const table of model.tables) {
-    if (table.strategy !== 'sidecar_eav' || !table.extTableName || !table.viewName) continue;
+  for (const [entityId, node] of ir.nodes) {
+    if (node.kind !== 'entity') continue;
+    const e = node.data as Entity;
+    const baseTable = baseTableByIdentity.get(e.primary_table);
+    if (!baseTable) continue;
+    // Only base tables with a sidecar strategy + declared view produce a view.
+    if (
+      (baseTable.strategy !== 'sidecar_eav' && baseTable.strategy !== 'sidecar_jsonb') ||
+      !baseTable.extTableName ||
+      !baseTable.viewName
+    )
+      continue;
 
-    // Find the entity whose primary_table points at this table.
-    let entityId: string | undefined;
-    for (const [eid, ptId] of entityToTable) {
-      const ptNode = ir.nodes.get(ptId);
-      if (
-        ptNode?.identity === `table:${table.name.replace(/_base$/, '')}` ||
-        ptNode?.identity.endsWith(`.${table.name}`)
-      ) {
-        entityId = eid;
-        break;
-      }
+    const extFields = model.extensionFields.get(entityId);
+    // Only sidecar exts participate in pivot views — new_table exts have their
+    // own physical tables and should not be pivoted from JSONB.
+    const sidecarFields = extFields?.filter(
+      (ef) => ef.strategy === 'sidecar_jsonb' || ef.strategy === undefined,
+    );
+    if (!sidecarFields || sidecarFields.length === 0) {
+      // Entity has a sidecar'd base table but no ext fields of its own.
+      // Skip emitting a view (the table is shared; another entity owns the ext).
+      continue;
     }
-    // Fallback: match by the table's own identity suffix.
-    if (entityId === undefined) {
-      for (const [eid] of entityToTable) {
-        const ext = model.extensionFields.get(eid);
-        if (ext !== undefined) {
-          entityId = eid;
-          break;
-        }
-      }
-    }
-
-    const extFields = entityId !== undefined ? model.extensionFields.get(entityId) : undefined;
 
     // Assign SQL aliases to each group ('u' is reserved for the base table).
     const usedAliases = new Set<string>(['u']);
     const groupJoins: GroupJoin[] = [];
     const groupToAlias = new Map<string, string>();
-    if (extFields) {
-      for (const ef of extFields) {
-        if (!groupToAlias.has(ef.group)) {
-          const alias = pickGroupAlias(ef.group, usedAliases);
-          groupToAlias.set(ef.group, alias);
-          groupJoins.push({ group: ef.group, alias });
-        }
+    for (const ef of sidecarFields) {
+      if (!groupToAlias.has(ef.group)) {
+        const alias = pickGroupAlias(ef.group, usedAliases);
+        groupToAlias.set(ef.group, alias);
+        groupJoins.push({
+          group: ef.group,
+          alias,
+          sourceHash: ef.sourceHash ?? ef.group, // fallback to group name if no hash
+        });
       }
     }
 
     // Build pivot columns. Multi-field struct refs expand into N columns,
     // each in the same group as their parent field.
     const pivotCols: PivotColumn[] = [];
-    if (extFields) {
-      for (const ef of extFields) {
-        const gAlias = groupToAlias.get(ef.group);
-        if (gAlias === undefined) continue;
+    for (const ef of sidecarFields) {
+      const gAlias = groupToAlias.get(ef.group);
+      if (gAlias === undefined) continue;
 
-        if (ef.refValueTypeId) {
-          // Multi/single-field struct ref → expand into JSON keys.
-          const vtNode = ir.nodes.get(ef.refValueTypeId);
-          if (vtNode?.kind !== 'type') continue;
-          const vtFields =
-            (vtNode.data as { fields?: ReadonlyArray<{ name: string }> }).fields ?? [];
-          for (const f of vtFields) {
-            pivotCols.push({
-              fieldName: `${ef.name}_${f.name}`,
-              groupAlias: gAlias,
-            });
-          }
-        } else {
+      if (ef.refValueTypeId) {
+        // Multi/single-field struct ref → expand into JSON keys.
+        const vtNode = ir.nodes.get(ef.refValueTypeId);
+        if (vtNode?.kind !== 'type') continue;
+        const vtFields = (vtNode.data as { fields?: ReadonlyArray<{ name: string }> }).fields ?? [];
+        for (const f of vtFields) {
           pivotCols.push({
-            fieldName: ef.name,
+            fieldName: `${ef.name}_${f.name}`,
             groupAlias: gAlias,
           });
         }
+      } else {
+        pivotCols.push({
+          fieldName: ef.name,
+          groupAlias: gAlias,
+        });
       }
     }
 
     out.push({
-      viewName: table.viewName,
-      baseTable: table.qualifiedName,
-      extTable: table.extTableName,
-      baseColumns: table.columns.map((c) => c.name),
+      viewName: baseTable.viewName,
+      baseTable: baseTable.qualifiedName,
+      extTable: baseTable.extTableName,
+      baseColumns: baseTable.columns.map((c) => c.name),
+      basePkColumns: baseTable.primaryKey,
       columns: pivotCols,
       groupJoins,
     });
