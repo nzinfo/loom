@@ -1,0 +1,6 @@
+version: loom-schema/v2
+name: Product
+description: 商品领域对象 (base + sidecar ext + new_table ext)
+primary_table: table:shop.core.Products
+business_keys: [ name ]
+view: products

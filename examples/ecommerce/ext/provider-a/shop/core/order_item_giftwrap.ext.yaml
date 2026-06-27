@@ -1,0 +1,19 @@
+version: loom-schema/v2
+entity: entity:shop.core.OrderItem
+strategy: new_table
+table: order_item_giftwrap
+group: giftwrap
+using:
+  - shop.core.*
+fields:
+  - name: wrap_type
+    type:
+      ref: string
+      args: { max_length: 32 }
+    required: true
+  - name: gift_message
+    type:
+      ref: string
+      args: { max_length: 512 }
+  - name: wrap_cost
+    type: shop.core.Money

@@ -1,0 +1,19 @@
+version: loom-schema/v2
+entity: entity:shop.core.Product
+strategy: new_table
+table: product_warehouse
+group: warehouse
+using:
+  - shop.core.*
+fields:
+  - name: warehouse_code
+    type:
+      ref: string
+      args: { max_length: 16 }
+    required: true
+  - name: shelf_location
+    type:
+      ref: string
+      args: { max_length: 32 }
+  - name: restock_threshold
+    type: integer

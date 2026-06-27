@@ -1,0 +1,16 @@
+version: loom-schema/v2
+name: OrderStatus
+form: enum
+description: order lifecycle state (string carrier = native ENUM)
+carrier: string
+variants:
+  - value: pending
+    display_name: 待付款
+  - value: paid
+    display_name: 已付款
+  - value: shipped
+    display_name: 已发货
+  - value: delivered
+    display_name: 已送达
+  - value: cancelled
+    display_name: 已取消

@@ -1,0 +1,17 @@
+version: loom-schema/v2
+entity: entity:shop.core.Order
+strategy: sidecar_jsonb
+group: fulfillment
+using:
+  - shop.core.*
+fields:
+  - name: tracking_number
+    type:
+      ref: string
+      args: { max_length: 64 }
+  - name: shipped_at
+    type: bigint
+  - name: carrier
+    type:
+      ref: string
+      args: { max_length: 32 }

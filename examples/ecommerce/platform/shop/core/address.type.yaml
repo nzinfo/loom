@@ -1,0 +1,27 @@
+version: loom-schema/v2
+name: Address
+form: struct
+description: postal address (shipping / billing)
+using:
+  - shop.core.*
+fields:
+  - name: street
+    type:
+      ref: string
+      args: { max_length: 255 }
+    required: true
+  - name: city
+    type:
+      ref: string
+      args: { max_length: 64 }
+    required: true
+  - name: postal_code
+    type:
+      ref: string
+      args: { max_length: 16 }
+    required: true
+  - name: country_code
+    type:
+      ref: string
+      args: { max_length: 2 }
+    required: true

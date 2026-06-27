@@ -1,0 +1,30 @@
+version: loom-schema/v2
+name: Categories
+description: 商品分类表 (bigint PK, 与 Products 共享 sidecar 表 — PK 兼容)
+using:
+  - shop.core.*
+table:
+  name: categories_base
+extensible: true
+default_ext_table: products_ext
+fields:
+  - name: id
+    type: bigint
+    required: true
+  - name: name
+    type:
+      ref: string
+      args: { max_length: 128 }
+    required: true
+  - name: parent_id
+    type: bigint
+primary_key: [ id ]
+foreign_keys:
+  - name: fk_categories_parent
+    fields: [ parent_id ]
+    ref_table: shop.core.Categories
+    ref_fields: [ id ]
+    on_delete: set_null
+indexes:
+  - name: idx_categories_parent
+    fields: [ parent_id ]

@@ -1,0 +1,13 @@
+version: loom-schema/v2
+entity: entity:shop.core.Customer
+strategy: sidecar_jsonb
+group: profile
+using:
+  - shop.core.*
+fields:
+  - name: phone
+    type:
+      ref: string
+      args: { max_length: 32 }
+  - name: shipping_address
+    type: shop.core.Address

@@ -1,0 +1,15 @@
+version: loom-schema/v2
+entity: entity:shop.core.OrderItem
+strategy: sidecar_jsonb
+group: audit
+using:
+  - shop.core.*
+fields:
+  - name: audit_note
+    type:
+      ref: string
+      args: { max_length: 255 }
+  - name: audit_user
+    type:
+      ref: string
+      args: { max_length: 64 }

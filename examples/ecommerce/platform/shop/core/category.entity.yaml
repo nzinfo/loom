@@ -1,0 +1,6 @@
+version: loom-schema/v2
+name: Category
+description: "分类领域对象 (演示共享 sidecar 表: 与 Product 共用 products_ext)"
+primary_table: table:shop.core.Categories
+business_keys: [ name ]
+view: categories

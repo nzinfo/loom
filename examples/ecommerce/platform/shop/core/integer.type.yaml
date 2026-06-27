@@ -1,0 +1,4 @@
+version: loom-schema/v2
+name: integer
+form: scalar
+description: 32-bit signed integer

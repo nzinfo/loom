@@ -1,0 +1,42 @@
+version: loom-schema/v2
+name: OrderItems
+description: 订单明细 (detail of Order, 复合 PK [order_id, line_num], 自身可扩展)
+using:
+  - shop.core.*
+table:
+  name: order_items_base
+extensible: true
+default_ext_table: order_items_ext
+fields:
+  - name: order_id
+    type:
+      ref: string
+      args: { max_length: 36 }
+    required: true
+  - name: line_num
+    type: integer
+    required: true
+  - name: product_id
+    type: bigint
+    required: true
+  - name: quantity
+    type: integer
+    required: true
+  - name: unit_price
+    type: shop.core.Money
+    required: true
+primary_key: [ order_id, line_num ]
+foreign_keys:
+  - name: fk_orderitems_order
+    fields: [ order_id ]
+    ref_table: shop.core.Orders
+    ref_fields: [ id ]
+    on_delete: cascade
+  - name: fk_orderitems_product
+    fields: [ product_id ]
+    ref_table: shop.core.Products
+    ref_fields: [ id ]
+    on_delete: restrict
+indexes:
+  - name: idx_orderitems_product
+    fields: [ product_id ]

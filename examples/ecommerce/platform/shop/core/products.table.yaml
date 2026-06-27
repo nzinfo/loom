@@ -1,0 +1,34 @@
+version: loom-schema/v2
+name: Products
+description: 商品基础表 (bigint PK, 可扩展)
+using:
+  - shop.core.*
+table:
+  name: products_base
+extensible: true
+default_ext_table: products_ext
+fields:
+  - name: id
+    type: bigint
+    required: true
+  - name: name
+    type:
+      ref: string
+      args: { max_length: 255 }
+    required: true
+  - name: base_price
+    type: shop.core.Money
+  - name: category_id
+    type: bigint
+primary_key: [ id ]
+foreign_keys:
+  - name: fk_products_category
+    fields: [ category_id ]
+    ref_table: shop.core.Categories
+    ref_fields: [ id ]
+    on_delete: restrict
+indexes:
+  - name: idx_products_name
+    fields: [ name ]
+  - name: idx_products_category
+    fields: [ category_id ]

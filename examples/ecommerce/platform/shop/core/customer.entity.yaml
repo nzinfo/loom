@@ -1,0 +1,6 @@
+version: loom-schema/v2
+name: Customer
+description: 客户领域对象 (uuid PK, 演示与 bigint PK 的 sidecar 不共用)
+primary_table: table:shop.core.Customers
+business_keys: [ email ]
+view: customers

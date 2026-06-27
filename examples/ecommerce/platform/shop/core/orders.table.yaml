@@ -1,0 +1,42 @@
+version: loom-schema/v2
+name: Orders
+description: 订单主表 (master, uuid PK, 可扩展)
+using:
+  - shop.core.*
+table:
+  name: orders_base
+extensible: true
+default_ext_table: orders_ext
+fields:
+  - name: id
+    type:
+      ref: string
+      args: { max_length: 36 }
+    required: true
+  - name: customer_id
+    type:
+      ref: string
+      args: { max_length: 36 }
+    required: true
+  - name: status
+    type: shop.core.OrderStatus
+    required: true
+  - name: total_amount
+    type: shop.core.Money
+  - name: placed_at
+    type: bigint
+    required: true
+primary_key: [ id ]
+foreign_keys:
+  - name: fk_orders_customer
+    fields: [ customer_id ]
+    ref_table: shop.core.Customers
+    ref_fields: [ id ]
+    on_delete: restrict
+indexes:
+  - name: idx_orders_customer
+    fields: [ customer_id ]
+  - name: idx_orders_status
+    fields: [ status ]
+  - name: idx_orders_placed_at
+    fields: [ placed_at ]

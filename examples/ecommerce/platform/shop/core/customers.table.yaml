@@ -1,0 +1,32 @@
+version: loom-schema/v2
+name: Customers
+description: 客户表 (uuid PK, 可扩展 — 与 Products 的 bigint sidecar 不兼容, 演示分离)
+using:
+  - shop.core.*
+table:
+  name: customers_base
+extensible: true
+default_ext_table: customers_ext
+fields:
+  - name: id
+    type:
+      ref: string
+      args: { max_length: 36 }
+    required: true
+  - name: email
+    type:
+      ref: string
+      args: { max_length: 255 }
+    required: true
+  - name: display_name
+    type:
+      ref: string
+      args: { max_length: 128 }
+    required: true
+  - name: priority
+    type: shop.core.Priority
+primary_key: [ id ]
+indexes:
+  - name: idx_customers_email
+    fields: [ email ]
+    unique: true

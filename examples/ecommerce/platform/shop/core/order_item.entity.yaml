@@ -1,0 +1,6 @@
+version: loom-schema/v2
+name: OrderItem
+description: 订单明细领域对象 (复合 PK, 既是 detail 又带 ext — 覆盖最复杂场景)
+primary_table: table:shop.core.OrderItems
+business_keys: [ order_id, line_num ]
+view: order_items

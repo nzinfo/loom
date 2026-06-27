@@ -1,0 +1,4 @@
+version: loom-schema/v2
+name: bigint
+form: scalar
+description: 64-bit signed integer

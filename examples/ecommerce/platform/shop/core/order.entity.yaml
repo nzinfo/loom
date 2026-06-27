@@ -1,0 +1,6 @@
+version: loom-schema/v2
+name: Order
+description: 订单领域对象 (master, 有 detail OrderItem, 自身可扩展)
+primary_table: table:shop.core.Orders
+business_keys: [ id ]
+view: orders

@@ -1,0 +1,10 @@
+version: loom-schema/v2
+name: Priority
+form: enum
+description: ticket / task priority (integer carrier = int column + CHECK)
+carrier: uint8
+variants:
+  - { value: 0, display_name: 低 }
+  - { value: 1, display_name: 中 }
+  - { value: 2, display_name: 高 }
+  - { value: 3, display_name: 紧急 }
