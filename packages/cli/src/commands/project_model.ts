@@ -9,7 +9,14 @@
  * are not exported (they're internal to the SQL emission path).
  */
 import { scalarToSql } from '@loom/core';
-import type { Dialect, ExtensionFieldEntry, IR, PhysicalColumn, PhysicalModel } from '@loom/core';
+import type {
+  Dialect,
+  EnumVariant,
+  ExtensionFieldEntry,
+  IR,
+  PhysicalColumn,
+  PhysicalModel,
+} from '@loom/core';
 import type { TypeNode } from '@loom/core';
 
 export interface ModelJson {
@@ -61,10 +68,23 @@ interface ForeignKeyJson {
   readonly onDelete?: string;
 }
 
+interface EnumVariantJson {
+  readonly value: string | number;
+  readonly display_name?: string;
+  readonly description?: string;
+}
+
 interface EnumJson {
   readonly identity: string;
   readonly name: string;
-  readonly values: readonly string[];
+  /** Underlying storage scalar (e.g. 'string', 'uint8'). */
+  readonly carrier: string;
+  /** Bare value list (backward compatible). */
+  readonly values: readonly (string | number)[];
+  /** Variants with optional metadata (display_name/description) for downstream
+   * consumers (UI labels, docs, reverse-engineering). Mirrors the structured
+   * `loom:enum` comment emitted into DDL. */
+  readonly variants: readonly EnumVariantJson[];
 }
 
 interface ExtensionJson {
@@ -97,13 +117,13 @@ export function projectModelJson(ir: IR, model: PhysicalModel, dialect: Dialect)
   return {
     version: 'loom-schema/v2',
     dialect,
-    tables: model.tables.map((t) => serializeTable(t, dialect)),
+    tables: model.tables.map((t) => serializeTable(t, dialect, model.enums)),
     enums: serializeEnums(model),
     extensions: serializeExtensions(ir, model, dialect),
   };
 }
 
-function serializeTable(t: PhysicalModel['tables'][number], dialect: Dialect): TableJson {
+function serializeTable(t: PhysicalModel['tables'][number], dialect: Dialect, enums: PhysicalModel['enums']): TableJson {
   const extension =
     t.strategy !== 'none'
       ? {
@@ -117,7 +137,7 @@ function serializeTable(t: PhysicalModel['tables'][number], dialect: Dialect): T
     name: t.name,
     schema: t.schema ?? '',
     qualifiedName: t.qualifiedName,
-    columns: t.columns.map((c) => serializeColumn(c, dialect)),
+    columns: t.columns.map((c) => serializeColumn(c, dialect, enums)),
     primaryKey: t.primaryKey,
     indexes: t.indexes.map((i) => ({
       name: i.name,
@@ -135,10 +155,24 @@ function serializeTable(t: PhysicalModel['tables'][number], dialect: Dialect): T
   };
 }
 
-function serializeColumn(c: PhysicalColumn, dialect: Dialect): ColumnJson {
+function serializeColumn(c: PhysicalColumn, dialect: Dialect, enums: PhysicalModel['enums']): ColumnJson {
+  let sqlType: string;
+  if (c.enumRef) {
+    const entry = enums.get(c.enumRef);
+    if (entry && entry.carrier !== 'string') {
+      // Integer-backed enum: output the actual scalar SQL type.
+      sqlType = scalarToSql(entry.carrier, c.props as Record<string, unknown>, dialect);
+    } else {
+      // String-backed enum: keep backward-compatible behavior (enum identity).
+      // External tools use this to find the enum in the `enums` registry.
+      sqlType = c.enumRef;
+    }
+  } else {
+    sqlType = scalarToSql(c.scalar, c.props as Record<string, unknown>, dialect);
+  }
   return {
     name: c.name,
-    sqlType: c.enumRef ?? scalarToSql(c.scalar, c.props, dialect),
+    sqlType,
     scalar: c.scalar,
     props: c.props as Record<string, unknown>,
     required: c.required,
@@ -149,14 +183,28 @@ function serializeColumn(c: PhysicalColumn, dialect: Dialect): ColumnJson {
 
 function serializeEnums(model: PhysicalModel): EnumJson[] {
   const out: EnumJson[] = [];
-  for (const [identity, values] of model.enums) {
+  for (const [identity, entry] of model.enums) {
     const colonIdx = identity.indexOf(':');
     const body = identity.slice(colonIdx + 1);
     const lastDot = body.lastIndexOf('.');
     const name = lastDot >= 0 ? body.slice(lastDot + 1) : body;
-    out.push({ identity, name, values });
+    out.push({
+      identity,
+      name,
+      carrier: entry.carrier,
+      values: entry.variants.map((v) => v.value),
+      variants: entry.variants.map((v) => serializeVariant(v)),
+    });
   }
   return out;
+}
+
+function serializeVariant(v: EnumVariant): EnumVariantJson {
+  return {
+    value: v.value,
+    ...(v.display_name !== undefined ? { display_name: v.display_name } : {}),
+    ...(v.description !== undefined ? { description: v.description } : {}),
+  };
 }
 
 function serializeExtensions(ir: IR, model: PhysicalModel, dialect: Dialect): ExtensionJson[] {

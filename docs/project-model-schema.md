@@ -126,7 +126,13 @@
 {
   "identity": "type:shop.core.Status",
   "name": "Status",
-  "values": ["active", "inactive", "suspended"]
+  "carrier": "string",
+  "values": ["active", "inactive", "suspended"],
+  "variants": [
+    { "value": "active", "display_name": "Active" },
+    { "value": "inactive" },
+    { "value": "suspended", "display_name": "Suspended", "description": "account is frozen" }
+  ]
 }
 ```
 
@@ -134,9 +140,34 @@
 |---|---|---|
 | `identity` | string | 枚举类型的完整 identity |
 | `name` | string | 枚举类型名 |
-| `values` | string[] | 枚举值列表 |
+| `carrier` | string | 底层物理存储标量（`string` / `uint8` / `int16` / `integer` / `bigint`） |
+| `values` | (string\|number)[] | 枚举值列表（向后兼容） |
+| `variants` | object[] | variant 详情：`{ value: string\|number, display_name?, description? }`。供下游（UI label、文档、逆向工具）读取 |
 
 Column 的 `enumRef` 通过 `identity` 关联到这里的条目。
+
+### 结构化注释（DDL）
+
+当 variant 携带 `display_name`/`description` 时，SQL DDL 会以**结构化注释**形式写入数据库，供逆向工具机器解析（纯字符串 variant 不生成注释）：
+
+| 方言 | 形式 |
+|---|---|
+| PostgreSQL | `COMMENT ON TYPE base_core_status IS 'loom:enum active=Active\|inactive\|suspended=Suspended;account is frozen';` |
+| MySQL | `status ENUM('active','inactive','suspended') COMMENT 'loom:enum active=Active\|inactive\|suspended=Suspended;account is frozen',` |
+| SQLite | 列定义上方插 `-- loom:enum active=Active\|inactive\|suspended=Suspended;account is frozen` |
+
+**注释格式契约**（稳定，逆向工具据此解析）：
+
+```
+loom:enum <value>[=<display_name>][;<description>](|<entry>)*
+```
+
+- `loom:enum` 前缀标记 loom 注入的元数据
+- 每个 entry：`value`，或 `value=display_name`，或 `value=display_name;description`
+- entry 用 `|` 分隔（与 SQL 值列表的 `,` 不冲突）
+- variant 无 display_name/description 时该 entry 只写 `value`
+
+> **限制**：`display_name`/`description` 不得含 `|`、`;`、`=`、换行、单引号；含这些字符时不生成结构化注释（避免破坏 DDL）。
 
 ## Extension
 

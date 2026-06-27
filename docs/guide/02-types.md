@@ -128,6 +128,58 @@ variants:
 方言映射：pg 用 `CREATE TYPE ... AS ENUM`，mysql 用 `ENUM(...)`，sqlite 用
 `TEXT + CHECK`。
 
+### 整数承载类型（carrier）
+
+默认情况下，枚举的底层物理存储类型是 `string`。可以通过 `carrier` 字段指定整数标量
+作为承载类型：
+
+```yaml
+# priority.type.yaml
+version: loom-schema/v2
+name: Priority
+form: enum
+carrier: uint8
+variants:
+  - { value: 0, display_name: Low }
+  - { value: 1, display_name: Medium }
+  - { value: 2, display_name: High }
+```
+
+**规则**：
+- `carrier` 必须是合法的标量名：`string`（默认）、`uint8`、`int16`、`integer`、`bigint`
+- 整数 carrier 时 variant 的 `value` 为数字
+- 整数 carrier **不使用**原生 ENUM 类型（PG/MySQL 原生 ENUM 仅支持字符串），
+  改用 `<整数类型> + CHECK` 约束
+- `display_name`/`description` 元数据和结构化注释机制保持不变
+
+方言映射（整数 carrier）：
+- PG：`SMALLINT` + `CHECK (col IN (0, 1, 2))`
+- MySQL：`TINYINT` + `CHECK (col IN (0, 1, 2))`
+- SQLite：`INTEGER` + `CHECK (col IN (0, 1, 2))`
+
+### variant 元数据（display_name / description）
+
+每个 variant 可选携带 `display_name` 和 `description`：
+
+```yaml
+variants:
+  - { value: active, display_name: Active }
+  - { value: suspended, display_name: Suspended, description: account is frozen }
+  - { value: inactive }
+```
+
+这些元数据**不进数据库主列**（列只存值），但会以两种方式交付下游：
+
+1. **`project-model-schema` JSON 输出**：每个 enum 的 `variants` 字段含完整 `{ value, display_name?, description? }`，供 UI label、文档工具、ORM 生成器读取。
+2. **DDL 结构化注释**：当 variant 携带元数据时，DDL 写入机器可解析的 `loom:enum` 注释，让逆向工具能从数据库恢复 label：
+   - pg：`COMMENT ON TYPE <name> IS 'loom:enum active=Active|suspended=Suspended;account is frozen|inactive'`
+   - mysql：列级 `COMMENT 'loom:enum ...'`
+   - sqlite：列定义上方插 `-- loom:enum ...`
+
+纯字符串 variant（`variants: [a, b]`）不生成注释，保持 DDL 干净。
+
+> **限制**：`display_name`/`description` 不得含 `|`、`;`、`=`、换行、单引号。注释格式契约详见 `docs/project-model-schema.md` 的 Enum 节。
+
 ## 类型引用与 using 导入
 
 ### 两种引用形式

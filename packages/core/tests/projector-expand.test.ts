@@ -72,8 +72,6 @@ properties: []
 name: T
 table:
   name: t
-  extension:
-    strategy: none
 fields:
   - name: id
     type: bigint
@@ -103,8 +101,14 @@ variants: [active, inactive]
 `,
     });
     const { ir } = await load({ fs, basePath: '' });
-    const phys = expandTables(ir);
-    expect(phys.enums.get('type:base.core.Status')).toEqual(['active', 'inactive']);
+	    const phys = expandTables(ir);
+	    expect(phys.enums.get('type:base.core.Status')).toEqual({
+	      carrier: 'string',
+	      variants: [
+	        { value: 'active' },
+	        { value: 'inactive' },
+	      ],
+	    });
   });
 
   it('exposes extension_fields registry keyed by entity identity (spec §7.5)', async () => {
@@ -134,7 +138,6 @@ properties:
 name: Users
 table:
   name: users
-  extension: { strategy: none }
 fields:
   - { name: id, type: bigint, required: true }
   - name: email
@@ -173,7 +176,6 @@ using:
   - base.core.*
 table:
   name: users
-  extension: { strategy: none }
 fields:
   - { name: id, type: bigint, required: true }
   - { name: email, type: Email, required: true }
@@ -212,7 +214,6 @@ using:
   - base.core.*
 table:
   name: users
-  extension: { strategy: none }
 fields:
   - { name: id, type: bigint, required: true }
   - { name: balance, type: Money }
@@ -243,7 +244,6 @@ using:
   - base.core.*
 table:
   name: users
-  extension: { strategy: none }
 fields:
   - { name: id, type: bigint, required: true }
   - { name: status, type: Status }
@@ -257,6 +257,12 @@ primary_key: [id]
     // enumRef must be the full identity, not the bare fqn — the enum
     // registry is keyed by identity and dialect generators look it up.
     expect(statusCol?.enumRef).toBe('type:base.core.Status');
-    expect(model.enums.get('type:base.core.Status')).toEqual(['active', 'inactive']);
+    expect(model.enums.get('type:base.core.Status')).toEqual({
+      carrier: 'string',
+      variants: [
+        { value: 'active' },
+        { value: 'inactive' },
+      ],
+    });
   });
 });

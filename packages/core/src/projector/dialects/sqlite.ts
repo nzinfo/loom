@@ -1,3 +1,4 @@
+import { formatEnumComment } from '../enumMeta.js';
 import { formatOnDelete, scalarToSql } from '../scalars.js';
 /**
  * SQLite dialect.
@@ -14,7 +15,7 @@ export function projectSqlite(ctx: SqliteEmitContext): string {
   const blocks: string[] = [];
   for (const t of ctx.model.tables) {
     blocks.push(tableBlock(t, ctx));
-    if (t.strategy === 'sidecar_eav' && t.extTableName) {
+    if ((t.strategy === 'sidecar_eav' || t.strategy === 'sidecar_jsonb') && t.extTableName) {
       blocks.push(extTableBlock(t));
     }
   }
@@ -29,13 +30,29 @@ function tableBlock(t: PhysicalTable, ctx: SqliteEmitContext): string {
   lines.push(`CREATE TABLE ${t.qualifiedName} (`);
   const body: string[] = [];
   for (const c of t.columns) {
+    // Structured `loom:enum` line comment above an enum-backed column, so
+    // reverse-engineering tools can recover variant labels. SQLite has no
+    // native COMMENT syntax; a `--` line is the portable convention. Only
+    // emitted when the enum carries variant metadata.
+    if (c.enumRef) {
+      const entry = ctx.model.enums.get(c.enumRef);
+      if (entry) {
+        const comment = formatEnumComment(entry.variants);
+        if (comment !== undefined) {
+          body.push(`  -- ${comment}`);
+        }
+      }
+    }
     body.push(
-      `  ${c.name} ${sqliteType(c)}${c.required ? ' NOT NULL' : ''}${c.unique ? ' UNIQUE' : ''}`,
+      `  ${c.name} ${sqliteType(c, ctx)}${c.required ? ' NOT NULL' : ''}${c.unique ? ' UNIQUE' : ''}`,
     );
     if (c.enumRef) {
-      const values = ctx.model.enums.get(c.enumRef);
-      if (values) {
-        body.push(`  CHECK (${c.name} IN (${values.map((v) => `'${v}'`).join(', ')}))`);
+      const entry = ctx.model.enums.get(c.enumRef);
+      if (entry) {
+        // Integer-backed enum: values are unquoted numbers.
+        const quote = entry.carrier !== 'string' ? '' : "'";
+        const vals = entry.variants.map((v) => `${quote}${v.value}${quote}`).join(', ');
+        body.push(`  CHECK (${c.name} IN (${vals}))`);
       }
     }
   }
@@ -62,11 +79,15 @@ function extTableBlock(t: PhysicalTable): string {
   const extQual = `${schema}${t.extTableName}`;
   const lines: string[] = [];
   lines.push(`CREATE TABLE ${extQual} (`);
-  lines.push('  base_id INTEGER NOT NULL,');
-  lines.push('  scope INTEGER NOT NULL,');
-  lines.push('  group_name TEXT NOT NULL,');
-  lines.push("  values TEXT NOT NULL DEFAULT '{}',");
-  lines.push("  created_at TEXT NOT NULL DEFAULT (datetime('now'))");
+  const pkCols = t.sidecarPkColumns ?? ['base_id'];
+  const body: string[] = [];
+  for (let i = 0; i < pkCols.length; i++) {
+    body.push(`  base_id_${i} INTEGER NOT NULL`);
+  }
+  body.push("  source TEXT NOT NULL");
+  body.push("  values TEXT NOT NULL DEFAULT '{}'");
+  body.push("  created_at TEXT NOT NULL DEFAULT (datetime('now'))");
+  lines.push(body.join(',\n'));
   lines.push(');');
   return lines.join('\n');
 }
@@ -76,13 +97,25 @@ function viewBlock(v: PivotView): string {
   for (const c of v.columns) {
     selectCols.push(`json_extract(${c.groupAlias}.values, '$.${c.fieldName}') AS ${c.fieldName}`);
   }
-  const joins = v.groupJoins.map(
-    (g) =>
-      `LEFT JOIN ${v.extTable} ${g.alias} ON ${g.alias}.base_id = u.id AND ${g.alias}.group_name = '${g.group}'`,
-  );
+  const joins = v.groupJoins.map((g) => {
+    const pkCount = v.basePkColumns.length;
+    const joinConds: string[] = [];
+    for (let i = 0; i < pkCount; i++) {
+      joinConds.push(`${g.alias}.base_id_${i} = u.${v.basePkColumns[i]}`);
+    }
+    joinConds.push(`${g.alias}.source = '${g.sourceHash}'`);
+    return `LEFT JOIN ${v.extTable} ${g.alias} ON ${joinConds.join(' AND ')}`;
+  });
   return `CREATE VIEW ${v.viewName} AS\nSELECT\n${selectCols.map((c) => `  ${c}`).join(',\n')}\nFROM ${v.baseTable} u${joins.length > 0 ? '\n' : ''}${joins.join('\n')};`;
 }
 
-function sqliteType(c: PhysicalColumn): string {
+function sqliteType(c: PhysicalColumn, ctx: SqliteEmitContext): string {
+  // Integer-backed enum: use the carrier scalar's SQL type.
+  if (c.enumRef) {
+    const entry = ctx.model.enums.get(c.enumRef);
+    if (entry && entry.carrier !== 'string') {
+      return scalarToSql(entry.carrier, c.props as Record<string, unknown>, 'sqlite');
+    }
+  }
   return scalarToSql(c.scalar, c.props as Record<string, unknown>, 'sqlite');
 }

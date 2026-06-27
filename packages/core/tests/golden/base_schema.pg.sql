@@ -1,5 +1,7 @@
 CREATE TYPE base_core_status AS ENUM ('active', 'inactive', 'suspended');
 
+COMMENT ON TYPE base_core_status IS 'loom:enum active=Active|inactive|suspended';
+
 CREATE TABLE base_core.users_base (
   id BIGINT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL,
@@ -10,17 +12,19 @@ CREATE TABLE base_core.users_base (
   price_range_low NUMERIC(18,4),
   price_range_high NUMERIC(18,4),
   status base_core_status,
+  priority SMALLINT,
+  CONSTRAINT priority_check CHECK (priority IN (0, 1, 2)),
   PRIMARY KEY (id)
 );
 CREATE UNIQUE INDEX idx_users_email ON base_core.users_base (email);
 
 CREATE TABLE base_core.users_ext (
-  base_id BIGINT NOT NULL,
-  scope BIGINT NOT NULL,
-  group_name VARCHAR(50) NOT NULL,
+  base_id_0 BIGINT NOT NULL,
+  source CHAR(16) NOT NULL,
   values JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE INDEX idx_users_ext_source ON base_core.users_ext (base_id_0, source);
 
 CREATE TABLE retail_pos.orders (
   id BIGINT NOT NULL,
@@ -42,11 +46,12 @@ SELECT
   price_range_low,
   price_range_high,
   status,
+  priority,
   p.values->>'nickname' AS nickname,
   p.values->>'bio' AS bio,
   f.values->>'credit_limit_amount' AS credit_limit_amount,
   f.values->>'credit_limit_currency_code' AS credit_limit_currency_code,
   p.values->>'customer_no' AS customer_no
 FROM base_core.users_base u
-LEFT JOIN users_ext p ON p.base_id = u.id AND p.group_name = 'profile'
-LEFT JOIN users_ext f ON f.base_id = u.id AND f.group_name = 'finance';
+LEFT JOIN users_ext p ON p.base_id_0 = u.id AND p.source = '2ef0f158ba6171c9'
+LEFT JOIN users_ext f ON f.base_id_0 = u.id AND f.source = '1c3575051037d9de';

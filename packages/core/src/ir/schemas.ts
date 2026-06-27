@@ -130,11 +130,14 @@ export const typeField = z
 /** Inferred type for a field (from typeField schema). */
 export type TypeField = z.infer<typeof typeField>;
 
+const variantValueSchema = z.union([z.string().min(1), z.number().int()]);
+
 const variantSchema = z.union([
   z.string().min(1),
+  z.number().int(),
   z
     .object({
-      value: z.string().min(1),
+      value: variantValueSchema,
       display_name: z.string().optional(),
       description: z.string().optional(),
     })
@@ -168,6 +171,12 @@ const extensionSchema = z
   })
   .strict();
 
+/** Ext strategy: how an extension_fields file stores its data physically.
+ * - sidecar_jsonb: unified EAV+JSONB table (auto-generated structure)
+ * - new_table: user-defined physical table (custom columns + auto-injected FK)
+ * See design doc: 2026-06-24-ext-strategy-decoupling.md */
+export const extStrategySchema = z.enum(['sidecar_jsonb', 'new_table']);
+
 const scalarPropertySchema = z
   .object({
     name: z.string().min(1),
@@ -176,6 +185,12 @@ const scalarPropertySchema = z
     default: z.unknown().optional(),
   })
   .strict();
+
+/** Valid carrier types for enum form. string = default (native ENUM), integer
+ * scalars = integer column + CHECK constraint. */
+const VALID_ENUM_CARRIERS = new Set([
+  'string', 'uint8', 'int16', 'integer', 'bigint',
+]);
 
 export const TypeSchema = z
   .object({
@@ -188,8 +203,12 @@ export const TypeSchema = z
     // Form-specific fields (all optional; superRefine enforces the mutex).
     properties: z.array(scalarPropertySchema).optional(), // scalar
     fields: z.array(typeField).optional(), // struct
-    variants: z.array(variantSchema).min(1).optional(), // enum (current shape)
+    variants: z.array(variantSchema).min(1).optional(), // enum
     constraints: z.array(constraintSchema).optional(), // struct only
+    /** Underlying storage type for enum form. Defaults to 'string'.
+     * Integer carriers (uint8, int16, integer, bigint) use <type> + CHECK
+     * instead of native ENUM. Ignored for scalar/struct forms. */
+    carrier: z.string().min(1).optional(),
   })
   .strict()
   .superRefine((data, ctx) => {
@@ -213,21 +232,22 @@ export const TypeSchema = z
       });
     }
 
-    const has = (k: 'properties' | 'fields' | 'variants' | 'constraints') => data[k] !== undefined;
+    const has = (k: 'properties' | 'fields' | 'variants' | 'constraints' | 'carrier') =>
+      data[k] !== undefined;
 
     if (data.form === 'scalar') {
-      if (has('fields') || has('variants') || has('constraints')) {
+      if (has('fields') || has('variants') || has('constraints') || has('carrier')) {
         ctx.addIssue({
           code: 'custom',
-          message: 'scalar type must not have fields/variants/constraints',
+          message: 'scalar type must not have fields/variants/constraints/carrier',
           path: ['form'],
         });
       }
     } else if (data.form === 'struct') {
-      if (has('properties') || has('variants')) {
+      if (has('properties') || has('variants') || has('carrier')) {
         ctx.addIssue({
           code: 'custom',
-          message: 'struct type must not have properties/variants',
+          message: 'struct type must not have properties/variants/carrier',
           path: ['form'],
         });
       }
@@ -254,6 +274,14 @@ export const TypeSchema = z
           path: ['variants'],
         });
       }
+      // Validate carrier: must be a recognized scalar name.
+      if (data.carrier !== undefined && !VALID_ENUM_CARRIERS.has(data.carrier)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `invalid enum carrier "${data.carrier}"; must be one of: ${[...VALID_ENUM_CARRIERS].join(', ')}`,
+          path: ['carrier'],
+        });
+      }
     }
   });
 
@@ -267,9 +295,16 @@ export const TableSchema = z
     table: z
       .object({
         name: z.string().min(1),
-        extension: extensionSchema,
       })
       .strict(),
+    /** Whether this table allows extension_fields. New API (ext-strategy-decoupling). */
+    extensible: z.boolean().optional(),
+    /** Designer's suggested sidecar ext table name (advisory, not enforced).
+     * Ext provider may override via its own `table:` field. */
+    default_ext_table: z.string().min(1).optional(),
+    /** Legacy extension object (pre-ext-strategy-decoupling). Kept for backward
+     * compat — `extensible`/`default_ext_table` take precedence when present. */
+    extension: extensionSchema.optional(),
     fields: z.array(typeField).min(1),
     primary_key: z.array(z.string().min(1)).min(1),
     foreign_keys: z.array(foreignKeySchema).optional(),
@@ -300,6 +335,16 @@ export const ExtensionFieldsSchema = z
   .object({
     version: versionSchema,
     entity: z.string().min(1),
+    /** Extension strategy: how this ext stores its data physically.
+     * - sidecar_jsonb (default): unified EAV+JSONB table; FK columns auto-injected
+     *   as base_id_0..N; multiple groups share one table by source hash.
+     * - new_table: user-defined physical table; FK columns auto-injected at head
+     *   using base PK column names.
+     * See design doc: 2026-06-24-ext-strategy-decoupling.md */
+    strategy: extStrategySchema.optional(),
+    /** Table name for this ext. For new_table: required (the ext's own table).
+     * For sidecar_jsonb: optional (overrides table's default_ext_table / auto-derived). */
+    table: z.string().min(1).optional(),
     /** Extension group name. Fields in the same group are packed into one
      * JSONB row in the ext table. Optional — defaults to the file stem. */
     group: z.string().min(1).optional(),

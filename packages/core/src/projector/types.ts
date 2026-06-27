@@ -5,12 +5,17 @@
  * Each PhysicalTable represents a database table (base, ext, or view).
  */
 import type { ExtensionFieldEntry } from '../ir/version.js';
+import type { EnumVariant } from './enumMeta.js';
 
 /** Re-exported for projector consumers; source of truth is ir/version.ts. */
 export type { ExtensionFieldEntry };
+/** Variant with optional metadata; source of truth is projector/enumMeta.ts. */
+export type { EnumVariant };
 
-/** Strategy for storing extension_fields. */
-export type ExtensionStrategy = 'none' | 'json_column' | 'sidecar_eav';
+/** Strategy for storing extension_fields.
+ * - 'none' / 'json_column' / 'sidecar_eav': legacy table-level strategies (backward compat)
+ * - 'sidecar_jsonb' / 'new_table': ext-level strategies (ext-strategy-decoupling) */
+export type ExtensionStrategy = 'none' | 'json_column' | 'sidecar_eav' | 'sidecar_jsonb' | 'new_table';
 
 /**
  * A physical column in a database table.
@@ -22,7 +27,8 @@ export type ExtensionStrategy = 'none' | 'json_column' | 'sidecar_eav';
 export interface PhysicalColumn {
   /** Column name (may be suffixed for multi-field value_types). */
   readonly name: string;
-  /** Logical scalar name from base_types (e.g. "decimal", "string", "enum"). */
+  /** Logical scalar name from base_types (e.g. "decimal", "string", "enum").
+   * For enum columns this is the carrier type (e.g. 'string', 'uint8'). */
   readonly scalar: string;
   /** Scalar properties carried through (e.g. precision, scale, max_length). */
   readonly props: Readonly<Record<string, unknown>>;
@@ -31,7 +37,7 @@ export interface PhysicalColumn {
   /** True if column has a UNIQUE constraint. */
   readonly unique: boolean;
   /**
-   * If scalar === 'enum', this is the type identity (e.g.
+   * If scalar references an enum type, this is the type identity (e.g.
    * type:base.core.Status) used to look up the value list in the
    * model's enum registry.
    */
@@ -57,7 +63,7 @@ export interface PhysicalForeignKey {
 /**
  * A physical database table.
  *
- * Represents either a base table, an extension table (sidecar_eav), or a view.
+ * Represents either a base table, an extension table (sidecar or new_table), or a view.
  */
 export interface PhysicalTable {
   /** Simple table name (not schema-qualified). */
@@ -74,12 +80,27 @@ export interface PhysicalTable {
   readonly indexes: ReadonlyArray<PhysicalIndex>;
   /** Foreign keys defined on this table. */
   readonly foreignKeys: ReadonlyArray<PhysicalForeignKey>;
-  /** Extension strategy (from table.extension.strategy). */
+  /** Extension strategy (from table.extension.strategy or ext strategy). */
   readonly strategy: ExtensionStrategy;
-  /** If strategy=sidecar_eav, the extension table name. */
+  /** If strategy=sidecar_eav/sidecar_jsonb, the extension table name. */
   readonly extTableName?: string;
-  /** If strategy=sidecar_eav, the view name that unions base+ext. */
+  /** If strategy=sidecar_eav/sidecar_jsonb, the view name that unions base+ext. */
   readonly viewName?: string;
+  /** If strategy=sidecar_jsonb, the base PK column names (for generating
+   * base_id_0..N in the ext table). Copied from primaryKey for sidecar tables. */
+  readonly sidecarPkColumns?: readonly string[];
+}
+
+/**
+ * An enum type entry in the physical model's enum registry.
+ *
+ * Holds the carrier (underlying storage scalar) and the variant list.
+ */
+export interface EnumEntry {
+  /** Underlying storage scalar (e.g. 'string', 'uint8', 'int16'). */
+  readonly carrier: string;
+  /** Variants with optional metadata (display_name/description). */
+  readonly variants: ReadonlyArray<EnumVariant>;
 }
 
 /**
@@ -90,8 +111,12 @@ export interface PhysicalTable {
 export interface PhysicalModel {
   /** All physical tables (base + ext + views). */
   readonly tables: ReadonlyArray<PhysicalTable>;
-  /** Enum registry: identity → values. Populated from value_types with base='enum'. */
-  readonly enums: ReadonlyMap<string, ReadonlyArray<string>>;
+  /**
+   * Enum registry: identity → EnumEntry (carrier + variants).
+   * Populated from type nodes with form='enum'. Dialects read the carrier
+   * to decide between native ENUM (string) and integer column + CHECK.
+   */
+  readonly enums: ReadonlyMap<string, EnumEntry>;
   /** Extension fields registry: entity identity → ExtensionFieldEntry array. */
   readonly extensionFields: ReadonlyMap<string, ReadonlyArray<ExtensionFieldEntry>>;
 }

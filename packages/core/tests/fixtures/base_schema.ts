@@ -189,14 +189,22 @@ variants:
   - value: inactive
   - value: suspended
 `,
+    'platform/base/core/priority.type.yaml': `version: loom-schema/v2
+name: Priority
+form: enum
+carrier: uint8
+variants:
+  - { value: 0, display_name: Low }
+  - { value: 1, display_name: Medium }
+  - { value: 2, display_name: High }
+`,
 
     'platform/base/core/users.table.yaml': `version: loom-schema/v2
 name: Users
 table:
   name: users_base
-  extension:
-    strategy: sidecar_eav
-    ext_table: users_ext
+extensible: true
+default_ext_table: users_ext
 fields:
   - name: id
     type: bigint
@@ -214,6 +222,8 @@ fields:
     type: base.core.Range
   - name: status
     type: base.core.Status
+  - name: priority
+    type: base.core.Priority
 primary_key: [id]
 indexes:
   - name: idx_users_email
@@ -253,7 +263,6 @@ fields:
 name: Orders
 table:
   name: orders
-  extension: { strategy: none }
 fields:
   - name: id
     type: bigint
