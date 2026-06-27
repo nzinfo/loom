@@ -104,11 +104,7 @@ describe('resolveShortName', () => {
 
   it('resolves a renamed import (form C: "ns.Name as Alias")', () => {
     // base.core.Money as Cash → short name "Cash" resolves to base.core.Money
-    const result = resolveShortName(
-      'Cash',
-      ['base.core.Money as Cash', 'base.core.*'],
-      typeFqns,
-    );
+    const result = resolveShortName('Cash', ['base.core.Money as Cash', 'base.core.*'], typeFqns);
     expect(result.kind).toBe('resolved');
     if (result.kind === 'resolved') {
       expect(result.fqn).toBe('base.core.Money');

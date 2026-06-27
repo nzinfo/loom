@@ -56,8 +56,6 @@ properties: []
 name: T
 table:
   name: t
-  extension:
-    strategy: none
 fields:
   - name: id
     type: bigint
@@ -86,8 +84,6 @@ properties: []
 name: T
 table:
   name: t
-  extension:
-    strategy: none
 fields:
   - name: id
     type: bigint
@@ -168,7 +164,6 @@ properties: []
 name: Users
 table:
   name: users
-  extension: { strategy: none }
 fields:
   - { name: id, type: string, required: true }
   - { name: age, type: notAScalar }
@@ -213,7 +208,6 @@ using:
   - base.core.*
 table:
   name: users
-  extension: { strategy: none }
 fields:
   - { name: id, type: string, required: true }
   - { name: balance, type: Money }
@@ -244,7 +238,6 @@ using:
   - base.core.*
 table:
   name: users
-  extension: { strategy: none }
 fields:
   - { name: id, type: string, required: true }
   - { name: email, type: base.core.Email }
@@ -266,7 +259,6 @@ properties: []
 name: Users
 table:
   name: users
-  extension: { strategy: none }
 fields:
   - { name: id, type: string }
 primary_key: [id]
@@ -290,7 +282,6 @@ properties: []
 name: Users
 table:
   name: users
-  extension: { strategy: none }
 fields:
   - { name: id, type: string, required: true }
   - name: status
@@ -323,7 +314,6 @@ using:
   - base.core.*
 table:
   name: users
-  extension: { strategy: none }
 fields:
   - { name: id, type: string, required: true }
   - { name: status, type: Status }

@@ -78,6 +78,16 @@ export function validate(opts: ValidateOptions): ValidateResult {
   for (const [entityId, entries] of opts.ir.extensionFields) {
     for (const entry of entries) {
       checkExtensionEntry(entityId, entry, scalarReqProps, opts.ir, opts.diagnostics);
+      // Bug 4 fix: new_table strategy requires a non-empty table name.
+      if (entry.strategy === 'new_table' && !entry.tableName) {
+        opts.diagnostics.add({
+          category: 'semantic',
+          file: entityId,
+          line: 1,
+          column: 1,
+          message: `extension field "${entry.name}" uses strategy "new_table" but no table name is declared (add "table:" to the .ext.yaml)`,
+        });
+      }
     }
     checkExtensionTarget(entityId, opts.ir, opts.diagnostics);
 
@@ -110,10 +120,7 @@ export function validate(opts: ValidateOptions): ValidateResult {
  * Expand an extension field entry into its JSON key names.
  * Scalar fields → [name]. Struct refs → [name_subfield, ...].
  */
-function expandEntryKeys(
-  entry: ExtensionFieldEntry,
-  ir: IR,
-): string[] {
+function expandEntryKeys(entry: ExtensionFieldEntry, ir: IR): string[] {
   if (!entry.refValueTypeId) return [entry.name];
   const node = ir.nodes.get(entry.refValueTypeId);
   if (node?.kind !== 'type') return [entry.name];
@@ -196,7 +203,8 @@ function checkTable(
     checkTypedField(identity, 'table', fieldRec, scalarReqProps, diag);
   }
   for (let pki = 0; pki < t.primary_key.length; pki++) {
-    const pk = t.primary_key[pki]!;
+    const pk = t.primary_key[pki];
+    if (pk === undefined) continue;
     if (!requiredFieldNames.has(pk)) {
       const p = pos(nodeSource, `primary_key.${pki}`);
       diag.add({
@@ -210,13 +218,13 @@ function checkTable(
   }
 
   // Reject unimplemented strategies.
-  if (t.table.extension.strategy === 'json_column') {
+  if (t.extension?.strategy === 'json_column') {
     diag.add({
       category: 'semantic',
       file: identity,
       line: 1,
       column: 1,
-      message: `json_column strategy is not yet implemented; use sidecar_eav or none`,
+      message: 'json_column strategy is not yet implemented; use sidecar_eav or none',
     });
   }
 
@@ -370,13 +378,16 @@ function checkExtensionTarget(entityId: string, ir: IR, diag: Diagnostics): void
     return;
   }
   const table = tableNode.data as Table;
-  if (table.table.extension.strategy !== 'sidecar_eav') {
+  // Accept both legacy sidecar_eav and new extensible/sidecar_jsonb.
+  const isExtensible = table.extensible === true;
+  const legacyStrategy = table.extension?.strategy ?? 'none';
+  if (!isExtensible && legacyStrategy !== 'sidecar_eav') {
     diag.add({
       category: 'semantic',
       file: entityId,
       line: 1,
       column: 1,
-      message: `extension_fields requires sidecar_eav strategy on entity "${entityId}"`,
+      message: `extension_fields requires extensible:true or sidecar_eav strategy on entity "${entityId}"`,
     });
   }
 }
@@ -386,9 +397,9 @@ function checkExtensionTarget(entityId: string, ir: IR, diag: Diagnostics): void
  * Reports a 'cycle' diagnostic for each cycle found.
  */
 function checkCycles(deps: ReadonlyMap<string, ReadonlySet<string>>, diag: Diagnostics): void {
-  const WHITE = 0,
-    GRAY = 1,
-    BLACK = 2;
+  const WHITE = 0;
+  const GRAY = 1;
+  const BLACK = 2;
   const color = new Map<string, number>();
 
   function dfs(node: string, path: string[]): boolean {

@@ -1,3 +1,7 @@
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 /**
  * E2E test helpers — subprocess-based CLI execution + temp directory factory.
  *
@@ -7,10 +11,6 @@
  * command functions directly) cannot provide.
  */
 import { execa } from 'execa';
-import * as fs from 'node:fs';
-import * as os from 'node:os';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

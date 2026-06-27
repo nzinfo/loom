@@ -53,9 +53,12 @@ function collectNodes(
       };
     } else if (kind === 'table') {
       const table = data.table as Record<string, unknown>;
+      const extensible = data.extensible === true;
+      const legacyStrategy = (data.extension as Record<string, unknown>)?.strategy ?? 'none';
       entry.detail = {
         physical_name: table.name,
-        strategy: (table.extension as Record<string, unknown>)?.strategy ?? 'none',
+        extensible,
+        strategy: extensible ? 'sidecar_jsonb' : legacyStrategy,
       };
     }
     out.push(entry);

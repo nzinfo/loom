@@ -188,9 +188,7 @@ const scalarPropertySchema = z
 
 /** Valid carrier types for enum form. string = default (native ENUM), integer
  * scalars = integer column + CHECK constraint. */
-const VALID_ENUM_CARRIERS = new Set([
-  'string', 'uint8', 'int16', 'integer', 'bigint',
-]);
+const VALID_ENUM_CARRIERS = new Set(['string', 'uint8', 'int16', 'integer', 'bigint']);
 
 export const TypeSchema = z
   .object({

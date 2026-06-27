@@ -40,8 +40,9 @@ export function identityToPath(
   const parts = fqn.split('.');
   if (parts.length < 3) return undefined;
 
-  const system = parts[0]!;
-  const module = parts[1]!;
+  const system = parts[0];
+  const module = parts[1];
+  if (system === undefined || module === undefined) return undefined;
   const name = parts.slice(2).join('.'); // supports names with dots? unlikely but safe
 
   const ext = extForKind(kind as FileKind);

@@ -104,7 +104,8 @@ export function extractFlags(
   const positionals: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
-    const a = args[i]!;
+    const a = args[i];
+    if (a === undefined) continue;
 
     // Boolean flags (--json, --force, etc.)
     if (boolFlags.includes(a)) {
@@ -122,7 +123,8 @@ export function extractFlags(
     if (repeatFlags.includes(a) && i + 1 < args.length) {
       const key = a;
       if (!repeated[key]) repeated[key] = [];
-      repeated[key]!.push(args[++i]!);
+      const next = args[++i];
+      if (next !== undefined) repeated[key]?.push(next);
       continue;
     }
 
@@ -132,4 +134,3 @@ export function extractFlags(
 
   return { values, bools, repeated, positionals };
 }
-

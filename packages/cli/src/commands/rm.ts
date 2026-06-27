@@ -7,9 +7,9 @@
  */
 import * as fs from 'node:fs/promises';
 import type { Owner } from '@loom/core';
-import { extensionToPath, identityToPath } from '../shared/identity.js';
 import { load } from '@loom/core';
 import { NodeFileSystem } from '../shared/fs.js';
+import { extensionToPath, identityToPath } from '../shared/identity.js';
 import { loadOrError } from '../shared/load.js';
 import { writeError, writeText } from '../shared/output.js';
 
@@ -41,9 +41,7 @@ export async function rmNodeCommand(opts: RmNodeOptions): Promise<number> {
 
   if (dependents.length > 0 && !opts.force) {
     writeError(
-      `node "${opts.identity}" is referenced by ${dependents.length} other node(s):\n` +
-        dependents.map((d) => `  ${d}`).join('\n') +
-        '\nuse --force to delete anyway',
+      `node "${opts.identity}" is referenced by ${dependents.length} other node(s):\n${dependents.map((d) => `  ${d}`).join('\n')}\nuse --force to delete anyway`,
     );
     return 3;
   }
@@ -66,8 +64,7 @@ export async function rmNodeCommand(opts: RmNodeOptions): Promise<number> {
   writeText(`deleted: ${filePath}`);
   if (dependents.length > 0) {
     writeText(
-      `warning: ${dependents.length} node(s) still reference this (broken refs):\n` +
-        dependents.map((d) => `  ${d}`).join('\n'),
+      `warning: ${dependents.length} node(s) still reference this (broken refs):\n${dependents.map((d) => `  ${d}`).join('\n')}`,
     );
   }
   return 0;

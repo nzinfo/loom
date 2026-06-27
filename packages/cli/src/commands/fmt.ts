@@ -10,8 +10,8 @@
 import type { Dirent } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
-import { parseDocument, stringify, Document } from 'yaml';
-import { writeText, writeError } from '../shared/output.js';
+import { type Document, parseDocument, stringify } from 'yaml';
+import { writeError, writeText } from '../shared/output.js';
 
 export interface FmtOptions {
   readonly path: string;
@@ -20,9 +20,41 @@ export interface FmtOptions {
 
 // Canonical key order per file kind (top-level keys).
 const KEY_ORDER: Record<string, readonly string[]> = {
-  type: ['version', 'name', 'form', 'display_name', 'description', 'using', 'properties', 'fields', 'variants', 'constraints'],
-  table: ['version', 'name', 'display_name', 'description', 'using', 'table', 'fields', 'primary_key', 'indexes', 'foreign_keys', 'constraints'],
-  entity: ['version', 'name', 'display_name', 'description', 'primary_table', 'business_keys', 'audit', 'view'],
+  type: [
+    'version',
+    'name',
+    'form',
+    'display_name',
+    'description',
+    'using',
+    'properties',
+    'fields',
+    'variants',
+    'constraints',
+  ],
+  table: [
+    'version',
+    'name',
+    'display_name',
+    'description',
+    'using',
+    'table',
+    'fields',
+    'primary_key',
+    'indexes',
+    'foreign_keys',
+    'constraints',
+  ],
+  entity: [
+    'version',
+    'name',
+    'display_name',
+    'description',
+    'primary_table',
+    'business_keys',
+    'audit',
+    'view',
+  ],
   extension_fields: ['version', 'entity', 'group', 'using', 'fields'],
 };
 
@@ -66,9 +98,7 @@ export async function fmtCommand(opts: FmtOptions): Promise<number> {
     });
 
     // Ensure trailing newline.
-    const normalized = formatted_text.endsWith('\n')
-      ? formatted_text
-      : `${formatted_text}\n`;
+    const normalized = formatted_text.endsWith('\n') ? formatted_text : `${formatted_text}\n`;
 
     if (normalized !== original) {
       if (opts.check) {
@@ -142,7 +172,9 @@ function reorderTableInner(doc: Document.Parsed): void {
 function reorderFields(doc: Document.Parsed): void {
   const root = doc.contents as { get?: (key: string, keep?: boolean) => unknown } | null;
   if (!root?.get) return;
-  const fieldsNode = root.get('fields', true) as { items?: { items?: { key: { value: string } }[] }[] } | undefined;
+  const fieldsNode = root.get('fields', true) as
+    | { items?: { items?: { key: { value: string } }[] }[] }
+    | undefined;
   if (!fieldsNode?.items) return;
   for (const field of fieldsNode.items) {
     if (field?.items) {

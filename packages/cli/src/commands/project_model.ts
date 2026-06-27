@@ -123,7 +123,11 @@ export function projectModelJson(ir: IR, model: PhysicalModel, dialect: Dialect)
   };
 }
 
-function serializeTable(t: PhysicalModel['tables'][number], dialect: Dialect, enums: PhysicalModel['enums']): TableJson {
+function serializeTable(
+  t: PhysicalModel['tables'][number],
+  dialect: Dialect,
+  enums: PhysicalModel['enums'],
+): TableJson {
   const extension =
     t.strategy !== 'none'
       ? {
@@ -155,7 +159,11 @@ function serializeTable(t: PhysicalModel['tables'][number], dialect: Dialect, en
   };
 }
 
-function serializeColumn(c: PhysicalColumn, dialect: Dialect, enums: PhysicalModel['enums']): ColumnJson {
+function serializeColumn(
+  c: PhysicalColumn,
+  dialect: Dialect,
+  enums: PhysicalModel['enums'],
+): ColumnJson {
   let sqlType: string;
   if (c.enumRef) {
     const entry = enums.get(c.enumRef);

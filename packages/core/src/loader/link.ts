@@ -9,6 +9,42 @@ import type { ParsedExtensionFields } from './parse.js';
 import { findPosition } from './yaml_position.js';
 
 /**
+ * xxHash64 hash function — used for source hash in sidecar_jsonb extension
+ * tables (distinguishes rows from different base tables / owners / groups
+ * sharing one ext table).
+ *
+ * Uses xxhash-wasm (WASM implementation of xxHash64) for correctness —
+ * hand-rolled hash implementations are error-prone. The WASM module is
+ * initialized lazily and cached.
+ *
+ * Verified against known vectors:
+ *   xxHash64("")  = ef46db3751d8e999
+ *   xxHash64("a") = d24ec4f1a98c6e5b
+ *
+ * See design doc: 2026-06-24-ext-strategy-decoupling.md §5.
+ */
+
+// Lazy-init the WASM xxhash instance. The xxhash-wasm default export is an
+// async factory that returns an object with h64ToString().
+let _xxhashInstance: { h64ToString: (input: string) => string } | null = null;
+let _xxhashInitPromise: Promise<{ h64ToString: (input: string) => string }> | null = null;
+
+async function getXXHash(): Promise<{ h64ToString: (input: string) => string }> {
+  if (_xxhashInstance) return _xxhashInstance;
+  if (!_xxhashInitPromise) {
+    // Dynamic import to avoid loading WASM at module-eval time.
+    // The factory returns a promise that resolves to the hasher.
+    _xxhashInitPromise = import('xxhash-wasm').then((mod) => {
+      // xxhash-wasm v1.x: default export is an async factory.
+      const factory = mod.default as () => Promise<{ h64ToString: (input: string) => string }>;
+      return factory();
+    });
+  }
+  _xxhashInstance = await _xxhashInitPromise;
+  return _xxhashInstance;
+}
+
+/**
  * Pass 2 — link. See spec §13.1, §12.
  *
  * For every parsed file:
@@ -78,7 +114,7 @@ export async function link(opts: LinkOptions): Promise<LinkResult> {
   // Aggregate extension_fields across owners into the registry keyed by
   // entity identity. Same-name field across owners on the same entity is
   // a hard error (spec §7).
-  const extensionFields = collectExtensionFields(
+  const extensionFields = await collectExtensionFields(
     opts.extensionFieldsFiles ?? [],
     opts.files,
     opts.diagnostics,
@@ -155,11 +191,11 @@ function ownerOfFile(filePath: string, files?: ReadonlyMap<string, DiscoveredEnt
  * Each entry's `type:` is normalized via normalizeType. Single-segment refs
  * become `scalar`; three-segment refs become `refValueTypeId`.
  */
-function collectExtensionFields(
+async function collectExtensionFields(
   extensionFieldsFiles: ReadonlyArray<ParsedExtensionFields>,
   files: ReadonlyMap<string, DiscoveredEntry> | undefined,
   diag: Diagnostics,
-): Map<Identity, ReadonlyArray<ExtensionFieldEntry>> {
+): Promise<Map<Identity, ReadonlyArray<ExtensionFieldEntry>>> {
   const byEntity = new Map<Identity, ExtensionFieldEntry[]>();
   // Track which file first contributed each (entity, fieldName) for error msgs.
   const seen = new Map<string, string>();
@@ -170,6 +206,8 @@ function collectExtensionFields(
   for (const { identity, file } of extensionFieldsFiles) {
     const ef = file.data as ExtensionFields;
     const entityRef = ef.entity;
+    // Strategy: default to sidecar_jsonb for backward compat.
+    const strategy = (ef.strategy ?? 'sidecar_jsonb') as 'sidecar_jsonb' | 'new_table';
     // Group: from the .ext.yaml's group field, or default to the file stem.
     const fileStem =
       file.file
@@ -184,6 +222,16 @@ function collectExtensionFields(
         : owner.kind === 'ext'
           ? `ext:${owner.provider}`
           : `tenant:${owner.id}`;
+
+    // Resolve the ext table name and compute source hash.
+    // tableRef: ext-declared → use it; otherwise resolved in expand.ts from
+    // the base table's default_ext_table / auto-derivation.
+    const tableRef = ef.table;
+    // sourceHash = xxHash64(baseTableIdentity:ownerKey:group) — only for sidecar.
+    // baseTableIdentity resolved lazily in expand (entity → primary_table).
+    const sourceHashInput = `${entityRef}:${ownerKey}:${group}`;
+    const hasher = await getXXHash();
+    const sourceHash = hasher.h64ToString(sourceHashInput);
 
     // Check for duplicate group from the same owner on the same entity.
     // Different owners can have the same group name (different scope rows),
@@ -226,6 +274,7 @@ function collectExtensionFields(
       seen.set(key, identity);
 
       const ref = desc.ref;
+      const tableName = tableRef ?? ''; // resolved later in expand if empty
       if (ref.includes('.')) {
         bucket.push({
           name: fieldName,
@@ -234,6 +283,9 @@ function collectExtensionFields(
           props: desc.args ?? {},
           group,
           owner,
+          strategy,
+          tableName,
+          ...(strategy === 'sidecar_jsonb' ? { sourceHash } : {}),
           ...(file.sourceText ? { sourceText: file.sourceText } : {}),
         });
       } else {
@@ -243,6 +295,9 @@ function collectExtensionFields(
           props: desc.args ?? {},
           group,
           owner,
+          strategy,
+          tableName,
+          ...(strategy === 'sidecar_jsonb' ? { sourceHash } : {}),
           ...(file.sourceText ? { sourceText: file.sourceText } : {}),
         });
       }
@@ -295,12 +350,20 @@ function resolveFieldTypes(
     (e as Record<string, unknown>).type = descriptor;
 
     const pos = sourceText
-      ? findPosition(sourceText, `fields.${fieldIdx}.type`) ?? { line: 1, column: 1 }
+      ? (findPosition(sourceText, `fields.${fieldIdx}.type`) ?? { line: 1, column: 1 })
       : { line: 1, column: 1 };
 
     const threeSeg = parseTypeRef(descriptor.ref);
     if (threeSeg !== null) {
-      resolveThreeSegment(e as Record<string, unknown>, threeSeg, identity, parsed, diag, deps, pos);
+      resolveThreeSegment(
+        e as Record<string, unknown>,
+        threeSeg,
+        identity,
+        parsed,
+        diag,
+        deps,
+        pos,
+      );
     } else {
       resolveSingleSegment(
         e as Record<string, unknown>,

@@ -29,21 +29,34 @@ describe('e2e: full lifecycle', () => {
     expect(check1.exitCode).toBe(0);
 
     // 3. new type — creates a struct
-    const newType = await runLoom([
-      'new', 'type', dir, 'shop.core.Address', '--form', 'struct',
-    ]);
+    const newType = await runLoom(['new', 'type', dir, 'shop.core.Address', '--form', 'struct']);
     expect(newType.exitCode).toBe(0);
     expect(fs.existsSync(path.join(dir, 'platform/shop/core/address.type.yaml'))).toBe(true);
 
     // 4. add field city
     const add1 = await runLoom([
-      'add', 'field', dir, 'type:shop.core.Address', 'city', 'string', '--args', 'max_length=64',
+      'add',
+      'field',
+      dir,
+      'type:shop.core.Address',
+      'city',
+      'string',
+      '--args',
+      'max_length=64',
     ]);
     expect(add1.exitCode).toBe(0);
 
     // 5. add field country (required)
     const add2 = await runLoom([
-      'add', 'field', dir, 'type:shop.core.Address', 'country', 'string', '--args', 'max_length=2', '--required',
+      'add',
+      'field',
+      dir,
+      'type:shop.core.Address',
+      'country',
+      'string',
+      '--args',
+      'max_length=2',
+      '--required',
     ]);
     expect(add2.exitCode).toBe(0);
 
@@ -55,7 +68,12 @@ describe('e2e: full lifecycle', () => {
 
     // 7. move field country to first
     const move = await runLoom([
-      'move', 'field', dir, 'type:shop.core.Address', 'country', '--first',
+      'move',
+      'field',
+      dir,
+      'type:shop.core.Address',
+      'country',
+      '--first',
     ]);
     expect(move.exitCode).toBe(0);
 

@@ -9,11 +9,11 @@
  * to a file without loading the IR).
  */
 import process from 'node:process';
-import { YAMLMap } from 'yaml';
 import type { Owner } from '@loom/core';
-import { extensionToPath, identityToPath } from '../shared/identity.js';
 import { load } from '@loom/core';
+import { YAMLMap } from 'yaml';
 import { NodeFileSystem } from '../shared/fs.js';
+import { extensionToPath, identityToPath } from '../shared/identity.js';
 import { writeError, writeText } from '../shared/output.js';
 import {
   createFieldNode,
@@ -128,7 +128,11 @@ export async function moveFieldCommand(opts: MoveFieldOptions): Promise<number> 
   }
 
   // Remove from current position.
-  const node = seq.items[found.index]!;
+  const node = seq.items[found.index];
+  if (node === undefined || node === null) {
+    writeError(`internal: field node at index ${found.index} is not editable`);
+    return 3;
+  }
   seq.delete(found.index);
 
   // Compute new position.
@@ -294,7 +298,9 @@ async function resolveTargetFile(basePath: string, target: string): Promise<stri
     return filePath;
   }
 
-  writeError(`target must be an identity (type:...), extension target (ext:...::...), or a .yaml file path, got: ${target}`);
+  writeError(
+    `target must be an identity (type:...), extension target (ext:...::...), or a .yaml file path, got: ${target}`,
+  );
   return null;
 }
 

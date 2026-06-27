@@ -4,12 +4,12 @@
  * - Struct-expansion key collision (two fields produce same JSON key) → error
  */
 import { describe, expect, it } from 'vitest';
-import { link } from '../src/loader/link.js';
-import { validate } from '../src/loader/validate.js';
 import { Diagnostics } from '../src/errors.js';
 import type { AnyFile } from '../src/ir/schemas.js';
-import type { ParsedExtensionFields } from '../src/loader/parse.js';
 import type { DiscoveredEntry } from '../src/loader/discovery.js';
+import { link } from '../src/loader/link.js';
+import type { ParsedExtensionFields } from '../src/loader/parse.js';
+import { validate } from '../src/loader/validate.js';
 
 function makeExtFile(
   path: string,
@@ -83,7 +83,9 @@ describe('extension conflict: duplicate group from same owner', () => {
     });
 
     const messages = [...diag.errors].map((e) => e.message);
-    expect(messages.some((m) => m.includes('duplicate group "profile"') && m.includes('platform'))).toBe(true);
+    expect(
+      messages.some((m) => m.includes('duplicate group "profile"') && m.includes('platform')),
+    ).toBe(true);
   });
 
   it('allows different owners to use the same group name', async () => {
@@ -144,8 +146,8 @@ describe('extension conflict: struct-expansion key collision', () => {
     // Link pass to aggregate extension fields
     const extFiles: ParsedExtensionFields[] = [
       makeExtFile('platform/base/core/user.ext.yaml', 'entity:base.core.User', [
-        { name: 'balance', type: 'base.core.Money' },     // → balance_amount, balance_currency_code
-        { name: 'balance_amount', type: 'string' },        // ← collides with balance_amount!
+        { name: 'balance', type: 'base.core.Money' }, // → balance_amount, balance_currency_code
+        { name: 'balance_amount', type: 'string' }, // ← collides with balance_amount!
       ]),
     ];
 
@@ -165,7 +167,9 @@ describe('extension conflict: struct-expansion key collision', () => {
     validate({ ir: linkResult.ir, diagnostics: diag });
 
     const messages = [...diag.errors].map((e) => e.message);
-    expect(messages.some((m) => m.includes('key collision') && m.includes('balance_amount'))).toBe(true);
+    expect(messages.some((m) => m.includes('key collision') && m.includes('balance_amount'))).toBe(
+      true,
+    );
   });
 
   it('does not report collision when keys are distinct', async () => {
@@ -190,8 +194,8 @@ describe('extension conflict: struct-expansion key collision', () => {
 
     const extFiles: ParsedExtensionFields[] = [
       makeExtFile('platform/base/core/user.ext.yaml', 'entity:base.core.User', [
-        { name: 'balance', type: 'base.core.Money' },      // → balance_amount, balance_currency_code
-        { name: 'nickname', type: 'string' },               // no collision
+        { name: 'balance', type: 'base.core.Money' }, // → balance_amount, balance_currency_code
+        { name: 'nickname', type: 'string' }, // no collision
       ]),
     ];
 

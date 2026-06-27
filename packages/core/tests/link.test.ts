@@ -52,7 +52,7 @@ describe('link (Pass 2)', () => {
       'platform/base/core/a.type.yaml':
         'version: loom-schema/v2\nname: A\nform: struct\nfields:\n  - name: x\n    type: base.core.Users\n',
       'platform/base/core/users.table.yaml':
-        'version: loom-schema/v2\nname: Users\ntable:\n  name: users\n  extension:\n    strategy: none\nfields:\n  - name: id\n    type: string\n    required: true\nprimary_key: [id]\n',
+        'version: loom-schema/v2\nname: Users\ntable:\n  name: users\nfields:\n  - name: id\n    type: string\n    required: true\nprimary_key: [id]\n',
     });
     const { diagnostics } = await runLink(fs);
     expect(diagnostics.errors.some((e) => e.category === 'kind_mismatch')).toBe(true);
@@ -84,7 +84,6 @@ using:
   - base.core.*
 table:
   name: users_base
-  extension: { strategy: none }
 fields:
   - { name: id, type: bigint, required: true }
   - { name: email, type: Email, required: true, unique: true }
@@ -128,7 +127,6 @@ using:
   - retail.types.*
 table:
   name: orders
-  extension: { strategy: none }
 fields:
   - { name: id, type: string, required: true }
   - { name: total, type: Money }
@@ -152,7 +150,6 @@ properties: []
 name: Users
 table:
   name: users
-  extension: { strategy: none }
 fields:
   - { name: id, type: string, required: true }
   - { name: x, type: Nonexistent }
@@ -175,7 +172,6 @@ properties: []
 name: Users
 table:
   name: users
-  extension: { strategy: none }
 fields:
   - { name: id, type: string, required: true }
   - { name: x, type: base.core.Users }
@@ -198,7 +194,6 @@ properties: []
 name: Users
 table:
   name: users
-  extension: { strategy: none }
 fields:
   - { name: id, type: string, required: true }
   - { name: x, type: Foo.Bar }
@@ -227,7 +222,6 @@ properties: []
 name: Users
 table:
   name: users
-  extension: { strategy: none }
 fields:
   - { name: id, type: string, required: true }
 primary_key: [id]
@@ -242,7 +236,6 @@ primary_key: [id]
 name: Orders
 table:
   name: orders
-  extension: { strategy: none }
 fields:
   - { name: id, type: string, required: true }
 primary_key: [id]
@@ -267,9 +260,8 @@ properties: []
 name: Users
 table:
   name: users
-  extension:
-    strategy: sidecar_eav
-    ext_table: users_ext
+extensible: true
+default_ext_table: users_ext
 fields:
   - { name: id, type: string, required: true }
 primary_key: [id]
@@ -304,9 +296,8 @@ properties: []
 name: Users
 table:
   name: users
-  extension:
-    strategy: sidecar_eav
-    ext_table: users_ext
+extensible: true
+default_ext_table: users_ext
 fields:
   - { name: id, type: string, required: true }
 primary_key: [id]
@@ -344,9 +335,8 @@ properties: []
 name: Users
 table:
   name: users
-  extension:
-    strategy: sidecar_eav
-    ext_table: users_ext
+extensible: true
+default_ext_table: users_ext
 fields:
   - { name: id, type: string, required: true }
 primary_key: [id]

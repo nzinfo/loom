@@ -192,11 +192,15 @@ function buildGroups(extFields: readonly ExtensionFieldEntry[] | undefined): Gro
     }
     bucket.push(ef);
   }
-  return groupOrder.map((name) => ({
-    name,
-    owner: byGroup.get(name)?.[0] ? formatOwner(byGroup.get(name)![0]!.owner) : 'unknown',
-    fields: byGroup.get(name)!,
-  }));
+  return groupOrder.map((name) => {
+    const group = byGroup.get(name);
+    const first = group?.[0];
+    return {
+      name,
+      owner: first ? formatOwner(first.owner) : 'unknown',
+      fields: group ?? [],
+    };
+  });
 }
 
 function formatEntityView(

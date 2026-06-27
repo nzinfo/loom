@@ -28,10 +28,7 @@ describe('enumMeta', () => {
 
     it('formats value=display_name for labeled variants', () => {
       expect(
-        formatEnumCommentBody([
-          { value: 'active', display_name: 'Active' },
-          { value: 'inactive' },
-        ]),
+        formatEnumCommentBody([{ value: 'active', display_name: 'Active' }, { value: 'inactive' }]),
       ).toBe('active=Active|inactive');
     });
 
@@ -51,15 +48,11 @@ describe('enumMeta', () => {
 
     it('returns undefined when display_name contains a forbidden delimiter (|)', () => {
       // | would break entry separation → refuse to emit (avoid malformed comment)
-      expect(
-        formatEnumCommentBody([{ value: 'a', display_name: 'x|y' }]),
-      ).toBeUndefined();
+      expect(formatEnumCommentBody([{ value: 'a', display_name: 'x|y' }])).toBeUndefined();
     });
 
     it('returns undefined when description contains a forbidden delimiter (;)', () => {
-      expect(
-        formatEnumCommentBody([{ value: 'a', description: 'x;y' }]),
-      ).toBeUndefined();
+      expect(formatEnumCommentBody([{ value: 'a', description: 'x;y' }])).toBeUndefined();
     });
 
     it('returns undefined when display_name contains "="', () => {
@@ -71,7 +64,7 @@ describe('enumMeta', () => {
     });
 
     it('returns undefined when display_name contains a single quote', () => {
-      expect(formatEnumCommentBody([{ value: "a", display_name: "it's" }])).toBeUndefined();
+      expect(formatEnumCommentBody([{ value: 'a', display_name: "it's" }])).toBeUndefined();
     });
 
     it('still emits if only ONE of several variants has a forbidden char (whole enum refused)', () => {

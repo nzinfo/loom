@@ -35,7 +35,7 @@ describe('projector views (JSONB extension groups)', () => {
       'platform/base/core/bigint.type.yaml':
         'version: loom-schema/v2\nname: bigint\nform: scalar\nproperties: []\n',
       'platform/base/core/t.table.yaml':
-        'version: loom-schema/v2\nname: T\ntable:\n  name: t\n  extension:\n    strategy: none\nfields:\n  - name: id\n    type: bigint\n    required: true\nprimary_key: [id]\n',
+        'version: loom-schema/v2\nname: T\ntable:\n  name: t\nfields:\n  - name: id\n    type: bigint\n    required: true\nprimary_key: [id]\n',
     });
     const { ir } = await load({ fs, basePath: '' });
     const model = expandTables(ir);
@@ -55,7 +55,7 @@ describe('projector views (JSONB extension groups)', () => {
       'platform/base/core/money.type.yaml':
         'version: loom-schema/v2\nname: Money\nform: struct\nfields:\n  - name: amount\n    type:\n      ref: decimal\n      args: { precision: 18, scale: 4 }\n  - name: currency_code\n    type:\n      ref: string\n      args: { max_length: 3 }\n',
       'platform/base/core/users.table.yaml':
-        'version: loom-schema/v2\nname: Users\ntable:\n  name: users_base\n  extension:\n    strategy: sidecar_eav\n    ext_table: users_ext\nfields:\n  - name: id\n    type: bigint\n    required: true\nprimary_key: [id]\n',
+        'version: loom-schema/v2\nname: Users\ntable:\n  name: users_base\nextensible: true\ndefault_ext_table: users_ext\nfields:\n  - name: id\n    type: bigint\n    required: true\nprimary_key: [id]\n',
       'platform/base/core/user.entity.yaml':
         'version: loom-schema/v2\nname: User\nprimary_table: table:base.core.Users\nview: users\n',
       'platform/base/core/user_finance.ext.yaml':
@@ -87,7 +87,7 @@ describe('projector views (JSONB extension groups)', () => {
       'platform/base/core/string.type.yaml':
         'version: loom-schema/v2\nname: string\nform: scalar\nproperties:\n  - { name: max_length, type: integer, required: true }\n',
       'platform/base/core/users.table.yaml':
-        'version: loom-schema/v2\nname: Users\ntable:\n  name: users_base\n  extension:\n    strategy: sidecar_eav\n    ext_table: users_ext\nfields:\n  - name: id\n    type: bigint\n    required: true\nprimary_key: [id]\n',
+        'version: loom-schema/v2\nname: Users\ntable:\n  name: users_base\nextensible: true\ndefault_ext_table: users_ext\nfields:\n  - name: id\n    type: bigint\n    required: true\nprimary_key: [id]\n',
       'platform/base/core/user.entity.yaml':
         'version: loom-schema/v2\nname: User\nprimary_table: table:base.core.Users\nview: users\n',
       'platform/base/core/user_prefs.ext.yaml':

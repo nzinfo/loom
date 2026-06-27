@@ -56,7 +56,6 @@ export async function initCommand(opts: InitOptions): Promise<number> {
         name: 'Items',
         table: {
           name: `${opts.system}_${opts.module}_example`,
-          extension: { strategy: 'none' },
         },
         using: [`${ns}.*`],
         fields: [
@@ -87,7 +86,7 @@ export async function initCommand(opts: InitOptions): Promise<number> {
     `initialized ${created.length} file(s) in ${root}/platform/${opts.system}/${opts.module}/`,
   );
   if (!opts.noExample) {
-    writeText(`\nall 18 built-in scalars available. Example table + entity created.`);
+    writeText('\nall 18 built-in scalars available. Example table + entity created.');
     writeText(`run 'loom check ${root}/' to verify.`);
   }
   return 0;

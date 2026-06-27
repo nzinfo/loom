@@ -4,9 +4,8 @@ using:
   - shop.core.*
 table:
   name: products_base
-  extension:
-    strategy: sidecar_eav
-    ext_table: products_ext
+extensible: true
+default_ext_table: products_ext
 fields:
   - name: id
     type: bigint
@@ -19,3 +18,4 @@ fields:
   - name: base_price
     type: shop.core.Money
 primary_key: [ id ]
+

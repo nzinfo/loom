@@ -16,22 +16,47 @@ async function setupStructWithFields(): Promise<string> {
   const dir = tmpProject();
   await runLoom(['init', dir, '--system', 'shop', '--module', 'core', '--no-example']);
   await runLoom(['new', 'type', dir, 'shop.core.Address', '--form', 'struct']);
-  await runLoom(['add', 'field', dir, 'type:shop.core.Address', 'city', 'string', '--args', 'max_length=64']);
-  await runLoom(['add', 'field', dir, 'type:shop.core.Address', 'zip', 'string', '--args', 'max_length=10']);
-  await runLoom(['add', 'field', dir, 'type:shop.core.Address', 'country', 'string', '--args', 'max_length=2', '--required']);
+  await runLoom([
+    'add',
+    'field',
+    dir,
+    'type:shop.core.Address',
+    'city',
+    'string',
+    '--args',
+    'max_length=64',
+  ]);
+  await runLoom([
+    'add',
+    'field',
+    dir,
+    'type:shop.core.Address',
+    'zip',
+    'string',
+    '--args',
+    'max_length=10',
+  ]);
+  await runLoom([
+    'add',
+    'field',
+    dir,
+    'type:shop.core.Address',
+    'country',
+    'string',
+    '--args',
+    'max_length=2',
+    '--required',
+  ]);
   return dir;
 }
 
 function readFields(dir: string): string[] {
-  const content = fs.readFileSync(
-    path.join(dir, 'platform/shop/core/address.type.yaml'),
-    'utf-8',
-  );
+  const content = fs.readFileSync(path.join(dir, 'platform/shop/core/address.type.yaml'), 'utf-8');
   // Extract field names in order.
   const names: string[] = [];
   for (const line of content.split('\n')) {
     const m = line.match(/^\s+- name: (\w+)/);
-    if (m) names.push(m[1]!);
+    if (m?.[1]) names.push(m[1]);
   }
   return names;
 }
@@ -40,7 +65,14 @@ describe('e2e: add field', () => {
   it('adds a scalar field with args', async () => {
     const dir = await setupStructWithFields();
     const r = await runLoom([
-      'add', 'field', dir, 'type:shop.core.Address', 'state', 'string', '--args', 'max_length=32',
+      'add',
+      'field',
+      dir,
+      'type:shop.core.Address',
+      'state',
+      'string',
+      '--args',
+      'max_length=32',
     ]);
     expect(r.exitCode).toBe(0);
     expect(readFields(dir)).toContain('state');
@@ -48,9 +80,7 @@ describe('e2e: add field', () => {
 
   it('rejects duplicate field name', async () => {
     const dir = await setupStructWithFields();
-    const r = await runLoom([
-      'add', 'field', dir, 'type:shop.core.Address', 'city', 'string',
-    ]);
+    const r = await runLoom(['add', 'field', dir, 'type:shop.core.Address', 'city', 'string']);
     expect(r.exitCode).toBe(3);
     expect(r.stderr).toContain('already exists');
   });
@@ -85,7 +115,15 @@ describe('e2e: move field', () => {
 
   it('moves field after another', async () => {
     const dir = await setupStructWithFields();
-    const r = await runLoom(['move', 'field', dir, 'type:shop.core.Address', 'country', '--after', 'city']);
+    const r = await runLoom([
+      'move',
+      'field',
+      dir,
+      'type:shop.core.Address',
+      'country',
+      '--after',
+      'city',
+    ]);
     expect(r.exitCode).toBe(0);
     const names = readFields(dir);
     const cityIdx = names.indexOf('city');
@@ -107,7 +145,14 @@ describe('e2e: order fields', () => {
     const dir = await setupStructWithFields();
     // Current: value, city, zip, country
     const r = await runLoom([
-      'order', 'fields', dir, 'type:shop.core.Address', 'country', 'zip', 'city', 'value',
+      'order',
+      'fields',
+      dir,
+      'type:shop.core.Address',
+      'country',
+      'zip',
+      'city',
+      'value',
     ]);
     expect(r.exitCode).toBe(0);
     expect(readFields(dir)).toEqual(['country', 'zip', 'city', 'value']);
@@ -116,7 +161,13 @@ describe('e2e: order fields', () => {
   it('rejects incomplete order (missing field)', async () => {
     const dir = await setupStructWithFields();
     const r = await runLoom([
-      'order', 'fields', dir, 'type:shop.core.Address', 'value', 'city', 'zip',
+      'order',
+      'fields',
+      dir,
+      'type:shop.core.Address',
+      'value',
+      'city',
+      'zip',
       // missing 'country'
     ]);
     expect(r.exitCode).toBe(64);
@@ -126,8 +177,15 @@ describe('e2e: order fields', () => {
   it('rejects extra field in order', async () => {
     const dir = await setupStructWithFields();
     const r = await runLoom([
-      'order', 'fields', dir, 'type:shop.core.Address',
-      'value', 'city', 'zip', 'country', 'extra',
+      'order',
+      'fields',
+      dir,
+      'type:shop.core.Address',
+      'value',
+      'city',
+      'zip',
+      'country',
+      'extra',
     ]);
     expect(r.exitCode).toBe(64);
     expect(r.stderr).toContain('unknown');
@@ -140,15 +198,20 @@ describe('e2e: rm node with dependency check', () => {
     await runLoom(['init', dir, '--system', 'shop', '--module', 'core', '--no-example']);
     await runLoom(['new', 'type', dir, 'shop.core.Money', '--form', 'struct']);
     await runLoom([
-      'add', 'field', dir, 'type:shop.core.Money', 'amount',
-      'string', '--args', 'max_length=10', '--required',
+      'add',
+      'field',
+      dir,
+      'type:shop.core.Money',
+      'amount',
+      'string',
+      '--args',
+      'max_length=10',
+      '--required',
     ]);
 
     // Create a table referencing Money via a field
     await runLoom(['new', 'table', dir, 'shop.core.Orders']);
-    await runLoom([
-      'add', 'field', dir, 'table:shop.core.Orders', 'total', 'shop.core.Money',
-    ]);
+    await runLoom(['add', 'field', dir, 'table:shop.core.Orders', 'total', 'shop.core.Money']);
 
     // rm type should block (table:shop.core.Orders depends on type:shop.core.Money)
     const blocked = await runLoom(['rm', 'type', dir, 'shop.core.Money']);
@@ -167,7 +230,12 @@ describe('e2e: new entity + extension', () => {
     await runLoom(['init', dir, '--system', 'shop', '--module', 'core', '--no-example']);
     await runLoom(['new', 'table', dir, 'shop.core.Products']);
     await runLoom([
-      'new', 'entity', dir, 'shop.core.Product', '--table', 'table:shop.core.Products',
+      'new',
+      'entity',
+      dir,
+      'shop.core.Product',
+      '--table',
+      'table:shop.core.Products',
     ]);
 
     // entity file should exist
@@ -175,49 +243,65 @@ describe('e2e: new entity + extension', () => {
 
     // Create extension from platform owner
     const ext = await runLoom([
-      'new', 'extension', dir,
-      '--entity', 'entity:shop.core.Product',
-      '--group', 'inventory',
+      'new',
+      'extension',
+      dir,
+      '--entity',
+      'entity:shop.core.Product',
+      '--group',
+      'inventory',
     ]);
     expect(ext.exitCode).toBe(0);
     expect(fs.existsSync(path.join(dir, 'platform/shop/core/inventory.ext.yaml'))).toBe(true);
 
     // Create extension from ext provider
     const ext2 = await runLoom([
-      'new', 'extension', dir,
-      '--entity', 'entity:shop.core.Product',
-      '--group', 'pricing',
-      '--owner', 'ext:vendor-x',
+      'new',
+      'extension',
+      dir,
+      '--entity',
+      'entity:shop.core.Product',
+      '--group',
+      'pricing',
+      '--owner',
+      'ext:vendor-x',
     ]);
     expect(ext2.exitCode).toBe(0);
     expect(fs.existsSync(path.join(dir, 'ext/vendor-x/shop/core/pricing.ext.yaml'))).toBe(true);
 
     // Add field to extension via ext: target
     const addExt = await runLoom([
-      'add', 'field', dir,
+      'add',
+      'field',
+      dir,
       'ext:entity:shop.core.Product::inventory',
-      'sku', 'string', '--args', 'max_length=64',
+      'sku',
+      'string',
+      '--args',
+      'max_length=64',
     ]);
     expect(addExt.exitCode).toBe(0);
     const extContent = fs.readFileSync(
-      path.join(dir, 'platform/shop/core/inventory.ext.yaml'), 'utf-8',
+      path.join(dir, 'platform/shop/core/inventory.ext.yaml'),
+      'utf-8',
     );
     expect(extContent).toContain('sku');
 
     // rm extension (specific group)
     const rmExt = await runLoom([
-      'rm', 'extension', dir,
-      '--entity', 'entity:shop.core.Product',
-      '--group', 'inventory',
+      'rm',
+      'extension',
+      dir,
+      '--entity',
+      'entity:shop.core.Product',
+      '--group',
+      'inventory',
     ]);
     expect(rmExt.exitCode).toBe(0);
     expect(fs.existsSync(path.join(dir, 'platform/shop/core/inventory.ext.yaml'))).toBe(false);
 
     // rm extension (all remaining)
-    const rmAll = await runLoom([
-      'rm', 'extension', dir,
-      '--entity', 'entity:shop.core.Product',
-    ]);
+    const rmAll = await runLoom(['rm', 'extension', dir, '--entity', 'entity:shop.core.Product']);
     expect(rmAll.exitCode).toBe(0);
     expect(fs.existsSync(path.join(dir, 'ext/vendor-x/shop/core/pricing.ext.yaml'))).toBe(false);
   });
@@ -228,7 +312,14 @@ describe('e2e: rm table + entity', () => {
     const dir = tmpProject();
     await runLoom(['init', dir, '--system', 'shop', '--module', 'core', '--no-example']);
     await runLoom(['new', 'table', dir, 'shop.core.Standalone']);
-    await runLoom(['new', 'entity', dir, 'shop.core.Thing', '--table', 'table:shop.core.Standalone']);
+    await runLoom([
+      'new',
+      'entity',
+      dir,
+      'shop.core.Thing',
+      '--table',
+      'table:shop.core.Standalone',
+    ]);
 
     // rm entity first (no deps on it)
     const rmEntity = await runLoom(['rm', 'entity', dir, 'shop.core.Thing']);
@@ -247,7 +338,13 @@ describe('e2e: move field --before', () => {
     const dir = await setupStructWithFields();
     // Current: value, city, zip, country
     const r = await runLoom([
-      'move', 'field', dir, 'type:shop.core.Address', 'country', '--before', 'city',
+      'move',
+      'field',
+      dir,
+      'type:shop.core.Address',
+      'country',
+      '--before',
+      'city',
     ]);
     expect(r.exitCode).toBe(0);
     const names = readFields(dir);
@@ -257,24 +354,36 @@ describe('e2e: move field --before', () => {
   });
 });
 
-describe('e2e: update table strategy constraint', () => {
-  it('blocks strategy change when entity has extension fields', async () => {
-    const productDir = repoRoot('examples/product');
+describe('e2e: update table extensible constraint', () => {
+  it('blocks disabling extensions when entity has extension fields', async () => {
+    // Use a temp copy of the product example to avoid mutating the shared example.
+    const dir = tmpProject();
+    fs.cpSync(repoRoot('examples/product'), dir, { recursive: true });
     const blocked = await runLoom([
-      'update', 'table', productDir, 'table:shop.core.Products', '--strategy', 'none',
+      'update',
+      'table',
+      dir,
+      'table:shop.core.Products',
+      '--extensible',
+      'false',
     ]);
     expect(blocked.exitCode).toBe(3);
     expect(blocked.stderr).toContain('extension field');
     expect(blocked.stderr).toContain('rm extension');
   });
 
-  it('allows strategy change when no extensions exist', async () => {
+  it('allows disabling extensions when no extensions exist', async () => {
     const dir = tmpProject();
     await runLoom(['init', dir, '--system', 'shop', '--module', 'core', '--no-example']);
     await runLoom(['new', 'table', dir, 'shop.core.Items']);
     await runLoom(['new', 'entity', dir, 'shop.core.Item', '--table', 'table:shop.core.Items']);
     const r = await runLoom([
-      'update', 'table', dir, 'table:shop.core.Items', '--strategy', 'none',
+      'update',
+      'table',
+      dir,
+      'table:shop.core.Items',
+      '--extensible',
+      'false',
     ]);
     expect(r.exitCode).toBe(0);
   });

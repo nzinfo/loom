@@ -59,8 +59,7 @@ export async function projectAtlasCommand(opts: ProjectAtlasOptions): Promise<nu
     return 1;
   }
 
-  const projectOpts =
-    physicalSchemaOverrides.size > 0 ? physicalSchemaOverrides : undefined;
+  const projectOpts = physicalSchemaOverrides.size > 0 ? physicalSchemaOverrides : undefined;
   const model = expandTables(result.ir, projectOpts);
   const yaml = buildAtlasYaml(model, dialect);
   process.stdout.write(yaml);
@@ -254,11 +253,7 @@ function scalarToAtlasType(
 }
 
 /** Get the dialect-specific SQL type name (without kind wrapper). */
-function rawSqlName(
-  scalar: string,
-  props: Record<string, unknown>,
-  dialect: Dialect,
-): string {
+function rawSqlName(scalar: string, props: Record<string, unknown>, dialect: Dialect): string {
   return scalarToSql(scalar, props, dialect);
 }
 

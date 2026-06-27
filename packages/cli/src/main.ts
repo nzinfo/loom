@@ -19,6 +19,7 @@ import {
   orderFieldsCommand,
   rmFieldCommand,
 } from './commands/edit.js';
+import { fmtCommand } from './commands/fmt.js';
 import { initCommand } from './commands/init.js';
 import { listCommand } from './commands/list.js';
 import {
@@ -28,16 +29,15 @@ import {
   newTypeCommand,
 } from './commands/new.js';
 import { projectModelCommand, projectSqlCommand } from './commands/project.js';
-import { rmExtensionCommand, rmNodeCommand } from './commands/rm.js';
-import { updateTableCommand } from './commands/update.js';
 import { projectAtlasCommand } from './commands/project_atlas.js';
-import { fmtCommand } from './commands/fmt.js';
+import { rmExtensionCommand, rmNodeCommand } from './commands/rm.js';
 import {
   showEntityCommand,
   showGraphCommand,
   showTableCommand,
   showTypeCommand,
 } from './commands/show.js';
+import { updateTableCommand } from './commands/update.js';
 import { versionCommand } from './commands/version.js';
 import { extractFlags, parseFlag, parseFlagAll, parseGlobalFlags } from './shared/flags.js';
 import { writeError } from './shared/output.js';
@@ -66,7 +66,7 @@ commands:
   order fields <path> <target> <f1> <f2> ...
   rm <type|table|entity|extension> <path> [--entity <e>] [--group <g>] [--force]
   fmt [--check] <path>                              format schema files in place
-  update table <path> <identity> --strategy <none|sidecar_eav|json_column>
+  update table <path> <identity> --extensible <true|false>
 `);
 }
 
@@ -439,14 +439,21 @@ async function main(argv: string[]): Promise<number> {
         return 64;
       }
       const tail = rest.slice(1);
+      const extensibleFlag = parseFlag(tail, '--extensible').value;
       const strategyFlag = parseFlag(tail, '--strategy').value;
-      const positionals = tail.filter((a) => !a.startsWith('--') && a !== strategyFlag);
+      const flagValues = new Set([extensibleFlag, strategyFlag].filter((v) => v !== undefined));
+      const positionals = tail.filter((a) => !a.startsWith('--') && !flagValues.has(a));
       const [path, identity] = positionals;
       if (path === undefined || identity === undefined) {
-        writeError('update table requires <path> <identity> --strategy <s>');
+        writeError('update table requires <path> <identity> --extensible <true|false>');
         return 64;
       }
-      return await updateTableCommand({ path, identity, strategy: strategyFlag });
+      return await updateTableCommand({
+        path,
+        identity,
+        strategy: strategyFlag,
+        ...(extensibleFlag !== undefined ? { extensible: extensibleFlag } : {}),
+      });
     }
 
     default:

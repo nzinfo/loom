@@ -15,7 +15,9 @@ import { toYaml } from '../yaml/editor.js';
 function parseFqn(identity: string): { system: string; module: string; name: string } | undefined {
   const parts = identity.split('.');
   if (parts.length < 3) return undefined;
-  return { system: parts[0]!, module: parts[1]!, name: parts.slice(2).join('.') };
+  const [system, module, ...rest] = parts;
+  if (system === undefined || module === undefined) return undefined;
+  return { system, module, name: rest.join('.') };
 }
 
 // ── new type ─────────────────────────────────────────────────
@@ -95,7 +97,6 @@ export async function newTableCommand(opts: NewTableOptions): Promise<number> {
     name: fqn.name,
     table: {
       name: `${pascalToKebab(fqn.name)}_base`,
-      extension: { strategy: 'none' },
     },
     using: [`${fqn.system}.${fqn.module}.*`],
     fields: [{ name: 'id', type: 'bigint', required: true }],

@@ -154,8 +154,12 @@ describe('e2e: read commands', () => {
 
   it('project sql --physical-schema overrides schema name', async () => {
     const r = await runLoom([
-      'project', 'sql', '--dialect', 'pg',
-      '--physical-schema', 'shop.core=acme_shop',
+      'project',
+      'sql',
+      '--dialect',
+      'pg',
+      '--physical-schema',
+      'shop.core=acme_shop',
       productDir,
     ]);
     expect(r.exitCode).toBe(0);

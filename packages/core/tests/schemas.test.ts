@@ -186,9 +186,8 @@ constraints:
 name: Users
 table:
   name: users_base
-  extension:
-    strategy: sidecar_eav
-    ext_table: users_ext
+extensible: true
+default_ext_table: users_ext
 fields:
   - name: id
     type: bigint
@@ -197,7 +196,8 @@ primary_key: [id]
 `;
     const f = parseFile(src, 'platform/base/core/users.table.yaml', 'table');
     const t = TableSchema.parse((f as { raw: unknown }).raw);
-    expect(t.table.extension.strategy).toBe('sidecar_eav');
+    expect(t.extensible).toBe(true);
+    expect(t.default_ext_table).toBe('users_ext');
   });
 
   it('parses an entity referencing a primary_table', () => {

@@ -101,14 +101,11 @@ variants: [active, inactive]
 `,
     });
     const { ir } = await load({ fs, basePath: '' });
-	    const phys = expandTables(ir);
-	    expect(phys.enums.get('type:base.core.Status')).toEqual({
-	      carrier: 'string',
-	      variants: [
-	        { value: 'active' },
-	        { value: 'inactive' },
-	      ],
-	    });
+    const phys = expandTables(ir);
+    expect(phys.enums.get('type:base.core.Status')).toEqual({
+      carrier: 'string',
+      variants: [{ value: 'active' }, { value: 'inactive' }],
+    });
   });
 
   it('exposes extension_fields registry keyed by entity identity (spec §7.5)', async () => {
@@ -259,10 +256,7 @@ primary_key: [id]
     expect(statusCol?.enumRef).toBe('type:base.core.Status');
     expect(model.enums.get('type:base.core.Status')).toEqual({
       carrier: 'string',
-      variants: [
-        { value: 'active' },
-        { value: 'inactive' },
-      ],
+      variants: [{ value: 'active' }, { value: 'inactive' }],
     });
   });
 });

@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
 import { expandTables, load } from '@loom/core';
 import type { FileSystem } from '@loom/core';
+import { describe, expect, it } from 'vitest';
 import { projectModelJson } from '../src/commands/project_model.js';
 
 /** Minimal in-memory FileSystem for unit tests (mirrors core's fixture). */
@@ -86,10 +86,10 @@ describe('projectModelJson — enum serialization', () => {
     expect(status).toBeDefined();
 
     // values: plain string list (old consumers).
-    expect(status!.values).toEqual(['active', 'suspended', 'plain']);
+    expect(status?.values).toEqual(['active', 'suspended', 'plain']);
 
     // variants: objects with optional display_name/description.
-    expect(status!.variants).toEqual([
+    expect(status?.variants).toEqual([
       { value: 'active', display_name: 'Active' },
       { value: 'suspended', display_name: 'Suspended', description: 'account is frozen' },
       { value: 'plain' },
@@ -100,34 +100,33 @@ describe('projectModelJson — enum serialization', () => {
     const json = await buildModelJson('pg');
     const category = json.enums.find((e) => e.name === 'Category');
     expect(category).toBeDefined();
-    expect(category!.values).toEqual(['a', 'b']);
-    expect(category!.variants).toEqual([{ value: 'a' }, { value: 'b' }]);
+    expect(category?.values).toEqual(['a', 'b']);
+    expect(category?.variants).toEqual([{ value: 'a' }, { value: 'b' }]);
   });
 
   it('preserves the enum identity (for enumRef lookup) in JSON output', async () => {
     const json = await buildModelJson('mysql');
     const status = json.enums.find((e) => e.name === 'Status');
-    expect(status!.identity).toBe('type:base.core.Status');
+    expect(status?.identity).toBe('type:base.core.Status');
     // A column referencing this enum should carry the matching enumRef.
     const t = json.tables.find((tbl) => tbl.name === 't');
-    const statusCol = t!.columns.find((c) => c.name === 'status');
-    expect(statusCol!.enumRef).toBe('type:base.core.Status');
+    const statusCol = t?.columns.find((c) => c.name === 'status');
+    expect(statusCol?.enumRef).toBe('type:base.core.Status');
   });
 
   it('emits carrier field in enum output (default string)', async () => {
     const json = await buildModelJson('pg');
     const status = json.enums.find((e) => e.name === 'Status');
-    expect(status!.carrier).toBe('string');
+    expect(status?.carrier).toBe('string');
     const category = json.enums.find((e) => e.name === 'Category');
-    expect(category!.carrier).toBe('string');
+    expect(category?.carrier).toBe('string');
   });
 
   it('is consistent across dialects (enum shape does not depend on dialect)', async () => {
     const pg = await buildModelJson('pg');
     const mysql = await buildModelJson('mysql');
     const sqlite = await buildModelJson('sqlite');
-    const pick = (j: typeof pg) =>
-      j.enums.find((e) => e.name === 'Status')!.variants;
+    const pick = (j: typeof pg) => j.enums.find((e) => e.name === 'Status')?.variants;
     expect(pick(pg)).toEqual(pick(mysql));
     expect(pick(pg)).toEqual(pick(sqlite));
   });

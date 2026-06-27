@@ -106,7 +106,10 @@ export function findPositionByValue(text: string, fieldName: string): Position |
     const itemGet = (item as { get?: (key: string, keep?: boolean) => unknown }).get;
     if (!itemGet) continue;
     const nameNode = itemGet.call(item, 'name', true);
-    if (nameNode && String((nameNode as { toJSON?: () => unknown }).toJSON?.() ?? nameNode) === fieldName) {
+    if (
+      nameNode &&
+      String((nameNode as { toJSON?: () => unknown }).toJSON?.() ?? nameNode) === fieldName
+    ) {
       const range = (item as { range?: [number, number, number] }).range;
       if (range && range.length >= 1) {
         return offsetToPosition(text, range[0]);

@@ -111,6 +111,15 @@ export interface ExtensionFieldEntry {
   /** Owner that declared this field (platform / ext:provider / tenant:id),
    * derived from the .ext.yaml file's directory path. */
   readonly owner: Owner;
+  /** Extension strategy: how this ext stores its data physically.
+   * See design doc: 2026-06-24-ext-strategy-decoupling.md */
+  readonly strategy: 'sidecar_jsonb' | 'new_table';
+  /** Physical table name for this ext. For new_table: the ext's own table.
+   * For sidecar_jsonb: the resolved ext table name (ext-declared / table default / auto-derived). */
+  readonly tableName: string;
+  /** xxHash64 of `baseTableIdentity:ownerKey:group`, hex string.
+   * Only meaningful for sidecar_jsonb (distinguishes rows in shared ext tables). */
+  readonly sourceHash?: string;
   /** Original YAML source text of the .ext.yaml file (for position tracking). */
   readonly sourceText?: string;
 }
